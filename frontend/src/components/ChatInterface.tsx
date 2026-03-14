@@ -243,7 +243,7 @@ export function ChatInterface() {
       {/* Top Bar */}
       <div className="absolute top-0 left-0 w-full px-6 py-4 z-10 flex justify-between items-center">
         <Popover open={modelOpen} onOpenChange={setModelOpen}>
-          <PopoverTrigger className="w-[200px] flex justify-between items-center bg-white/80 backdrop-blur-sm border border-zinc-200 rounded-md px-3 py-2 text-sm hover:bg-zinc-50 hover:text-zinc-900 text-zinc-700 font-medium shadow-sm transition-all">
+          <PopoverTrigger className="w-[200px] flex justify-between items-center bg-white/80 backdrop-blur-sm rounded-md px-3 py-2 text-sm hover:bg-zinc-50 hover:text-zinc-900 text-zinc-700 font-medium transition-all outline-none border-none shadow-none ring-0">
               {currentModel ? (currentModel.name || currentModel.model) : "选择模型..."}
               <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </PopoverTrigger>
