@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+import { useLocation } from "react-router-dom";
 
 interface Message {
   id: string;
@@ -26,25 +27,63 @@ interface ModelConfig {
   is_active: boolean;
 }
 
+interface SessionData {
+  key: string;
+  messages: Array<{
+    role: string;
+    content: string;
+    [key: string]: any;
+  }>;
+}
+
 export function ChatInterface() {
-  const [messages, setMessages] = useState<Message[]>([
-    { id: '1', role: 'assistant', content: 'Hello! I am DataClaw. How can I help you analyze your data today?' }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [selectedCapability, setSelectedCapability] = useState<string>("智能问答");
   const selectedDataSource = "postgres-main";
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { setVisualization, setLoading: setVizLoading, setError: setVizError } = useVisualizationStore();
+  const location = useLocation();
   
   // Model selection state
   const [models, setModels] = useState<ModelConfig[]>([]);
   const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [modelOpen, setModelOpen] = useState(false);
 
+  // Try to parse active session from URL query
+  const queryParams = new URLSearchParams(location.search);
+  const activeSessionKey = queryParams.get("session") || "api:default";
+
   useEffect(() => {
     fetchModels();
   }, []);
+
+  useEffect(() => {
+    const fetchSessionData = async () => {
+      setIsLoading(true);
+      try {
+        const data = await api.get<SessionData>(`/nanobot/sessions/${activeSessionKey}`);
+        if (data.messages && data.messages.length > 0) {
+          const formattedMessages = data.messages.map((m, idx) => ({
+            id: `${Date.now()}-${idx}`,
+            role: m.role as 'user' | 'assistant',
+            content: m.content
+          }));
+          setMessages(formattedMessages);
+        } else {
+          setMessages([]);
+        }
+      } catch (e) {
+        console.error("Failed to fetch session messages", e);
+        setMessages([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchSessionData();
+  }, [activeSessionKey]);
 
   const fetchModels = async () => {
     try {
@@ -103,9 +142,10 @@ export function ChatInterface() {
              ...(token ? { Authorization: `Bearer ${token}` } : {}),
            },
            body: JSON.stringify({
-             message: newMessage.content,
-             model_id: selectedModelId,
-           }),
+               message: newMessage.content,
+               session_id: activeSessionKey,
+               model_id: selectedModelId,
+             }),
          });
 
          if (!response.ok || !response.body) {
@@ -163,6 +203,7 @@ export function ChatInterface() {
          const response = await api.post<{sql?: string, result?: unknown, error?: string}>('/api/v1/agent/nl2sql', {
             query: newMessage.content,
             source: source,
+            session_id: activeSessionKey,
             model_id: selectedModelId 
          });
 

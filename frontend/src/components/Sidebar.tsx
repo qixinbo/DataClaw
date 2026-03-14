@@ -1,21 +1,40 @@
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Menu, LayoutDashboard, Plus, MoreVertical, User, Search, Wrench, Settings, Brain } from "lucide-react";
+import { Menu, LayoutDashboard, Plus, MoreVertical, User, Search, Wrench, Settings, Brain, Trash2, Pencil } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
+import { api } from "@/lib/api";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
-const threadItems = ["我叫", "年龄最大的是谁", "有哪些字段", "文件中有些什么字段"];
+interface SessionInfo {
+  key: string;
+  created_at: string;
+  updated_at: string;
+  metadata?: {
+    title?: string;
+  };
+}
 
 function Section({
   title,
   count,
   items,
+  onSelect,
+  onDelete,
+  onRename,
+  activeKey
 }: {
   title: string;
   count: number;
-  items: string[];
+  items: SessionInfo[];
+  onSelect: (key: string) => void;
+  onDelete: (key: string) => void;
+  onRename: (key: string, currentTitle: string) => void;
+  activeKey: string | null;
 }) {
   return (
     <div className="px-3 pt-6">
@@ -26,15 +45,38 @@ function Section({
         </div>
       </div>
       <div className="space-y-0.5 mt-2">
-        {items.map((item) => (
-          <button
-            key={item}
-            className="w-full h-9 px-2 text-left rounded-md text-[14px] text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 flex items-center justify-between group transition-colors"
-          >
-            <span className="truncate pr-2">{item}</span>
-            <MoreVertical className="h-4 w-4 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-          </button>
-        ))}
+        {items.map((item) => {
+          const displayTitle = item.metadata?.title || item.key.replace("api:", "");
+          const isActive = activeKey === item.key;
+          
+          return (
+            <div
+              key={item.key}
+              className={`w-full h-9 px-2 text-left rounded-md text-[14px] flex items-center justify-between group transition-colors cursor-pointer ${
+                isActive ? 'bg-zinc-100 text-zinc-900 font-medium' : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'
+              }`}
+              onClick={() => onSelect(item.key)}
+            >
+              <span className="truncate pr-2 flex-1">{displayTitle}</span>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger onClick={(e) => e.stopPropagation()} className="h-6 w-6 flex items-center justify-center rounded hover:bg-zinc-200 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity outline-none">
+                  <MoreVertical className="h-4 w-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-32">
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onRename(item.key, displayTitle); }}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    <span>重命名</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(item.key); }} className="text-red-600 focus:text-red-600 focus:bg-red-50">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    <span>删除会话</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -42,9 +84,36 @@ function Section({
 
 function SidebarBody() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuthStore();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  
+  // Session management state
+  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [sessionToRename, setSessionToRename] = useState<{key: string, title: string} | null>(null);
+  const [newTitle, setNewTitle] = useState("");
+  
+  // Try to parse active session from URL query
+  const queryParams = new URLSearchParams(location.search);
+  const activeSessionKey = queryParams.get("session") || "api:default";
+
+  const fetchSessions = async () => {
+    try {
+      const data = await api.get<SessionInfo[]>("/nanobot/sessions");
+      setSessions(data);
+    } catch (e) {
+      console.error("Failed to fetch sessions", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchSessions();
+    // Set up polling to refresh session list
+    const interval = setInterval(fetchSessions, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -59,6 +128,45 @@ function SidebarBody() {
   const handleLogout = () => {
     logout();
     navigate("/login");
+  };
+
+  const handleSelectSession = (key: string) => {
+    navigate(`/?session=${encodeURIComponent(key)}`);
+  };
+
+  const handleNewThread = () => {
+    const newSessionId = `api:${Date.now()}`;
+    navigate(`/?session=${encodeURIComponent(newSessionId)}`);
+  };
+
+  const handleDeleteSession = async (key: string) => {
+    if (!window.confirm("确定要删除这个会话吗？")) return;
+    try {
+      await api.delete(`/nanobot/sessions/${key}`);
+      if (activeSessionKey === key) {
+        navigate("/");
+      }
+      fetchSessions();
+    } catch (e) {
+      console.error("Failed to delete session", e);
+    }
+  };
+
+  const openRenameDialog = (key: string, currentTitle: string) => {
+    setSessionToRename({ key, title: currentTitle });
+    setNewTitle(currentTitle);
+    setRenameDialogOpen(true);
+  };
+
+  const handleRename = async () => {
+    if (!sessionToRename || !newTitle.trim()) return;
+    try {
+      await api.put(`/nanobot/sessions/${sessionToRename.key}`, { title: newTitle.trim() });
+      setRenameDialogOpen(false);
+      fetchSessions();
+    } catch (e) {
+      console.error("Failed to rename session", e);
+    }
   };
 
   return (
@@ -91,7 +199,7 @@ function SidebarBody() {
         <Button 
           variant="outline" 
           className="w-full justify-start h-10 px-3 rounded-lg border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-600 shadow-sm font-medium"
-          onClick={() => navigate("/")}
+          onClick={handleNewThread}
         >
           <Plus className="h-4 w-4 mr-2" />
           New Thread
@@ -99,8 +207,41 @@ function SidebarBody() {
       </div>
 
       <ScrollArea className="flex-1">
-        <Section title="THREADS" count={threadItems.length} items={threadItems} />
+        <Section 
+          title="THREADS" 
+          count={sessions.length} 
+          items={sessions} 
+          onSelect={handleSelectSession}
+          onDelete={handleDeleteSession}
+          onRename={openRenameDialog}
+          activeKey={activeSessionKey}
+        />
       </ScrollArea>
+
+      <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>重命名会话</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Input 
+              value={newTitle} 
+              onChange={(e) => setNewTitle(e.target.value)} 
+              placeholder="输入新的会话标题" 
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleRename();
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>取消</Button>
+            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleRename}>保存</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="p-4 border-t border-zinc-200 mt-auto relative" ref={menuRef}>
         <div className="flex items-center justify-between text-zinc-600">

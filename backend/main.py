@@ -70,6 +70,7 @@ def nanobot_status():
 
 class ChatRequest(BaseModel):
     message: str
+    session_id: str = "api:default"
     skill_ids: Optional[List[str]] = None
     model_id: Optional[str] = None
 
@@ -87,6 +88,7 @@ async def nanobot_chat_stream(request: ChatRequest):
         try:
             response = await nanobot_service.process_message(
                 request.message,
+                session_id=request.session_id,
                 skill_ids=request.skill_ids,
                 model_id=request.model_id,
             )
@@ -109,6 +111,52 @@ async def nanobot_chat_stream(request: ChatRequest):
             "X-Accel-Buffering": "no",
         },
     )
+
+@app.get("/nanobot/sessions")
+def get_sessions():
+    if not nanobot_service.agent:
+        return []
+    # session_manager has list_sessions()
+    sessions = nanobot_service.agent.sessions.list_sessions()
+    return sessions
+
+@app.get("/nanobot/sessions/{session_id}")
+def get_session(session_id: str):
+    if not nanobot_service.agent:
+        raise HTTPException(status_code=400, detail="Nanobot not running")
+    session = nanobot_service.agent.sessions.get_or_create(session_id)
+    return {
+        "key": session.key,
+        "created_at": session.created_at,
+        "updated_at": session.updated_at,
+        "metadata": session.metadata,
+        "messages": session.messages
+    }
+
+@app.delete("/nanobot/sessions/{session_id}")
+def delete_session(session_id: str):
+    if not nanobot_service.agent:
+        raise HTTPException(status_code=400, detail="Nanobot not running")
+    
+    # Try to remove from cache and delete file
+    session = nanobot_service.agent.sessions.get_or_create(session_id)
+    if session:
+        nanobot_service.agent.sessions.invalidate(session_id)
+        path = nanobot_service.agent.sessions._get_session_path(session_id)
+        if path.exists():
+            path.unlink()
+        return {"status": "success"}
+    raise HTTPException(status_code=404, detail="Session not found")
+
+@app.put("/nanobot/sessions/{session_id}")
+def update_session(session_id: str, title: str = Body(..., embed=True)):
+    if not nanobot_service.agent:
+        raise HTTPException(status_code=400, detail="Nanobot not running")
+    
+    session = nanobot_service.agent.sessions.get_or_create(session_id)
+    session.metadata["title"] = title
+    nanobot_service.agent.sessions.save(session)
+    return {"status": "success", "title": title}
 
 @app.post("/api/v1/agent/nl2sql", response_model=NL2SQLResponse)
 async def run_nl2sql(request: NL2SQLRequest):
