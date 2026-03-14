@@ -28,7 +28,7 @@ export function ChatInterface() {
     { id: '1', role: 'assistant', content: 'Hello! I am DataClaw. How can I help you analyze your data today?' }
   ]);
   const [input, setInput] = useState("");
-  const selectedSkill = "sql-generator";
+  const [selectedCapability, setSelectedCapability] = useState<string>("智能问答");
   const selectedDataSource = "postgres-main";
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -84,13 +84,83 @@ export function ChatInterface() {
     setVizError(null);
     
     try {
-      if (selectedSkill === 'sql-generator' || selectedSkill === 'chart-creator') {
-         // Use NL2SQL agent
+      if (selectedCapability === "智能问答") {
+         const assistantId = (Date.now() + 1).toString();
+         setMessages(prev => [...prev, {
+            id: assistantId,
+            role: "assistant",
+            content: ""
+         }]);
+
+         const token = localStorage.getItem("token");
+         const response = await fetch("/nanobot/chat/stream", {
+           method: "POST",
+           headers: {
+             "Content-Type": "application/json",
+             ...(token ? { Authorization: `Bearer ${token}` } : {}),
+           },
+           body: JSON.stringify({
+             message: newMessage.content,
+             model_id: selectedModelId,
+           }),
+         });
+
+         if (!response.ok || !response.body) {
+           const err = await response.json().catch(() => ({}));
+           throw new Error(err.detail || "流式响应失败");
+         }
+
+         const reader = response.body.getReader();
+         const decoder = new TextDecoder("utf-8");
+         let buffer = "";
+         let streamedText = "";
+
+         while (true) {
+           const { done, value } = await reader.read();
+           if (done) break;
+           buffer += decoder.decode(value, { stream: true });
+           const events = buffer.split("\n\n");
+           buffer = events.pop() || "";
+
+           for (const eventBlock of events) {
+             const line = eventBlock
+               .split("\n")
+               .find((item) => item.startsWith("data:"));
+             if (!line) continue;
+             const payloadText = line.slice(5).trim();
+             if (!payloadText) continue;
+             const payload = JSON.parse(payloadText) as { type: string; content?: string };
+
+             if (payload.type === "delta" && payload.content) {
+               streamedText = streamedText ? `${streamedText}\n${payload.content}` : payload.content;
+               setMessages((prev) =>
+                 prev.map((msg) =>
+                   msg.id === assistantId ? { ...msg, content: streamedText } : msg
+                 )
+               );
+             }
+
+             if (payload.type === "final" && payload.content) {
+               streamedText = payload.content;
+               setMessages((prev) =>
+                 prev.map((msg) =>
+                   msg.id === assistantId ? { ...msg, content: payload.content || "" } : msg
+                 )
+               );
+             }
+
+             if (payload.type === "error") {
+               throw new Error(payload.content || "流式响应错误");
+             }
+           }
+         }
+      } else {
+         // Fallback to existing NL2SQL or other skills (e.g. for "表格问答" or "深度问数")
          const source = selectedDataSource.split('-')[0]; // postgres-main -> postgres
          const response = await api.post<{sql?: string, result?: unknown, error?: string}>('/api/v1/agent/nl2sql', {
             query: newMessage.content,
             source: source,
-            model_id: selectedModelId // Pass selected model ID if backend supports it
+            model_id: selectedModelId 
          });
 
          if (response.error) {
@@ -110,20 +180,6 @@ export function ChatInterface() {
             }]);
             setVisualization(rows, sql);
          }
-
-      } else {
-         // General Chat
-         const response = await api.post<{response: string}>('/nanobot/chat', {
-             message: newMessage.content,
-             skill_ids: [selectedSkill],
-             model_id: selectedModelId 
-         });
-         
-         setMessages(prev => [...prev, { 
-            id: (Date.now() + 1).toString(), 
-            role: 'assistant', 
-            content: response.response 
-         }]);
       }
     } catch (error: any) {
         setMessages(prev => [...prev, { 
@@ -218,7 +274,12 @@ export function ChatInterface() {
                       {capabilities.map((cap) => (
                         <button
                           key={cap.label}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${cap.bg} ${cap.color} hover:opacity-80`}
+                          onClick={() => setSelectedCapability(cap.label)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                            selectedCapability === cap.label 
+                              ? `${cap.bg} ${cap.color} ring-1 ring-${cap.color.split('-')[1]}-200 shadow-sm` 
+                              : 'bg-zinc-50 text-zinc-500 hover:bg-zinc-100'
+                          }`}
                         >
                           <cap.icon className="h-3.5 w-3.5" />
                           {cap.label}

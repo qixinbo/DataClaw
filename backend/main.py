@@ -1,8 +1,10 @@
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Body
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import asyncio
+import json
 
 from app.api import upload, llm, skills, users
 from app.connectors.postgres import postgres_connector
@@ -69,14 +71,58 @@ def nanobot_status():
 class ChatRequest(BaseModel):
     message: str
     skill_ids: Optional[List[str]] = None
+    model_id: Optional[str] = None
 
 @app.post("/nanobot/chat")
 async def nanobot_chat(request: ChatRequest):
     try:
-        response = await nanobot_service.process_message(request.message, skill_ids=request.skill_ids)
+        response = await nanobot_service.process_message(request.message, skill_ids=request.skill_ids, model_id=request.model_id)
         return {"response": response}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/nanobot/chat/stream")
+async def nanobot_chat_stream(request: ChatRequest):
+    async def event_generator():
+        queue: asyncio.Queue[dict] = asyncio.Queue()
+
+        async def on_progress(content: str):
+            await queue.put({"type": "delta", "content": content})
+
+        async def run_chat():
+            try:
+                response = await nanobot_service.process_message(
+                    request.message,
+                    skill_ids=request.skill_ids,
+                    model_id=request.model_id,
+                    on_progress=on_progress,
+                )
+                await queue.put({"type": "final", "content": response})
+            except Exception as e:
+                await queue.put({"type": "error", "content": str(e)})
+            finally:
+                await queue.put({"type": "done"})
+
+        task = asyncio.create_task(run_chat())
+        try:
+            while True:
+                event = await queue.get()
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                if event.get("type") == "done":
+                    break
+        finally:
+            if not task.done():
+                task.cancel()
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 @app.post("/api/v1/agent/nl2sql", response_model=NL2SQLResponse)
 async def run_nl2sql(request: NL2SQLRequest):

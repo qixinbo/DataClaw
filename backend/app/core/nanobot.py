@@ -2,7 +2,7 @@ import asyncio
 import sys
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Callable, Awaitable
 
 # Add project root to sys.path to allow importing nanobot
 # Assuming backend/app/core/nanobot.py -> backend/app/core -> backend/app -> backend -> root
@@ -40,12 +40,24 @@ class NanobotIntegration:
         self.config: Config | None = None
 
     def initialize(self):
+        # Set workspace path to backend/data/workspace
+        workspace_path = Path(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "workspace"))
+        workspace_path.mkdir(parents=True, exist_ok=True)
+        
+        # Override config workspace path via environment variable (since config is loaded from env)
+        os.environ["NANOBOT_AGENTS__DEFAULTS__WORKSPACE"] = str(workspace_path)
+        
         self.config = load_config()
+        # No need to set self.config.workspace_path as it's a property that reads from agents.defaults.workspace
+        
         self.bus = MessageBus()
         provider = self._make_provider(self.config)
         
-        cron_store_path = get_cron_dir() / "jobs.json"
-        self.cron = CronService(cron_store_path)
+        cron_store_path = workspace_path / "cron"
+        cron_store_path.mkdir(parents=True, exist_ok=True)
+        cron_store_file = cron_store_path / "jobs.json"
+        
+        self.cron = CronService(cron_store_file)
         
         session_manager = SessionManager(self.config.workspace_path)
 
@@ -75,6 +87,24 @@ class NanobotIntegration:
         provider_name = config.get_provider_name(model)
         p = config.get_provider(model)
 
+        # Check if model is using an ID from our database configuration
+        # This requires accessing the database or a cache of LLM configs
+        # Since we are inside NanobotIntegration, we can try to load from the JSON file directly for simplicity
+        # or rely on the caller to have injected the right config if they used environment variables.
+        # But here we need to support dynamic loading based on the `model` string if it matches a stored config ID.
+        
+        # However, typically the `model` passed here comes from `config.agents.defaults.model`.
+        # If we want to support dynamic switching per request, we should look at `agent.process_direct` arguments.
+        # The `AgentLoop` initializes with a provider, but `LiteLLMProvider` might be able to handle dynamic models if we pass them.
+        # BUT `LiteLLMProvider` is initialized with a specific `default_model`.
+        
+        # To support per-request model changes, we need to ensure the `provider` object or the `agent` can accept a model override.
+        # `AgentLoop` methods like `process_direct` don't typically take a `model` argument to override the provider's default.
+        # We might need to reinstantiate the provider or use a "DynamicProvider" that delegates based on context.
+        
+        # For now, let's assume standard initialization. 
+        # If the user provides a `model_id` in `process_message`, we will handle it there by creating a temporary provider/agent or updating the current one.
+        
         if provider_name == "openai_codex" or model.startswith("openai-codex/"):
             return OpenAICodexProvider(default_model=model)
 
@@ -120,11 +150,98 @@ class NanobotIntegration:
         if self.cron:
             self.cron.stop()
 
-    async def process_message(self, message: str, session_id: str = "api:default", skill_ids: List[str] | None = None):
+    async def process_message(
+        self,
+        message: str,
+        session_id: str = "api:default",
+        skill_ids: List[str] | None = None,
+        model_id: str | None = None,
+        on_progress: Callable[[str], Awaitable[None]] | None = None,
+    ):
         if not self.agent:
             self.initialize()
             await self.start()
             
+        # Handle dynamic model switching
+        # If model_id is provided, we need to fetch its config and create a temporary provider
+        # or update the current agent's provider context for this request.
+        # Since AgentLoop is stateful and tied to a provider, and we want to avoid recreating the whole agent for every request if possible,
+        # but changing the provider/model is a significant change.
+        #
+        # A simpler approach for this "stateless API" usage pattern:
+        # We can instantiate a lightweight version of the agent or provider just for this request if the model differs.
+        # OR, since we are using `process_direct`, we can check if `AgentLoop` supports overriding the model.
+        # Looking at `nanobot/agent/loop.py` (assumed), it uses `self.provider.completion(...)`.
+        
+        # Strategy: 
+        # 1. Load the model config from our JSON file using `model_id`.
+        # 2. Construct a temporary provider instance for this model.
+        # 3. Inject this provider into the agent for this request OR (cleaner) instantiate a temporary agent.
+        #    Instantiating a whole AgentLoop might be heavy due to MCP/Cron etc.
+        #    BUT `process_direct` is relatively isolated.
+        #
+        # Let's try to fetch the config first.
+        current_provider = self.agent.provider
+        temp_provider = None
+        
+        if model_id:
+            from app.api.llm import _load_data
+            llm_configs = _load_data()
+            target_config = next((item for item in llm_configs if item["id"] == model_id), None)
+            
+            if target_config:
+                # Map our DB config to Nanobot Provider
+                # We reuse LiteLLMProvider for most cases as it is generic
+                
+                # Construct kwargs for LiteLLMProvider
+                provider_name = target_config["provider"]
+                model_name = target_config["model"]
+                
+                # Handle special case where provider might need to be part of model name for LiteLLM if not standard
+                # But LiteLLMProvider handles `provider_name` arg.
+                
+                temp_provider = LiteLLMProvider(
+                    api_key=target_config.get("api_key"),
+                    api_base=target_config.get("api_base"),
+                    default_model=model_name,
+                    extra_headers=target_config.get("extra_headers"),
+                    provider_name=provider_name
+                )
+        
+        # If we created a temp provider, we need to use it.
+        # Since AgentLoop binds the provider, we might need to swap it temporarily or create a new AgentLoop.
+        # Swapping is risky for concurrency.
+        # Creating a new AgentLoop is safer but heavier.
+        #
+        # Optimization: If we are just doing a single turn chat (process_direct), maybe we can just use the provider directly?
+        # But we want the Agent's reasoning loop (ReAct / tools).
+        #
+        # Let's try creating a temporary AgentLoop sharing the same components (bus, tools) but different provider.
+        
+        agent_to_use = self.agent
+        if temp_provider:
+            # Shallow copy or new instance
+            # We need to pass all dependencies.
+            agent_to_use = AgentLoop(
+                bus=self.bus,
+                provider=temp_provider,
+                workspace=self.config.workspace_path,
+                model=temp_provider.default_model,
+                temperature=self.config.agents.defaults.temperature,
+                max_tokens=self.config.agents.defaults.max_tokens,
+                max_iterations=self.config.agents.defaults.max_tool_iterations,
+                memory_window=self.config.agents.defaults.memory_window,
+                reasoning_effort=self.config.agents.defaults.reasoning_effort,
+                brave_api_key=self.config.tools.web.search.api_key or None,
+                web_proxy=self.config.tools.web.proxy or None,
+                exec_config=self.config.tools.exec,
+                cron_service=self.cron,
+                restrict_to_workspace=self.config.tools.restrict_to_workspace,
+                session_manager=self.agent.sessions,
+                mcp_servers=self.config.tools.mcp_servers,
+                channels_config=self.config.channels,
+            )
+
         full_message = message
         if skill_ids:
             skills = load_skills()
@@ -138,11 +255,12 @@ class NanobotIntegration:
                 # Append user message after skills
                 full_message = f"{skill_context}\n\n{message}"
 
-        response = await self.agent.process_direct(
+        response = await agent_to_use.process_direct(
             full_message,
             session_key=session_id,
             channel="api",
-            chat_id=session_id
+            chat_id=session_id,
+            on_progress=on_progress,
         )
         return response
 
