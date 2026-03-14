@@ -156,6 +156,7 @@ function SidebarBody() {
   
   // Session management state
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [sessionFilter, setSessionFilter] = useState("");
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [sessionToRename, setSessionToRename] = useState<{key: string, title: string} | null>(null);
   const [newTitle, setNewTitle] = useState("");
@@ -298,8 +299,19 @@ function SidebarBody() {
     }
   };
 
-  const activeSessions = sessions.filter((item) => !item.archived);
-  const archivedSessions = sessions.filter((item) => !!item.archived);
+  const normalizedFilter = sessionFilter.trim().toLowerCase();
+  const activeSessions = sessions.filter((item) => {
+    if (item.archived) return false;
+    if (!normalizedFilter) return true;
+    const title = (item.metadata?.title || item.key.replace("api:", "")).toLowerCase();
+    return title.includes(normalizedFilter);
+  });
+  const archivedSessions = sessions.filter((item) => {
+    if (!item.archived) return false;
+    if (!normalizedFilter) return true;
+    const title = (item.metadata?.title || item.key.replace("api:", "")).toLowerCase();
+    return title.includes(normalizedFilter);
+  });
 
   return (
     <div className="h-full flex flex-col bg-zinc-50/30 border-r border-zinc-200 relative">
@@ -311,11 +323,7 @@ function SidebarBody() {
             龙虾问数
           </span>
         </Link>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-600">
-            <Search className="h-4.5 w-4.5" />
-          </Button>
-        </div>
+        <div className="w-8" />
       </div>
 
       <div className="px-3 pt-4 space-y-2">
@@ -339,6 +347,17 @@ function SidebarBody() {
       </div>
 
       <ScrollArea className="flex-1">
+        <div className="px-3 pt-4">
+          <div className="relative">
+            <Search className="h-4 w-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Input
+              value={sessionFilter}
+              onChange={(e) => setSessionFilter(e.target.value)}
+              placeholder="过滤会话名称"
+              className="pl-9 h-9 border-zinc-200 bg-white"
+            />
+          </div>
+        </div>
         <Section 
           title="THREADS" 
           count={activeSessions.length} 
