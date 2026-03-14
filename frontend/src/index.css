@@ -1,5 +1,6 @@
 @import "@fontsource-variable/geist";
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 /* @plugin "tw-animate-css"; */
 

@@ -8,6 +8,9 @@ import { useVisualizationStore } from "@/store/visualizationStore";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 
 interface Message {
   id: string;
@@ -238,7 +241,7 @@ export function ChatInterface() {
         </Popover>
       </div>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 h-[calc(100vh-100px)]">
 
         <div className="min-h-full">
           {messages.length <= 1 ? (
@@ -309,7 +312,7 @@ export function ChatInterface() {
               </div>
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto py-8 px-4 pb-32 space-y-8">
+            <div className="max-w-3xl mx-auto pt-24 px-4 pb-48 space-y-8">
               {messages.map((msg) => (
                 <div
                   key={msg.id}
@@ -324,10 +327,18 @@ export function ChatInterface() {
                     className={`rounded-2xl px-5 py-3.5 text-[15px] leading-relaxed max-w-[85%] shadow-sm ${
                       msg.role === "user"
                         ? "bg-zinc-100 text-zinc-800"
-                        : "bg-white border border-zinc-100 text-zinc-700"
+                        : "bg-white border border-zinc-100 text-zinc-700 overflow-hidden"
                     }`}
                   >
-                    {msg.content}
+                    {msg.role === "assistant" ? (
+                      <div className="prose prose-sm prose-zinc max-w-none prose-p:leading-normal prose-p:my-2 prose-headings:my-3 prose-ul:my-2 prose-li:my-0.5 prose-pre:bg-zinc-50 prose-pre:text-zinc-800 prose-pre:border prose-pre:border-zinc-200">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      msg.content
+                    )}
                   </div>
                   {msg.role === "user" && (
                     <div className="w-8 h-8 rounded-full bg-zinc-200 flex items-center justify-center text-zinc-500 shrink-0 mt-1">
