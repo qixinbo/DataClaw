@@ -6,6 +6,7 @@ import { Skills } from "./pages/Skills";
 import { Settings } from "./pages/Settings";
 import { Users } from "./pages/Users";
 import { Login } from "./pages/Login";
+import { ModelConfigs } from "./pages/ModelConfigs";
 import { useAuthStore } from "./store/authStore";
 
 // Protected Route Component
@@ -79,6 +80,14 @@ function App() {
           <ProtectedRoute requireAdmin={true}>
             <MainLayout>
               <Users />
+            </MainLayout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/model-configs" element={
+          <ProtectedRoute>
+            <MainLayout>
+              <ModelConfigs />
             </MainLayout>
           </ProtectedRoute>
         } />

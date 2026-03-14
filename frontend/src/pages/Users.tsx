@@ -87,7 +87,7 @@ export function Users() {
       } else {
         // Create
         if (!formData.password) {
-          setError("Password is required for new users");
+          setError("新建用户必须填写密码");
           return;
         }
         await api.post("/api/v1/users", formData);
@@ -95,12 +95,12 @@ export function Users() {
       setIsDialogOpen(false);
       fetchUsers();
     } catch (err: any) {
-      setError(err.message || "An error occurred");
+      setError(err.message || "发生错误");
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (window.confirm("Are you sure you want to delete this user?")) {
+    if (window.confirm("确认删除该用户吗？")) {
       try {
         await api.delete(`/api/v1/users/${id}`);
         fetchUsers();
@@ -115,22 +115,22 @@ export function Users() {
       <div className="h-14 px-6 flex items-center justify-between border-b border-zinc-100 bg-white">
         <div className="flex items-center gap-2 text-zinc-700 font-medium">
           <UsersIcon className="h-5 w-5 text-indigo-500" />
-          User Management
+          用户管理
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-8 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md px-3" onClick={() => handleOpenDialog()}>
             <Plus className="h-4 w-4" />
-            Add User
+            添加用户
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]">
             <form onSubmit={handleSubmit}>
               <DialogHeader>
-                <DialogTitle>{editingUser ? "Edit User" : "Add New User"}</DialogTitle>
+                <DialogTitle>{editingUser ? "编辑用户" : "添加新用户"}</DialogTitle>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 {error && <div className="text-red-500 text-sm">{error}</div>}
                 <div className="grid gap-2">
-                  <Label htmlFor="username">Username</Label>
+                  <Label htmlFor="username">用户名</Label>
                   <Input
                     id="username"
                     value={formData.username}
@@ -139,7 +139,7 @@ export function Users() {
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">邮箱</Label>
                   <Input
                     id="email"
                     type="email"
@@ -150,7 +150,7 @@ export function Users() {
                 </div>
                 {!editingUser && (
                   <div className="grid gap-2">
-                    <Label htmlFor="password">Password</Label>
+                    <Label htmlFor="password">密码</Label>
                     <Input
                       id="password"
                       type="password"
@@ -161,7 +161,7 @@ export function Users() {
                   </div>
                 )}
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="is_active">Active</Label>
+                  <Label htmlFor="is_active">激活状态</Label>
                   <Switch
                     id="is_active"
                     checked={formData.is_active}
@@ -169,7 +169,7 @@ export function Users() {
                   />
                 </div>
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="is_admin">Admin</Label>
+                  <Label htmlFor="is_admin">管理员权限</Label>
                   <Switch
                     id="is_admin"
                     checked={formData.is_admin}
@@ -179,10 +179,10 @@ export function Users() {
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
+                  取消
                 </Button>
                 <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                  Save
+                  保存
                 </Button>
               </DialogFooter>
             </form>
@@ -201,19 +201,19 @@ export function Users() {
               <TableHeader>
                 <TableRow>
                   <TableHead>ID</TableHead>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Created At</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>用户名</TableHead>
+                  <TableHead>邮箱</TableHead>
+                  <TableHead>状态</TableHead>
+                  <TableHead>角色</TableHead>
+                  <TableHead>创建时间</TableHead>
+                  <TableHead className="text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {users.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center h-24 text-zinc-500">
-                      No users found.
+                      暂无用户数据
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -224,12 +224,12 @@ export function Users() {
                       <TableCell>{user.email}</TableCell>
                       <TableCell>
                         <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${user.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-600'}`}>
-                          {user.is_active ? 'Active' : 'Inactive'}
+                          {user.is_active ? '正常' : '禁用'}
                         </span>
                       </TableCell>
                       <TableCell>
                         <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${user.is_admin ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                          {user.is_admin ? 'Admin' : 'User'}
+                          {user.is_admin ? '管理员' : '普通用户'}
                         </span>
                       </TableCell>
                       <TableCell className="text-zinc-500">

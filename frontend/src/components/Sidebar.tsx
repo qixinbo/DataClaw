@@ -1,7 +1,7 @@
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Menu, LayoutDashboard, Plus, MoreVertical, User, Search, Wrench, Settings } from "lucide-react";
+import { Menu, LayoutDashboard, Plus, MoreVertical, User, Search, Wrench, Settings, Brain } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
@@ -138,20 +138,33 @@ function SidebarBody() {
               }}
             >
               <Settings className="h-4 w-4 text-zinc-500" />
-              Settings
+              个人设置
             </button>
-            
+
             {user?.is_admin && (
-              <button 
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50 transition-colors"
-                onClick={() => {
-                  navigate("/users");
-                  setShowUserMenu(false);
-                }}
-              >
-                <User className="h-4 w-4" />
-                User Management
-              </button>
+              <>
+                <button
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 transition-colors"
+                  onClick={() => {
+                    navigate("/model-configs");
+                    setShowUserMenu(false);
+                  }}
+                >
+                  <Brain className="h-4 w-4 text-zinc-500" />
+                  模型配置
+                </button>
+                
+                <button 
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50 transition-colors"
+                  onClick={() => {
+                    navigate("/users");
+                    setShowUserMenu(false);
+                  }}
+                >
+                  <User className="h-4 w-4" />
+                  用户管理
+                </button>
+              </>
             )}
             
             <div className="h-px bg-zinc-100 my-1 mx-2" />
@@ -160,7 +173,7 @@ function SidebarBody() {
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
               onClick={handleLogout}
             >
-              Log out
+              退出登录
             </button>
           </div>
         )}

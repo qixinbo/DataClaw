@@ -3,188 +3,144 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Save, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
-
-interface LLMConfig {
-  id: string;
-  provider: string;
-  model: string;
-  api_key?: string;
-  api_base?: string;
-  is_active: boolean;
-}
+import { useAuthStore } from "@/store/authStore";
 
 export function Settings() {
-  const [configId, setConfigId] = useState<string | null>(null);
-  const [apiKey, setApiKey] = useState('');
-  const [provider, setProvider] = useState('openai');
-  const [model, setModel] = useState('gpt-4-turbo');
-  const [baseUrl, setBaseUrl] = useState('https://api.openai.com/v1');
-  const [enableVoice, setEnableVoice] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const { user, updateUser } = useAuthStore();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    fetchConfig();
-  }, []);
-
-  const fetchConfig = async () => {
-    setIsLoading(true);
-    try {
-        const configs = await api.get<LLMConfig[]>('/api/v1/llm');
-        const activeConfig = configs.find(c => c.is_active) || configs[0];
-        if (activeConfig) {
-            setConfigId(activeConfig.id);
-            setProvider(activeConfig.provider);
-            setModel(activeConfig.model);
-            setApiKey(activeConfig.api_key || '');
-            setBaseUrl(activeConfig.api_base || '');
-        }
-    } catch (error) {
-        console.error("Failed to fetch LLM config", error);
-    } finally {
-        setIsLoading(false);
+    if (user) {
+      setEmail(user.email || '');
     }
-  };
+  }, [user]);
+  const isPasswordMismatch = password !== '' && confirmPassword !== '' && password !== confirmPassword;
 
   const handleSave = async () => {
+    setError('');
+    setSuccess('');
+    
+    if (isPasswordMismatch) {
+      setError("两次输入的密码不一致");
+      return;
+    }
+
     setIsSaving(true);
     try {
-        const configData = {
-            provider,
-            model,
-            api_key: apiKey,
-            api_base: baseUrl,
-            is_active: true
+        const updateData: any = {
+          email: email
         };
-
-        if (configId) {
-            await api.put(`/api/v1/llm/${configId}`, configData);
-        } else {
-            const newId = Date.now().toString();
-            await api.post('/api/v1/llm', { ...configData, id: newId });
-            setConfigId(newId);
+        
+        if (password) {
+          updateData.password = password;
         }
-        alert("Settings saved successfully!");
-    } catch (error) {
+
+        if (user && user.id) {
+            const response = await api.put<any>(`/api/v1/users/${user.id}`, updateData);
+            let successMsg = "个人设置保存成功！";
+            if (password) {
+              successMsg = "个人设置及密码修改成功！";
+            }
+            setSuccess(successMsg);
+            setPassword('');
+            setConfirmPassword('');
+            
+            // Update global state with new email
+            updateUser({ email: response.email });
+        }
+    } catch (error: any) {
         console.error("Failed to save settings", error);
-        alert("Failed to save settings");
+        setError(error.message || "保存设置失败");
     } finally {
         setIsSaving(false);
     }
   };
 
-  if (isLoading) {
-    return (
-        <div className="h-full flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-    );
-  }
-
   return (
-    <div className="p-6 h-full overflow-y-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-muted-foreground">Configure AI model and application preferences</p>
+    <div className="flex-1 flex flex-col h-full bg-zinc-50/30 overflow-hidden">
+      <div className="h-14 px-6 flex items-center justify-between border-b border-zinc-100 bg-white">
+        <div className="flex items-center gap-2 text-zinc-700 font-medium">
+          <Save className="h-5 w-5 text-indigo-500" />
+          个人设置
+        </div>
       </div>
 
-      <div className="grid gap-6 max-w-2xl">
-        <Card>
-          <CardHeader>
-            <CardTitle>LLM Configuration</CardTitle>
-            <CardDescription>Manage your Large Language Model settings</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="provider">Provider</Label>
-              <Select value={provider} onValueChange={(val) => val && setProvider(val)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="openai">OpenAI</SelectItem>
-                  <SelectItem value="anthropic">Anthropic</SelectItem>
-                  <SelectItem value="azure">Azure OpenAI</SelectItem>
-                  <SelectItem value="local">Local (Ollama/LM Studio)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="model">Model</Label>
-              <Select value={model} onValueChange={(val) => val && setModel(val)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select model" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="gpt-4-turbo">GPT-4 Turbo</SelectItem>
-                  <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                  <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
-                  <SelectItem value="claude-3-opus">Claude 3 Opus</SelectItem>
-                  <SelectItem value="claude-3-sonnet">Claude 3 Sonnet</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="api-key">API Key</Label>
-              <Input 
-                id="api-key" 
-                type="password" 
-                placeholder="sk-..." 
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="base-url">Base URL (Optional)</Label>
-              <Input 
-                id="base-url" 
-                placeholder="https://api.openai.com/v1" 
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Interface Settings</CardTitle>
-            <CardDescription>Customize your experience</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="voice-mode">Voice Mode</Label>
-                <p className="text-sm text-muted-foreground">Enable voice input and output</p>
+      <div className="flex-1 p-6 overflow-auto">
+        <div className="grid gap-6 max-w-2xl mx-auto">
+          {error && <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-md p-3">{error}</div>}
+          {success && <div className="text-sm text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-md p-3">{success}</div>}
+          
+          <Card className="border-zinc-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-xl">账号信息</CardTitle>
+              <CardDescription>修改您的登录邮箱和密码</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="username">用户名</Label>
+                <Input 
+                  id="username" 
+                  value={user?.username || ''}
+                  disabled
+                  className="bg-zinc-50 text-zinc-500"
+                />
+                <p className="text-xs text-zinc-400">用户名不可修改</p>
               </div>
-              <Switch 
-                id="voice-mode" 
-                checked={enableVoice}
-                onCheckedChange={setEnableVoice}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="dark-mode">Dark Mode</Label>
-                <p className="text-sm text-muted-foreground">Toggle dark/light theme</p>
+              
+              <div className="space-y-2">
+                <Label htmlFor="email">邮箱地址</Label>
+                <Input 
+                  id="email" 
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
               </div>
-              <Switch id="dark-mode" defaultChecked />
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button onClick={handleSave} className="ml-auto" disabled={isSaving}>
-              {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-              Save Changes
-            </Button>
-          </CardFooter>
-        </Card>
+
+              <div className="space-y-2 pt-4 border-t border-zinc-100">
+                <Label htmlFor="new-password">新密码</Label>
+                <Input 
+                  id="new-password" 
+                  type="password" 
+                  placeholder="如不修改请留空" 
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setError('');
+                  }}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">确认新密码</Label>
+                <Input 
+                  id="confirm-password" 
+                  type="password" 
+                  placeholder="如不修改请留空" 
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    setError('');
+                  }}
+                />
+                {isPasswordMismatch && <p className="text-sm text-red-600">两次输入的密码不一致</p>}
+              </div>
+            </CardContent>
+            <CardFooter className="bg-zinc-50/50 border-t border-zinc-100 pt-6">
+              <Button onClick={handleSave} className="ml-auto bg-indigo-600 hover:bg-indigo-700 text-white" disabled={isSaving || isPasswordMismatch}>
+                {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                保存设置
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
       </div>
     </div>
   );
