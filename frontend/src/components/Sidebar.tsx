@@ -64,7 +64,12 @@ function Section({
               }`}
               onClick={() => onSelect(item.key)}
             >
-              <span className="truncate pr-2 flex-1">{displayTitle}</span>
+              <div className="truncate pr-2 flex-1 flex items-center gap-1.5 min-w-0">
+                <span className="w-4 shrink-0 flex items-center justify-center">
+                  {item.pinned && <Pin className="h-3.5 w-3.5 text-zinc-500" />}
+                </span>
+                <span className="truncate">{displayTitle}</span>
+              </div>
               
               <DropdownMenu>
                 <DropdownMenuTrigger onClick={(e) => e.stopPropagation()} className="h-6 w-6 flex items-center justify-center rounded hover:bg-zinc-200 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity outline-none">
@@ -293,6 +298,9 @@ function SidebarBody() {
     }
   };
 
+  const activeSessions = sessions.filter((item) => !item.archived);
+  const archivedSessions = sessions.filter((item) => !!item.archived);
+
   return (
     <div className="h-full flex flex-col bg-zinc-50/30 border-r border-zinc-200 relative">
       {/* Header */}
@@ -333,8 +341,19 @@ function SidebarBody() {
       <ScrollArea className="flex-1">
         <Section 
           title="THREADS" 
-          count={sessions.length} 
-          items={sessions} 
+          count={activeSessions.length} 
+          items={activeSessions} 
+          onSelect={handleSelectSession}
+          onDelete={handleDeleteSession}
+          onRename={openRenameDialog}
+          onTogglePinned={handleTogglePinned}
+          onToggleArchived={handleToggleArchived}
+          activeKey={activeSessionKey}
+        />
+        <Section 
+          title="ARCIVED_THREADS" 
+          count={archivedSessions.length} 
+          items={archivedSessions} 
           onSelect={handleSelectSession}
           onDelete={handleDeleteSession}
           onRename={openRenameDialog}
