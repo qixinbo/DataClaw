@@ -9,7 +9,6 @@ import json
 from app.api import upload, llm, skills, users
 from app.connectors.postgres import postgres_connector
 from app.connectors.clickhouse import clickhouse_connector
-from app.connectors.minio import minio_connector
 from app.core.nanobot import nanobot_service
 from app.core.session_alias_store import session_alias_store
 from app.agent.nl2sql import process_nl2sql, NL2SQLRequest, NL2SQLResponse
@@ -56,12 +55,6 @@ def test_clickhouse():
     if clickhouse_connector.test_connection():
         return {"status": "success", "message": "Connected to ClickHouse"}
     raise HTTPException(status_code=500, detail="Failed to connect to ClickHouse")
-
-@app.get("/connect/minio")
-def test_minio():
-    if minio_connector.test_connection():
-        return {"status": "success", "message": "Connected to MinIO"}
-    raise HTTPException(status_code=500, detail="Failed to connect to MinIO")
 
 @app.get("/nanobot/status")
 def nanobot_status():
