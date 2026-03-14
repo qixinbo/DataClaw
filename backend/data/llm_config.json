@@ -1,12 +1,16 @@
 [
   {
     "id": "m1773487590",
-    "provider": "zhipuai",
+    "provider": "openai",
     "model": "glm-4-7-251222",
-    "api_key": "secret",
+    "api_key": "4a54896c-dac5-4aa6-b618-558dfbd89e4a",
     "api_base": "https://ark.cn-beijing.volces.com/api/v3",
-    "extra_headers": null,
-    "is_active": true
+    "extra_headers": {},
+    "is_active": true,
+    "name": "glm-4-7-251222",
+    "model_type": "\u5927\u8bed\u8a00\u6a21\u578b",
+    "base_model": "glm-4-7-251222",
+    "protocol_type": "OpenAI"
   },
   {
     "id": "deny1",

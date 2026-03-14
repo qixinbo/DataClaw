@@ -104,6 +104,45 @@ export function ModelConfigs() {
     setDialogOpen(true);
   };
 
+  const [isTesting, setIsTesting] = useState(false);
+
+  const handleTestConnection = async () => {
+    if (!form.model || !form.provider || !form.api_base) {
+      setError("请先填写必要信息（供应商、模型ID、API域名）");
+      return;
+    }
+    setIsTesting(true);
+    setError("");
+    try {
+      let extraHeaders: Record<string, string> = {};
+      if (extraConfigText.trim()) {
+        try {
+          const parsed = JSON.parse(extraConfigText);
+          if (parsed && typeof parsed === "object") extraHeaders = parsed;
+        } catch (err) {
+          setError("额外配置必须是有效的JSON");
+          setIsTesting(false);
+          return;
+        }
+      }
+      
+      const payload = {
+        provider: form.provider,
+        model: form.model,
+        api_key: form.api_key,
+        api_base: form.api_base,
+        extra_headers: extraHeaders
+      };
+
+      await api.post("/api/v1/llm/test", payload);
+      alert("连接测试成功！");
+    } catch (e: any) {
+      setError(e.message || "连接测试失败");
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!form.model || !form.provider || !form.api_base) {
@@ -285,12 +324,25 @@ export function ModelConfigs() {
                   <Label>供应商 *</Label>
                   <Select value={form.provider} onValueChange={(v) => setForm((p) => ({ ...p, provider: v || "openai" }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="max-h-[300px]">
                       <SelectItem value="openai">OpenAI</SelectItem>
-                      <SelectItem value="zhipuai">ZhipuAI</SelectItem>
-                      <SelectItem value="anthropic">Anthropic</SelectItem>
                       <SelectItem value="azure">Azure OpenAI</SelectItem>
-                      <SelectItem value="local">Local</SelectItem>
+                      <SelectItem value="anthropic">Anthropic</SelectItem>
+                      <SelectItem value="vertex_ai">Google Vertex AI</SelectItem>
+                      <SelectItem value="gemini">Google AI Studio (Gemini)</SelectItem>
+                      <SelectItem value="bedrock">AWS Bedrock</SelectItem>
+                      <SelectItem value="deepseek">DeepSeek</SelectItem>
+                      <SelectItem value="zhipuai">ZhipuAI (智谱)</SelectItem>
+                      <SelectItem value="moonshot">Moonshot (Kimi)</SelectItem>
+                      <SelectItem value="dashscope">DashScope (通义千问)</SelectItem>
+                      <SelectItem value="volcengine">Volcengine (火山引擎)</SelectItem>
+                      <SelectItem value="groq">Groq</SelectItem>
+                      <SelectItem value="cohere">Cohere</SelectItem>
+                      <SelectItem value="mistral">Mistral</SelectItem>
+                      <SelectItem value="openrouter">OpenRouter</SelectItem>
+                      <SelectItem value="ollama">Ollama</SelectItem>
+                      <SelectItem value="huggingface">HuggingFace</SelectItem>
+                      <SelectItem value="local">Local (OpenAI Compatible)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -298,26 +350,23 @@ export function ModelConfigs() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>模型标识 *</Label>
+                  <Label>模型ID *</Label>
                   <Input value={form.model || ""} onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))} placeholder="如：gpt-4-turbo" required />
                 </div>
                 <div className="space-y-2">
-                  <Label>基础模型</Label>
-                  <Input value={form.base_model || ""} onChange={(e) => setForm((p) => ({ ...p, base_model: e.target.value }))} placeholder="可选" />
+                  <Label>模型类型</Label>
+                  <Select value={form.model_type || "LLM"} onValueChange={(v) => setForm((p) => ({ ...p, model_type: v || "LLM" }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="LLM">LLM</SelectItem>
+                      <SelectItem value="Embedding">Embedding</SelectItem>
+                      <SelectItem value="Rerank">Rerank</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>模型类型</Label>
-                  <Select value={form.model_type || "大语言模型"} onValueChange={(v) => setForm((p) => ({ ...p, model_type: v || "大语言模型" }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="大语言模型">大语言模型</SelectItem>
-                      <SelectItem value="多模态模型">多模态模型</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
                 <div className="space-y-2">
                   <Label>协议类型</Label>
                   <Select value={form.protocol_type || "OpenAI"} onValueChange={(v) => setForm((p) => ({ ...p, protocol_type: v || "OpenAI" }))}>
@@ -360,12 +409,18 @@ export function ModelConfigs() {
                 <Textarea value={extraConfigText} onChange={(e) => setExtraConfigText(e.target.value)} className="min-h-[80px] font-mono text-xs" placeholder='{"timeout": "60"}' />
               </div>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-              <Button type="submit" disabled={isSaving} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                保存
+            <DialogFooter className="flex items-center justify-between gap-2">
+              <Button type="button" variant="outline" onClick={handleTestConnection} disabled={isTesting}>
+                {isTesting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                测试连接
               </Button>
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
+                <Button type="submit" disabled={isSaving} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  保存
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         </DialogContent>

@@ -2,14 +2,25 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { User, Loader2, Sparkles, Search, ArrowUp, ChevronDown, Table, Paperclip } from "lucide-react";
+import { User, Loader2, Sparkles, Search, ArrowUp, ChevronDown, Table, Paperclip, Check } from "lucide-react";
 import { api } from "@/lib/api";
 import { useVisualizationStore } from "@/store/visualizationStore";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+}
+
+interface ModelConfig {
+  id: string;
+  name?: string;
+  model: string;
+  provider: string;
+  is_active: boolean;
 }
 
 export function ChatInterface() {
@@ -22,6 +33,33 @@ export function ChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { setVisualization, setLoading: setVizLoading, setError: setVizError } = useVisualizationStore();
+  
+  // Model selection state
+  const [models, setModels] = useState<ModelConfig[]>([]);
+  const [selectedModelId, setSelectedModelId] = useState<string>("");
+  const [modelOpen, setModelOpen] = useState(false);
+
+  useEffect(() => {
+    fetchModels();
+  }, []);
+
+  const fetchModels = async () => {
+    try {
+      const data = await api.get<ModelConfig[]>("/api/v1/llm");
+      setModels(data);
+      // Set default model if available
+      const active = data.find(m => m.is_active);
+      if (active) {
+        setSelectedModelId(active.id);
+      } else if (data.length > 0) {
+        setSelectedModelId(data[0].id);
+      }
+    } catch (e) {
+      console.error("Failed to fetch models", e);
+    }
+  };
+
+  const currentModel = models.find(m => m.id === selectedModelId);
   
   const capabilities = [
     { icon: Sparkles, label: "智能问答", color: "text-purple-500", bg: "bg-purple-50" },
@@ -51,7 +89,8 @@ export function ChatInterface() {
          const source = selectedDataSource.split('-')[0]; // postgres-main -> postgres
          const response = await api.post<{sql?: string, result?: unknown, error?: string}>('/api/v1/agent/nl2sql', {
             query: newMessage.content,
-            source: source
+            source: source,
+            model_id: selectedModelId // Pass selected model ID if backend supports it
          });
 
          if (response.error) {
@@ -76,7 +115,8 @@ export function ChatInterface() {
          // General Chat
          const response = await api.post<{response: string}>('/nanobot/chat', {
              message: newMessage.content,
-             skill_ids: [selectedSkill] 
+             skill_ids: [selectedSkill],
+             model_id: selectedModelId 
          });
          
          setMessages(prev => [...prev, { 
@@ -101,14 +141,49 @@ export function ChatInterface() {
   return (
     <div className="h-full bg-white relative flex flex-col">
       {/* Top Bar */}
-      <div className="absolute top-0 left-0 w-full px-6 py-4 z-10">
-        <button className="flex items-center gap-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100 px-3 py-1.5 rounded-lg transition-colors">
-          glm-4-7-251222
-          <ChevronDown className="h-4 w-4 text-zinc-400" />
-        </button>
+      <div className="absolute top-0 left-0 w-full px-6 py-4 z-10 flex justify-between items-center">
+        <Popover open={modelOpen} onOpenChange={setModelOpen}>
+          <PopoverTrigger className="w-[200px] flex justify-between items-center bg-white/80 backdrop-blur-sm border border-zinc-200 rounded-md px-3 py-2 text-sm hover:bg-zinc-50 hover:text-zinc-900 text-zinc-700 font-medium shadow-sm transition-all">
+              {currentModel ? (currentModel.name || currentModel.model) : "选择模型..."}
+              <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </PopoverTrigger>
+          <PopoverContent className="w-[240px] p-0" align="start">
+            <Command>
+              <CommandInput placeholder="搜索模型..." className="h-9" />
+              <CommandList>
+                <CommandEmpty>未找到模型</CommandEmpty>
+                <CommandGroup heading="可用模型">
+                  {models.map((model) => (
+                    <CommandItem
+                      key={model.id}
+                      value={model.name || model.model}
+                      onSelect={() => {
+                        setSelectedModelId(model.id);
+                        setModelOpen(false);
+                      }}
+                      className="cursor-pointer"
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-medium">{model.name || model.model}</span>
+                        <span className="text-xs text-zinc-400">{model.provider}</span>
+                      </div>
+                      <Check
+                        className={cn(
+                          "ml-auto h-4 w-4",
+                          selectedModelId === model.id ? "opacity-100" : "opacity-0"
+                        )}
+                      />
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
       </div>
 
       <ScrollArea className="flex-1">
+
         <div className="min-h-full">
           {messages.length <= 1 ? (
             <div className="h-full flex flex-col items-center justify-center pt-[20vh] px-4 pb-32">
