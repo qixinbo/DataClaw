@@ -3,25 +3,24 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { Code, Table as TableIcon, BarChart as ChartIcon, LineChart as LineChartIcon, Download, LayoutDashboard, Loader2 } from "lucide-react";
+import { Code, Table as TableIcon, BarChart as ChartIcon, Download, LayoutDashboard, Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useDashboardStore } from "@/store/dashboardStore";
 import { useVisualizationStore } from "@/store/visualizationStore";
+import { VegaChart } from "./VegaChart";
 
 export function VisualizationPanel() {
   const [view, setView] = useState<'table' | 'chart'>('chart');
-  const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
   const { addChart } = useDashboardStore();
-  const { currentData, currentSQL, isLoading, error } = useVisualizationStore();
+  const { currentData, currentSQL, currentChartSpec, isLoading, error } = useVisualizationStore();
 
   const handleAddToDashboard = () => {
     if (!currentData || !currentSQL) return;
     
     addChart({
       id: Date.now().toString(),
-      title: 'Generated Analysis', // Could be dynamic based on query
-      type: chartType,
+      title: currentChartSpec?.title || 'Generated Analysis',
+      type: currentChartSpec?.chart_type as any || 'bar',
       data: currentData,
       sql: currentSQL,
     });
@@ -67,9 +66,6 @@ export function VisualizationPanel() {
   }
 
   const columns = Object.keys(objectRows[0] as Record<string, unknown>);
-  const firstRow = objectRows[0] as Record<string, unknown>;
-  const stringColumn = columns.find(col => typeof firstRow[col] === 'string') || columns[0];
-  const numberColumns = columns.filter(col => typeof firstRow[col] === 'number');
 
   return (
     <div className="h-full flex flex-col bg-muted/10 overflow-hidden">
@@ -98,17 +94,6 @@ export function VisualizationPanel() {
             </Button>
            </div>
            
-           {view === 'chart' && (
-             <div className="flex gap-1 mr-2 border-r pr-2">
-               <Button variant={chartType === 'bar' ? 'secondary' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => setChartType('bar')}>
-                 <ChartIcon className="h-3.5 w-3.5" />
-               </Button>
-               <Button variant={chartType === 'line' ? 'secondary' : 'ghost'} size="icon" className="h-7 w-7" onClick={() => setChartType('line')}>
-                 <LineChartIcon className="h-3.5 w-3.5" />
-               </Button>
-             </div>
-           )}
-
           <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleAddToDashboard}>
             <LayoutDashboard className="h-3.5 w-3.5 mr-1.5" />
             Add to Dashboard
@@ -148,42 +133,21 @@ export function VisualizationPanel() {
       <div className="flex-1 p-4 overflow-hidden min-h-0">
         <Card className="h-full flex flex-col shadow-sm border-muted">
           <CardHeader className="pb-2 shrink-0">
-            <CardTitle>Analysis Result</CardTitle>
-            <CardDescription>Generated from your query</CardDescription>
+            <CardTitle>{currentChartSpec?.title || 'Analysis Result'}</CardTitle>
+            <CardDescription>{currentChartSpec?.description || 'Generated from your query'}</CardDescription>
           </CardHeader>
           <CardContent className="flex-1 min-h-0 p-4">
              {view === 'chart' ? (
                 <div className="h-full w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    {chartType === 'bar' ? (
-                      <BarChart data={objectRows} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                        <XAxis dataKey={stringColumn} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} />
-                        <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} />
-                        <Tooltip 
-                          cursor={{ fill: 'rgba(0,0,0,0.05)' }}
-                          contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                        />
-                        <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                        {numberColumns.map((col, idx) => (
-                             <Bar key={col} dataKey={col} fill={`hsl(${idx * 60 + 200}, 70%, 50%)`} radius={[4, 4, 0, 0]} name={col} />
-                        ))}
-                      </BarChart>
-                    ) : (
-                      <LineChart data={objectRows} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                        <XAxis dataKey={stringColumn} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} />
-                        <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} />
-                        <Tooltip 
-                          contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                        />
-                        <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                        {numberColumns.map((col, idx) => (
-                             <Line key={col} type="monotone" dataKey={col} stroke={`hsl(${idx * 60 + 200}, 70%, 50%)`} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} name={col} />
-                        ))}
-                      </LineChart>
-                    )}
-                  </ResponsiveContainer>
+                  {currentChartSpec ? (
+                    <VegaChart data={objectRows} spec={currentChartSpec} />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                       <ChartIcon className="h-12 w-12 mb-4 opacity-20" />
+                       <p>No chart configuration available for this data.</p>
+                       <Button variant="link" onClick={() => setView('table')}>View Table</Button>
+                    </div>
+                  )}
                 </div>
              ) : (
                <ScrollArea className="h-full border rounded-md">

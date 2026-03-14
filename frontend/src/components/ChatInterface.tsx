@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { User, Loader2, Sparkles, Search, ArrowUp, ChevronDown, Table, Paperclip, Check, X, File as FileIcon } from "lucide-react";
 import { api } from "@/lib/api";
-import { useVisualizationStore } from "@/store/visualizationStore";
+import { type ChartSpec, useVisualizationStore } from "@/store/visualizationStore";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
@@ -267,7 +267,12 @@ export function ChatInterface() {
       } else {
          // Fallback to existing NL2SQL or other skills (e.g. for "表格问答" or "深度问数")
          const source = selectedDataSource.split('-')[0]; // postgres-main -> postgres
-         const response = await api.post<{sql?: string, result?: unknown, error?: string}>('/api/v1/agent/nl2sql', {
+         const response = await api.post<{
+             sql?: string, 
+             result?: unknown, 
+             error?: string,
+             chart?: { chart_spec: ChartSpec, reasoning: string, can_visualize: boolean }
+         }>('/api/v1/agent/nl2sql', {
             query: messagePayload,
             source: source,
             session_id: activeSessionKey,
@@ -287,9 +292,9 @@ export function ChatInterface() {
             setMessages(prev => [...prev, { 
                 id: (Date.now() + 1).toString(), 
                 role: 'assistant', 
-                content: `I've generated a SQL query and fetched ${rows.length} rows for you. Check the visualization panel.` 
+                content: `I've generated a SQL query and fetched ${rows.length} rows for you. Check the visualization panel.${response.chart?.reasoning ? `\n\nVisualization reasoning: ${response.chart.reasoning}` : ''}` 
             }]);
-            setVisualization(rows, sql);
+            setVisualization(rows, sql, response.chart?.chart_spec);
          }
       }
     } catch (error: any) {
