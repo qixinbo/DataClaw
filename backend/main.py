@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import asyncio
 
-from app.api import upload, llm, skills
+from app.api import upload, llm, skills, users
 from app.connectors.postgres import postgres_connector
 from app.connectors.clickhouse import clickhouse_connector
 from app.connectors.minio import minio_connector
@@ -24,6 +24,7 @@ app.add_middleware(
 app.include_router(upload.router, prefix="/api/v1")
 app.include_router(llm.router, prefix="/api/v1")
 app.include_router(skills.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
 
 @app.on_event("startup")
 async def startup_event():

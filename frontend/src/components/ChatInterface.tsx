@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { User, Loader2, Sparkles, Search, ArrowUp, ChevronDown, Database, Table, Paperclip, Bot } from "lucide-react";
+import { User, Loader2, Sparkles, Search, ArrowUp, ChevronDown, Table, Paperclip } from "lucide-react";
 import { api } from "@/lib/api";
 import { useVisualizationStore } from "@/store/visualizationStore";
 
