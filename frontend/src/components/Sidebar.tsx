@@ -338,7 +338,7 @@ function SidebarBody() {
         
         <Button 
           variant="outline" 
-          className="w-full justify-start h-10 px-3 rounded-lg border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-600 shadow-sm font-medium"
+          className="w-full justify-start h-10 px-3 rounded-lg border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-600 font-medium"
           onClick={handleNewThread}
         >
           <Plus className="h-4 w-4 mr-2" />
