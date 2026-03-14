@@ -84,35 +84,21 @@ async def nanobot_chat(request: ChatRequest):
 @app.post("/nanobot/chat/stream")
 async def nanobot_chat_stream(request: ChatRequest):
     async def event_generator():
-        queue: asyncio.Queue[dict] = asyncio.Queue()
-
-        async def on_progress(content: str):
-            await queue.put({"type": "delta", "content": content})
-
-        async def run_chat():
-            try:
-                response = await nanobot_service.process_message(
-                    request.message,
-                    skill_ids=request.skill_ids,
-                    model_id=request.model_id,
-                    on_progress=on_progress,
-                )
-                await queue.put({"type": "final", "content": response})
-            except Exception as e:
-                await queue.put({"type": "error", "content": str(e)})
-            finally:
-                await queue.put({"type": "done"})
-
-        task = asyncio.create_task(run_chat())
         try:
-            while True:
-                event = await queue.get()
-                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-                if event.get("type") == "done":
-                    break
-        finally:
-            if not task.done():
-                task.cancel()
+            response = await nanobot_service.process_message(
+                request.message,
+                skill_ids=request.skill_ids,
+                model_id=request.model_id,
+            )
+            text = response or ""
+            for ch in text:
+                yield f"data: {json.dumps({'type': 'delta', 'content': ch}, ensure_ascii=False)}\n\n"
+                await asyncio.sleep(0.008)
+            yield f"data: {json.dumps({'type': 'final', 'content': text}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'content': str(e)}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
         event_generator(),

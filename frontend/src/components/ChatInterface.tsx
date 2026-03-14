@@ -132,7 +132,7 @@ export function ChatInterface() {
              const payload = JSON.parse(payloadText) as { type: string; content?: string };
 
              if (payload.type === "delta" && payload.content) {
-               streamedText = streamedText ? `${streamedText}\n${payload.content}` : payload.content;
+               streamedText = `${streamedText}${payload.content}`;
                setMessages((prev) =>
                  prev.map((msg) =>
                    msg.id === assistantId ? { ...msg, content: streamedText } : msg
