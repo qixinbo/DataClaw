@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -11,6 +11,7 @@ from app.connectors.postgres import postgres_connector
 from app.connectors.clickhouse import clickhouse_connector
 from app.connectors.minio import minio_connector
 from app.core.nanobot import nanobot_service
+from app.core.session_alias_store import session_alias_store
 from app.agent.nl2sql import process_nl2sql, NL2SQLRequest, NL2SQLResponse
 
 app = FastAPI()
@@ -74,10 +75,21 @@ class ChatRequest(BaseModel):
     skill_ids: Optional[List[str]] = None
     model_id: Optional[str] = None
 
+
+class SessionAliasUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    pinned: Optional[bool] = None
+    archived: Optional[bool] = None
+
 @app.post("/nanobot/chat")
 async def nanobot_chat(request: ChatRequest):
     try:
-        response = await nanobot_service.process_message(request.message, skill_ids=request.skill_ids, model_id=request.model_id)
+        response = await nanobot_service.process_message(
+            request.message,
+            session_id=request.session_id,
+            skill_ids=request.skill_ids,
+            model_id=request.model_id,
+        )
         return {"response": response}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -115,21 +127,22 @@ async def nanobot_chat_stream(request: ChatRequest):
 @app.get("/nanobot/sessions")
 def get_sessions():
     if not nanobot_service.agent:
-        return []
-    # session_manager has list_sessions()
+        return session_alias_store.list_cached_sessions()
     sessions = nanobot_service.agent.sessions.list_sessions()
-    return sessions
+    return session_alias_store.sync_and_list(sessions)
 
 @app.get("/nanobot/sessions/{session_id}")
 def get_session(session_id: str):
     if not nanobot_service.agent:
         raise HTTPException(status_code=400, detail="Nanobot not running")
     session = nanobot_service.agent.sessions.get_or_create(session_id)
+    alias = session_alias_store.get_alias(session_id)
     return {
         "key": session.key,
         "created_at": session.created_at,
         "updated_at": session.updated_at,
         "metadata": session.metadata,
+        "alias": alias,
         "messages": session.messages
     }
 
@@ -145,18 +158,19 @@ def delete_session(session_id: str):
         path = nanobot_service.agent.sessions._get_session_path(session_id)
         if path.exists():
             path.unlink()
+        session_alias_store.delete_session(session_id)
         return {"status": "success"}
     raise HTTPException(status_code=404, detail="Session not found")
 
 @app.put("/nanobot/sessions/{session_id}")
-def update_session(session_id: str, title: str = Body(..., embed=True)):
-    if not nanobot_service.agent:
-        raise HTTPException(status_code=400, detail="Nanobot not running")
-    
-    session = nanobot_service.agent.sessions.get_or_create(session_id)
-    session.metadata["title"] = title
-    nanobot_service.agent.sessions.save(session)
-    return {"status": "success", "title": title}
+def update_session(session_id: str, payload: SessionAliasUpdateRequest):
+    updated = session_alias_store.update_alias_meta(
+        session_key=session_id,
+        alias=payload.title,
+        pinned=payload.pinned,
+        archived=payload.archived,
+    )
+    return {"status": "success", **updated}
 
 @app.post("/api/v1/agent/nl2sql", response_model=NL2SQLResponse)
 async def run_nl2sql(request: NL2SQLRequest):

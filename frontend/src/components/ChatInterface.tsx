@@ -17,6 +17,7 @@ interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  awaitingFirstToken?: boolean;
 }
 
 interface ModelConfig {
@@ -131,10 +132,12 @@ export function ChatInterface() {
          setMessages(prev => [...prev, {
             id: assistantId,
             role: "assistant",
-            content: ""
+            content: "",
+            awaitingFirstToken: true
          }]);
 
          const token = localStorage.getItem("token");
+         const effectiveModelId = selectedModelId || currentModel?.id || "";
          const response = await fetch("/nanobot/chat/stream", {
            method: "POST",
            headers: {
@@ -144,7 +147,7 @@ export function ChatInterface() {
            body: JSON.stringify({
                message: newMessage.content,
                session_id: activeSessionKey,
-               model_id: selectedModelId,
+               model_id: effectiveModelId,
              }),
          });
 
@@ -178,7 +181,7 @@ export function ChatInterface() {
                streamedText = `${streamedText}${payload.content}`;
                setMessages((prev) =>
                  prev.map((msg) =>
-                   msg.id === assistantId ? { ...msg, content: streamedText } : msg
+                    msg.id === assistantId ? { ...msg, content: streamedText, awaitingFirstToken: false } : msg
                  )
                );
              }
@@ -187,7 +190,7 @@ export function ChatInterface() {
                streamedText = payload.content;
                setMessages((prev) =>
                  prev.map((msg) =>
-                   msg.id === assistantId ? { ...msg, content: payload.content || "" } : msg
+                    msg.id === assistantId ? { ...msg, content: payload.content || "", awaitingFirstToken: false } : msg
                  )
                );
              }
@@ -196,6 +199,19 @@ export function ChatInterface() {
                throw new Error(payload.content || "流式响应错误");
              }
            }
+         }
+
+         if (!streamedText) {
+           const fallback = await api.post<{ response: string }>("/nanobot/chat", {
+             message: newMessage.content,
+             session_id: activeSessionKey,
+             model_id: effectiveModelId,
+           });
+           setMessages((prev) =>
+             prev.map((msg) =>
+              msg.id === assistantId ? { ...msg, content: fallback.response || "暂无回复", awaitingFirstToken: false } : msg
+             )
+           );
          }
       } else {
          // Fallback to existing NL2SQL or other skills (e.g. for "表格问答" or "深度问数")
@@ -235,6 +251,7 @@ export function ChatInterface() {
     } finally {
         setIsLoading(false);
         setVizLoading(false);
+        window.dispatchEvent(new Event("nanobot:sessions-changed"));
     }
   };
 
@@ -372,11 +389,18 @@ export function ChatInterface() {
                     }`}
                   >
                     {msg.role === "assistant" ? (
-                      <div className="prose prose-sm prose-zinc max-w-none prose-p:leading-normal prose-p:my-2 prose-headings:my-3 prose-ul:my-2 prose-li:my-0.5 prose-pre:bg-zinc-50 prose-pre:text-zinc-800 prose-pre:border prose-pre:border-zinc-200">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-                          {msg.content}
-                        </ReactMarkdown>
-                      </div>
+                      msg.awaitingFirstToken && !msg.content ? (
+                        <div className="flex items-center gap-2 text-zinc-500 text-sm py-1">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>模型思考中，请稍候...</span>
+                        </div>
+                      ) : (
+                        <div className="prose prose-sm prose-zinc max-w-none prose-p:leading-normal prose-p:my-2 prose-headings:my-3 prose-ul:my-2 prose-li:my-0.5 prose-pre:bg-zinc-50 prose-pre:text-zinc-800 prose-pre:border prose-pre:border-zinc-200">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                            {msg.content}
+                          </ReactMarkdown>
+                        </div>
+                      )
                     ) : (
                       msg.content
                     )}

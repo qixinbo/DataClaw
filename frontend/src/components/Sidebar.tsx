@@ -1,7 +1,7 @@
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Menu, LayoutDashboard, Plus, MoreVertical, User, Search, Wrench, Settings, Brain, Trash2, Pencil } from "lucide-react";
+import { Menu, LayoutDashboard, Plus, MoreVertical, User, Search, Wrench, Settings, Brain, Trash2, Pencil, Pin, Archive } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
@@ -14,6 +14,9 @@ interface SessionInfo {
   key: string;
   created_at: string;
   updated_at: string;
+  alias?: string | null;
+  pinned?: boolean;
+  archived?: boolean;
   metadata?: {
     title?: string;
   };
@@ -26,6 +29,8 @@ function Section({
   onSelect,
   onDelete,
   onRename,
+  onTogglePinned,
+  onToggleArchived,
   activeKey
 }: {
   title: string;
@@ -34,6 +39,8 @@ function Section({
   onSelect: (key: string) => void;
   onDelete: (key: string) => void;
   onRename: (key: string, currentTitle: string) => void;
+  onTogglePinned: (key: string, pinned: boolean) => void;
+  onToggleArchived: (key: string, archived: boolean) => void;
   activeKey: string | null;
 }) {
   return (
@@ -64,11 +71,64 @@ function Section({
                   <MoreVertical className="h-4 w-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-32">
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onRename(item.key, displayTitle); }}>
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onRename(item.key, displayTitle);
+                    }}
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onRename(item.key, displayTitle);
+                    }}
+                  >
                     <Pencil className="mr-2 h-4 w-4" />
                     <span>重命名</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(item.key); }} className="text-red-600 focus:text-red-600 focus:bg-red-50">
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onTogglePinned(item.key, !!item.pinned);
+                    }}
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onTogglePinned(item.key, !!item.pinned);
+                    }}
+                  >
+                    <Pin className="mr-2 h-4 w-4" />
+                    <span>{item.pinned ? "取消置顶" : "置顶"}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onToggleArchived(item.key, !!item.archived);
+                    }}
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onToggleArchived(item.key, !!item.archived);
+                    }}
+                  >
+                    <Archive className="mr-2 h-4 w-4" />
+                    <span>{item.archived ? "取消归档" : "归档"}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onDelete(item.key);
+                    }}
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onDelete(item.key);
+                    }}
+                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                  >
                     <Trash2 className="mr-2 h-4 w-4" />
                     <span>删除会话</span>
                   </DropdownMenuItem>
@@ -110,9 +170,17 @@ function SidebarBody() {
 
   useEffect(() => {
     fetchSessions();
-    // Set up polling to refresh session list
-    const interval = setInterval(fetchSessions, 5000);
-    return () => clearInterval(interval);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    const onFocus = () => fetchSessions();
+    const onSessionsChanged = () => fetchSessions();
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("nanobot:sessions-changed", onSessionsChanged);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("nanobot:sessions-changed", onSessionsChanged);
+    };
   }, []);
 
   useEffect(() => {
@@ -142,11 +210,12 @@ function SidebarBody() {
   const handleDeleteSession = async (key: string) => {
     if (!window.confirm("确定要删除这个会话吗？")) return;
     try {
-      await api.delete(`/nanobot/sessions/${key}`);
+      await api.delete(`/nanobot/sessions/${encodeURIComponent(key)}`);
       if (activeSessionKey === key) {
         navigate("/");
       }
       fetchSessions();
+      window.dispatchEvent(new Event("nanobot:sessions-changed"));
     } catch (e) {
       console.error("Failed to delete session", e);
     }
@@ -161,11 +230,66 @@ function SidebarBody() {
   const handleRename = async () => {
     if (!sessionToRename || !newTitle.trim()) return;
     try {
-      await api.put(`/nanobot/sessions/${sessionToRename.key}`, { title: newTitle.trim() });
+      const nextTitle = newTitle.trim();
+      await api.put(`/nanobot/sessions/${encodeURIComponent(sessionToRename.key)}`, { title: nextTitle });
+      setSessions((prev) =>
+        prev.map((item) =>
+          item.key === sessionToRename.key
+            ? { ...item, alias: nextTitle, metadata: { ...(item.metadata || {}), title: nextTitle } }
+            : item
+        )
+      );
       setRenameDialogOpen(false);
       fetchSessions();
+      window.dispatchEvent(new Event("nanobot:sessions-changed"));
     } catch (e) {
       console.error("Failed to rename session", e);
+    }
+  };
+
+  const handleTogglePinned = async (key: string, pinned: boolean) => {
+    const nextPinned = !pinned;
+    try {
+      await api.put(`/nanobot/sessions/${encodeURIComponent(key)}`, { pinned: nextPinned });
+      setSessions((prev) =>
+        prev
+          .map((item) => (item.key === key ? { ...item, pinned: nextPinned } : item))
+          .sort((a, b) => {
+            const ap = a.pinned ? 1 : 0;
+            const bp = b.pinned ? 1 : 0;
+            if (bp !== ap) return bp - ap;
+            const aa = a.archived ? 1 : 0;
+            const ba = b.archived ? 1 : 0;
+            if (aa !== ba) return aa - ba;
+            return (b.updated_at || "").localeCompare(a.updated_at || "");
+          })
+      );
+      window.dispatchEvent(new Event("nanobot:sessions-changed"));
+    } catch (e) {
+      console.error("Failed to toggle pinned", e);
+    }
+  };
+
+  const handleToggleArchived = async (key: string, archived: boolean) => {
+    const nextArchived = !archived;
+    try {
+      await api.put(`/nanobot/sessions/${encodeURIComponent(key)}`, { archived: nextArchived });
+      setSessions((prev) =>
+        prev
+          .map((item) => (item.key === key ? { ...item, archived: nextArchived } : item))
+          .sort((a, b) => {
+            const ap = a.pinned ? 1 : 0;
+            const bp = b.pinned ? 1 : 0;
+            if (bp !== ap) return bp - ap;
+            const aa = a.archived ? 1 : 0;
+            const ba = b.archived ? 1 : 0;
+            if (aa !== ba) return aa - ba;
+            return (b.updated_at || "").localeCompare(a.updated_at || "");
+          })
+      );
+      window.dispatchEvent(new Event("nanobot:sessions-changed"));
+    } catch (e) {
+      console.error("Failed to toggle archived", e);
     }
   };
 
@@ -214,6 +338,8 @@ function SidebarBody() {
           onSelect={handleSelectSession}
           onDelete={handleDeleteSession}
           onRename={openRenameDialog}
+          onTogglePinned={handleTogglePinned}
+          onToggleArchived={handleToggleArchived}
           activeKey={activeSessionKey}
         />
       </ScrollArea>
