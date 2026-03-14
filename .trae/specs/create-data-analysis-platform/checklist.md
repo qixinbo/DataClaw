@@ -1,0 +1,15 @@
+- [x] Directory structure is correct (`backend/`, `frontend/`, `nanobot/`).
+- [x] FastAPI server running.
+- [x] React frontend running.
+- [x] LLM Configuration UI works.
+- [x] Users can select configured LLM for agents.
+- [x] Data Sources (PG, CH, MinIO, CSV) connect successfully.
+- [x] NL2SQL generates correct SQL.
+- [x] "View SQL" button works.
+- [x] "Add to Dashboard" button works.
+- [x] Dashboard displays pinned charts.
+- [x] Dashboard panels are resizable and draggable (Grafana-like).
+- [x] Internal Skills CRUD works.
+- [x] Users can select specific skills for a chat session.
+- [x] Selected skills are used by the agent.
+- [x] Multi-agent workflow functions as expected.
