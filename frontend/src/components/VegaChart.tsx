@@ -29,14 +29,53 @@ export const VegaChart: React.FC<VegaChartProps> = ({ data, spec }) => {
     return () => observer.disconnect();
   }, []);
 
-  const vegaSpec: any = useMemo(() => ({
-    $schema: typeof spec.$schema === 'string' ? spec.$schema : 'https://vega.github.io/schema/vega-lite/v5.json',
-    ...spec,
-    width: size.width > 0 ? size.width : "container",
-    height: size.height > 0 ? size.height : "container",
-    data: { values: data },
-    autosize: { type: "fit", contains: "padding", resize: true },
-  }), [data, size.height, size.width, spec]);
+  const vegaSpec: any = useMemo(() => {
+    // Clone spec and ensure tooltip is enabled in mark if not already specified
+    const baseSpec = { ...spec };
+    if (typeof baseSpec.mark === 'string') {
+      baseSpec.mark = { type: baseSpec.mark, tooltip: true };
+    } else if (typeof baseSpec.mark === 'object' && baseSpec.mark !== null) {
+      baseSpec.mark = { ...baseSpec.mark, tooltip: true };
+    }
+
+    // Add highlight effect: hover over an element makes others transparent
+    // 1. Define hover param
+    if (!baseSpec.params) {
+      baseSpec.params = [
+        {
+          name: "highlight",
+          select: { type: "point", on: "mouseover", clear: "mouseout" }
+        }
+      ];
+    }
+
+    // 2. Add conditional opacity to encoding
+    if (!baseSpec.encoding) {
+      baseSpec.encoding = {};
+    }
+    
+    // Only add opacity highlight if not explicitly set
+    if (!baseSpec.encoding.opacity) {
+      baseSpec.encoding.opacity = {
+        condition: { param: "highlight", value: 1 },
+        value: 0.3
+      };
+    }
+
+    // Also add cursor: pointer for marks
+    if (typeof baseSpec.mark === 'object' && baseSpec.mark !== null) {
+      (baseSpec.mark as any).cursor = "pointer";
+    }
+
+    return {
+      $schema: typeof spec.$schema === 'string' ? spec.$schema : 'https://vega.github.io/schema/vega-lite/v5.json',
+      ...baseSpec,
+      width: size.width > 0 ? size.width : "container",
+      height: size.height > 0 ? size.height : "container",
+      data: { values: data },
+      autosize: { type: "fit", contains: "padding", resize: true },
+    };
+  }, [data, size.height, size.width, spec]);
 
   return (
     <div className="w-full h-full" ref={containerRef}>
