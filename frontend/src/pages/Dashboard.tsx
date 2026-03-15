@@ -39,7 +39,7 @@ function inferChartKeys(data: Record<string, unknown>[]) {
 }
 
 export function Dashboard() {
-  const { charts, removeChart } = useDashboardStore();
+  const { charts, removeChart, updateLayout } = useDashboardStore();
   const ResponsiveGridLayout = useMemo(
     () => WidthProvider(Responsive as any) as any,
     []
@@ -49,10 +49,16 @@ export function Dashboard() {
     lg: charts.map((c) => c.layout)
   }), [charts]);
 
-  const onLayoutChange = (_currentLayout: any, _allLayouts: any) => {
-    // updateLayout(currentLayout); // This might cause infinite loops if not handled carefully
-    // For simplicity, we just log it or update it if needed.
-    // In a real app, we would debounce this and save to backend.
+  const onLayoutChange = (currentLayout: any[]) => {
+    updateLayout(
+      currentLayout.map((item) => ({
+        i: item.i,
+        x: item.x,
+        y: item.y,
+        w: item.w,
+        h: item.h,
+      }))
+    );
   };
 
   if (charts.length === 0) {

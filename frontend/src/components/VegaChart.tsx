@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { VegaEmbed } from 'react-vega';
 import type { ChartSpec } from '@/store/visualizationStore';
 
@@ -8,17 +8,38 @@ interface VegaChartProps {
 }
 
 export const VegaChart: React.FC<VegaChartProps> = ({ data, spec }) => {
-  const vegaSpec: any = {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node) return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const nextWidth = Math.max(0, Math.floor(entry.contentRect.width));
+      const nextHeight = Math.max(0, Math.floor(entry.contentRect.height));
+      setSize((prev) => (
+        prev.width === nextWidth && prev.height === nextHeight
+          ? prev
+          : { width: nextWidth, height: nextHeight }
+      ));
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  const vegaSpec: any = useMemo(() => ({
     $schema: typeof spec.$schema === 'string' ? spec.$schema : 'https://vega.github.io/schema/vega-lite/v5.json',
     ...spec,
-    width: "container",
-    height: "container",
+    width: size.width > 0 ? size.width : "container",
+    height: size.height > 0 ? size.height : "container",
     data: { values: data },
-    autosize: { type: "fit", contains: "padding" },
-  };
+    autosize: { type: "fit", contains: "padding", resize: true },
+  }), [data, size.height, size.width, spec]);
 
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full" ref={containerRef}>
       <VegaEmbed 
         spec={vegaSpec} 
         options={{ actions: false }} 

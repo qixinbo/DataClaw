@@ -26,10 +26,10 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   addChart: (chart) => set((state) => {
     const newLayout: GridLayout = {
       i: chart.id,
-      x: (state.charts.length * 6) % 12,
+      x: (state.charts.length * 4) % 12,
       y: Infinity,
-      w: 6,
-      h: 8,
+      w: 4,
+      h: 4,
     };
     return { charts: [...state.charts, { ...chart, layout: newLayout }] };
   }),
