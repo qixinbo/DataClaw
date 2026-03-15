@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import GridLayout from 'react-grid-layout';
+import { Responsive, WidthProvider } from 'react-grid-layout/legacy';
 import { useDashboardStore } from '../store/dashboardStore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,6 @@ import 'react-resizable/css/styles.css';
 
 export function Dashboard() {
   const { charts, removeChart } = useDashboardStore();
-  const Responsive = (GridLayout as any).Responsive?.default ?? (GridLayout as any).Responsive;
-  const WidthProvider = (GridLayout as any).WidthProvider?.default ?? (GridLayout as any).WidthProvider;
   const ResponsiveGridLayout = useMemo(
     () => WidthProvider(Responsive as any) as any,
     []
