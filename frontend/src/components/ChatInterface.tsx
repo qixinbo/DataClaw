@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { User, Loader2, Sparkles, Search, ArrowUp, ChevronDown, Table, Paperclip, Check, X, File as FileIcon } from "lucide-react";
 import { api } from "@/lib/api";
-import { type ChartSpec, useVisualizationStore } from "@/store/visualizationStore";
+import { type ChartSpec } from "@/store/visualizationStore";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
@@ -12,12 +12,23 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import { useLocation } from "react-router-dom";
+import { VegaChart } from "./VegaChart";
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   awaitingFirstToken?: boolean;
+  viz?: MessageViz;
+}
+
+interface MessageViz {
+  sql: string;
+  rows: unknown[];
+  chartSpec: ChartSpec | null;
+  canVisualize: boolean;
+  reasoning?: string;
+  error?: string | null;
 }
 
 interface ModelConfig {
@@ -44,7 +55,6 @@ export function ChatInterface() {
   const [selectedDataSource, setSelectedDataSource] = useState<string>("postgres-main");
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { setVisualization, setLoading: setVizLoading, setError: setVizError } = useVisualizationStore();
   const location = useLocation();
   
   // Model selection state
@@ -58,6 +68,7 @@ export function ChatInterface() {
 
   // File upload state
   const [attachedFile, setAttachedFile] = useState<{ filename: string; url: string; columns?: string[]; summary?: string } | null>(null);
+  const [activeDataFile, setActiveDataFile] = useState<{ filename: string; url: string; columns?: string[]; summary?: string } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -116,6 +127,26 @@ export function ChatInterface() {
   ];
   const chartIntentPattern = /(图表|可视化|画图|作图|柱状图|折线图|饼图|趋势|分布|chart|plot|visuali[sz]e)/i;
 
+  const buildMessageViz = (payload: {
+    sql?: string;
+    result?: unknown;
+    error?: string | null;
+    chart?: { chart_spec?: ChartSpec | null; reasoning?: string; can_visualize?: boolean; chart_type?: string } | null;
+  }): MessageViz => {
+    const rows = Array.isArray(payload.result) ? payload.result : [];
+    const chart = payload.chart ?? undefined;
+    const canVisualize = Boolean(chart?.can_visualize);
+    const chartSpec = canVisualize ? (chart?.chart_spec ?? null) : null;
+    return {
+      sql: typeof payload.sql === "string" ? payload.sql : "",
+      rows,
+      chartSpec,
+      canVisualize,
+      reasoning: chart?.reasoning,
+      error: payload.error ?? null,
+    };
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -138,12 +169,15 @@ export function ChatInterface() {
       }
 
       const data = await response.json();
-      setAttachedFile({
+      const uploadedFile = {
         filename: file.name,
         url: data.url,
         columns: data.columns,
         summary: data.summary,
-      });
+      };
+      setAttachedFile(uploadedFile);
+      setActiveDataFile(uploadedFile);
+      setSelectedDataSource("upload-main");
     } catch (error) {
       console.error("File upload error:", error);
       // Could show a toast notification here
@@ -176,8 +210,6 @@ export function ChatInterface() {
     }
     
     setIsLoading(true);
-    setVizLoading(true);
-    setVizError(null);
     
     try {
       if (selectedCapability === "智能问答") {
@@ -191,8 +223,13 @@ export function ChatInterface() {
 
          const token = localStorage.getItem("token");
          const effectiveModelId = selectedModelId || currentModel?.id || "";
-         const source = currentAttachedFile?.url?.startsWith("local://") ? "upload" : selectedDataSource.split('-')[0];
-         const fileUrl = currentAttachedFile?.url || undefined;
+         const selectedSource = selectedDataSource.split('-')[0];
+         const useUploadSource = Boolean(
+           currentAttachedFile?.url?.startsWith("local://") ||
+           (selectedSource === "upload" && activeDataFile?.url?.startsWith("local://"))
+         );
+         const source = useUploadSource ? "upload" : selectedSource;
+         const fileUrl = useUploadSource ? (currentAttachedFile?.url || activeDataFile?.url) : undefined;
          const preferSqlChart = chartIntentPattern.test(messagePayload);
          const response = await fetch("/nanobot/chat/stream", {
            method: "POST",
@@ -219,6 +256,7 @@ export function ChatInterface() {
          const decoder = new TextDecoder("utf-8");
          let buffer = "";
          let streamedText = "";
+         let streamedViz: MessageViz | null = null;
 
          while (true) {
            const { done, value } = await reader.read();
@@ -256,7 +294,7 @@ export function ChatInterface() {
                streamedText = payload.content;
                setMessages((prev) =>
                  prev.map((msg) =>
-                    msg.id === assistantId ? { ...msg, content: payload.content || "", awaitingFirstToken: false } : msg
+                   msg.id === assistantId ? { ...msg, content: payload.content || "", awaitingFirstToken: false, viz: streamedViz ?? msg.viz } : msg
                  )
                );
              }
@@ -266,26 +304,12 @@ export function ChatInterface() {
              }
 
             if (payload.type === "viz") {
-              if (payload.error) {
-                setVizError(payload.error);
-              } else {
-                const rows = Array.isArray(payload.result) ? payload.result : [];
-                const sql = typeof payload.sql === "string" ? payload.sql : "";
-                const chart = payload.chart ?? undefined;
-                const canVisualize = Boolean(chart?.can_visualize);
-                const chartSpec = canVisualize ? (chart?.chart_spec ?? null) : null;
-                setVisualization(
-                  rows,
-                  sql,
-                  chartSpec,
-                  {
-                    canVisualize,
-                    reasoning: chart?.reasoning,
-                    chartType: chart?.chart_type,
-                    description: canVisualize ? "根据模型返回的 Vega-Lite schema 渲染" : "当前结果不适合可视化",
-                  }
-                );
-              }
+              streamedViz = buildMessageViz(payload);
+              setMessages((prev) =>
+                prev.map((msg) =>
+                   msg.id === assistantId ? { ...msg, viz: streamedViz || undefined } : msg
+                )
+              );
             }
            }
          }
@@ -307,35 +331,22 @@ export function ChatInterface() {
             prefer_sql_chart: preferSqlChart,
             file_url: fileUrl,
            });
-          if (fallback.viz?.error) {
-            setVizError(fallback.viz.error);
-          } else if (fallback.viz) {
-            const rows = Array.isArray(fallback.viz.result) ? fallback.viz.result : [];
-            const sql = typeof fallback.viz.sql === "string" ? fallback.viz.sql : "";
-            const chart = fallback.viz.chart ?? undefined;
-            const canVisualize = Boolean(chart?.can_visualize);
-            const chartSpec = canVisualize ? (chart?.chart_spec ?? null) : null;
-            setVisualization(
-              rows,
-              sql,
-              chartSpec,
-              {
-                canVisualize,
-                reasoning: chart?.reasoning,
-                chartType: chart?.chart_type,
-                description: canVisualize ? "根据模型返回的 Vega-Lite schema 渲染" : "当前结果不适合可视化",
-              }
-            );
-          }
+          const fallbackViz = fallback.viz ? buildMessageViz(fallback.viz) : undefined;
            setMessages((prev) =>
              prev.map((msg) =>
-              msg.id === assistantId ? { ...msg, content: fallback.response || "暂无回复", awaitingFirstToken: false } : msg
+             msg.id === assistantId ? { ...msg, content: fallback.response || "暂无回复", awaitingFirstToken: false, viz: fallbackViz } : msg
              )
            );
          }
       } else {
          // Fallback to existing NL2SQL or other skills (e.g. for "表格问答" or "深度问数")
-         const source = currentAttachedFile?.url?.startsWith("local://") ? "upload" : selectedDataSource.split('-')[0];
+         const selectedSource = selectedDataSource.split('-')[0];
+         const useUploadSource = Boolean(
+           currentAttachedFile?.url?.startsWith("local://") ||
+           (selectedSource === "upload" && activeDataFile?.url?.startsWith("local://"))
+         );
+         const source = useUploadSource ? "upload" : selectedSource;
+         const fileUrl = useUploadSource ? (currentAttachedFile?.url || activeDataFile?.url) : undefined;
          const response = await api.post<{
              sql?: string, 
              result?: unknown, 
@@ -344,7 +355,7 @@ export function ChatInterface() {
          }>('/api/v1/agent/nl2sql', {
             query: messagePayload,
             source: source,
-           file_url: currentAttachedFile?.url,
+           file_url: fileUrl,
             session_id: activeSessionKey,
             model_id: selectedModelId 
          });
@@ -355,29 +366,19 @@ export function ChatInterface() {
                 role: 'assistant', 
                 content: `Error: ${response.error}` 
             }]);
-            setVizError(response.error);
          } else {
-            const rows = Array.isArray(response.result) ? response.result : [];
-            const sql = typeof response.sql === "string" ? response.sql : "";
-           const chart = response.chart;
-           const canVisualize = Boolean(chart?.can_visualize);
-           const chartSpec = canVisualize ? (chart?.chart_spec ?? null) : null;
+           const canVisualize = Boolean(response.chart?.can_visualize);
+           const viz = buildMessageViz({
+             sql: response.sql,
+             result: response.result,
+             chart: response.chart,
+           });
             setMessages(prev => [...prev, { 
                 id: (Date.now() + 1).toString(), 
                 role: 'assistant', 
-                content: `已为你生成 SQL 并查询到 ${rows.length} 行数据。${canVisualize ? '可视化面板已同步更新图表。' : '本次结果不适合图表展示。'}${chart?.reasoning ? `\n\n可视化说明：${chart.reasoning}` : ''}` 
+                content: `已为你生成 SQL 并查询到 ${viz.rows.length} 行数据。${canVisualize ? '图表已附在回答下方。' : '本次结果不适合图表展示。'}${response.chart?.reasoning ? `\n\n可视化说明：${response.chart.reasoning}` : ''}`,
+                viz,
             }]);
-            setVisualization(
-              rows,
-              sql,
-              chartSpec,
-              {
-                canVisualize,
-                reasoning: chart?.reasoning,
-                chartType: chart?.chart_type,
-                description: canVisualize ? "根据模型返回的 Vega-Lite schema 渲染" : "当前结果不适合可视化",
-              }
-            );
          }
       }
     } catch (error: any) {
@@ -386,10 +387,8 @@ export function ChatInterface() {
             role: 'assistant', 
             content: `Sorry, something went wrong: ${error.message}` 
         }]);
-        setVizError(error.message);
     } finally {
         setIsLoading(false);
-        setVizLoading(false);
         window.dispatchEvent(new Event("nanobot:sessions-changed"));
     }
   };
@@ -445,6 +444,9 @@ export function ChatInterface() {
           >
             <option value="postgres-main">PostgreSQL</option>
             <option value="clickhouse-main">ClickHouse</option>
+            {activeDataFile?.url?.startsWith("local://") ? (
+              <option value="upload-main">上传文件</option>
+            ) : null}
           </select>
         </div>
       </div>
@@ -571,11 +573,32 @@ export function ChatInterface() {
                           <span>模型思考中，请稍候...</span>
                         </div>
                       ) : (
-                        <div className="prose prose-sm prose-zinc max-w-none prose-p:leading-normal prose-p:my-2 prose-headings:my-3 prose-ul:my-2 prose-li:my-0.5 prose-pre:bg-zinc-50 prose-pre:text-zinc-800 prose-pre:border prose-pre:border-zinc-200">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-                            {msg.content}
-                          </ReactMarkdown>
-                        </div>
+                        <>
+                          <div className="prose prose-sm prose-zinc max-w-none prose-p:leading-normal prose-p:my-2 prose-headings:my-3 prose-ul:my-2 prose-li:my-0.5 prose-pre:bg-zinc-50 prose-pre:text-zinc-800 prose-pre:border prose-pre:border-zinc-200">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                              {msg.content}
+                            </ReactMarkdown>
+                          </div>
+                          {msg.viz ? (
+                            <div className="mt-3 pt-3 border-t border-zinc-100">
+                              {msg.viz.error ? (
+                                <div className="text-sm text-red-500">{msg.viz.error}</div>
+                              ) : msg.viz.canVisualize && msg.viz.chartSpec ? (
+                                (() => {
+                                  const objectRows = msg.viz?.rows?.filter((row) => row && typeof row === "object" && !Array.isArray(row)) || [];
+                                  if (objectRows.length === 0) {
+                                    return <div className="text-sm text-zinc-500">当前结果没有可渲染的结构化数据。</div>;
+                                  }
+                                  return (
+                                    <div className="w-full h-80 rounded-xl border border-zinc-100 p-2">
+                                      <VegaChart data={objectRows} spec={msg.viz.chartSpec} />
+                                    </div>
+                                  );
+                                })()
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </>
                       )
                     ) : (
                       msg.content
