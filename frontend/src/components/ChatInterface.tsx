@@ -39,8 +39,19 @@ interface ModelConfig {
   is_active: boolean;
 }
 
+interface DataFileContext {
+  filename: string;
+  url: string;
+  columns?: string[];
+  summary?: string;
+}
+
 interface SessionData {
   key: string;
+  metadata?: {
+    active_data_file?: DataFileContext | null;
+    [key: string]: any;
+  };
   messages: Array<{
     role: string;
     content: string;
@@ -67,14 +78,24 @@ export function ChatInterface() {
   const activeSessionKey = queryParams.get("session") || "api:default";
 
   // File upload state
-  const [attachedFile, setAttachedFile] = useState<{ filename: string; url: string; columns?: string[]; summary?: string } | null>(null);
-  const [activeDataFile, setActiveDataFile] = useState<{ filename: string; url: string; columns?: string[]; summary?: string } | null>(null);
+  const [attachedFile, setAttachedFile] = useState<DataFileContext | null>(null);
+  const [activeDataFile, setActiveDataFile] = useState<DataFileContext | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchModels();
   }, []);
+
+  const syncSessionFileContext = async (file: DataFileContext | null) => {
+    try {
+      await api.put(`/nanobot/sessions/${encodeURIComponent(activeSessionKey)}/context-file`, {
+        active_data_file: file,
+      });
+    } catch (e) {
+      console.error("Failed to sync session file context", e);
+    }
+  };
 
   useEffect(() => {
     const fetchSessionData = async () => {
@@ -92,9 +113,19 @@ export function ChatInterface() {
         } else {
           setMessages([]);
         }
+        const restoredFile = data.metadata?.active_data_file || null;
+        setActiveDataFile(restoredFile);
+        setAttachedFile(null);
+        if (restoredFile) {
+          setSelectedDataSource("upload-main");
+        } else if (selectedDataSource.startsWith("upload")) {
+          setSelectedDataSource("postgres-main");
+        }
       } catch (e) {
         console.error("Failed to fetch session messages", e);
         setMessages([]);
+        setActiveDataFile(null);
+        setAttachedFile(null);
       } finally {
         setIsLoading(false);
       }
@@ -179,6 +210,7 @@ export function ChatInterface() {
       setAttachedFile(uploadedFile);
       setActiveDataFile(uploadedFile);
       setSelectedDataSource("upload-main");
+      await syncSessionFileContext(uploadedFile);
     } catch (error) {
       console.error("File upload error:", error);
       // Could show a toast notification here
@@ -477,15 +509,25 @@ export function ChatInterface() {
               {/* Input Area */}
               <div className="w-full max-w-3xl relative">
                 <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-zinc-100 p-4 transition-shadow hover:shadow-[0_8px_40px_rgb(0,0,0,0.08)]">
-                  {attachedFile && (
+                  {activeDataFile && (
                     <div className="mx-2 mb-3 p-2.5 bg-blue-50/50 border border-blue-100/50 rounded-xl flex items-center justify-between">
                       <div className="flex items-center gap-2.5 text-sm text-blue-900">
                         <div className="p-1.5 bg-blue-100 rounded-md">
                           <FileIcon className="h-4 w-4 text-blue-600" />
                         </div>
-                        <span className="font-medium truncate max-w-[300px]">{attachedFile.filename}</span>
+                        <span className="font-medium truncate max-w-[300px]">{activeDataFile.filename}</span>
                       </div>
-                      <button onClick={() => setAttachedFile(null)} className="p-1 text-blue-400 hover:text-blue-600 hover:bg-blue-100/50 rounded-md transition-colors">
+                      <button
+                        onClick={async () => {
+                          setAttachedFile(null);
+                          setActiveDataFile(null);
+                          if (selectedDataSource.startsWith("upload")) {
+                            setSelectedDataSource("postgres-main");
+                          }
+                          await syncSessionFileContext(null);
+                        }}
+                        className="p-1 text-blue-400 hover:text-blue-600 hover:bg-blue-100/50 rounded-md transition-colors"
+                      >
                         <X className="h-4 w-4" />
                       </button>
                     </div>
@@ -609,13 +651,23 @@ export function ChatInterface() {
         <div className="absolute bottom-6 left-0 right-0 px-4">
           <div className="max-w-3xl mx-auto">
              <div className="bg-white rounded-2xl shadow-xl border border-zinc-200/60 p-2 flex flex-col gap-2 ring-1 ring-zinc-100">
-                {attachedFile && (
+                {activeDataFile && (
                   <div className="mx-2 mt-1 p-2 bg-blue-50/50 border border-blue-100/50 rounded-lg flex items-center justify-between">
                     <div className="flex items-center gap-2 text-xs text-blue-900">
                       <FileIcon className="h-3.5 w-3.5 text-blue-600" />
-                      <span className="font-medium truncate max-w-[200px]">{attachedFile.filename}</span>
+                      <span className="font-medium truncate max-w-[200px]">{activeDataFile.filename}</span>
                     </div>
-                    <button onClick={() => setAttachedFile(null)} className="text-blue-400 hover:text-blue-600">
+                    <button
+                      onClick={async () => {
+                        setAttachedFile(null);
+                        setActiveDataFile(null);
+                        if (selectedDataSource.startsWith("upload")) {
+                          setSelectedDataSource("postgres-main");
+                        }
+                        await syncSessionFileContext(null);
+                      }}
+                      className="text-blue-400 hover:text-blue-600"
+                    >
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>

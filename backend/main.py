@@ -1,10 +1,11 @@
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import asyncio
 import json
+from datetime import datetime
 
 from app.api import upload, llm, skills, users
 from app.connectors.postgres import postgres_connector
@@ -76,6 +77,10 @@ class SessionAliasUpdateRequest(BaseModel):
     title: Optional[str] = None
     pinned: Optional[bool] = None
     archived: Optional[bool] = None
+
+
+class SessionFileContextUpdateRequest(BaseModel):
+    active_data_file: Optional[Dict[str, Any]] = None
 
 
 def _build_sql_chart_text(nl2sql_result: NL2SQLResponse) -> str:
@@ -244,6 +249,20 @@ def update_session(session_id: str, payload: SessionAliasUpdateRequest):
         archived=payload.archived,
     )
     return {"status": "success", **updated}
+
+
+@app.put("/nanobot/sessions/{session_id}/context-file")
+def update_session_context_file(session_id: str, payload: SessionFileContextUpdateRequest):
+    if not nanobot_service.agent:
+        raise HTTPException(status_code=400, detail="Nanobot not running")
+    session = nanobot_service.agent.sessions.get_or_create(session_id)
+    if payload.active_data_file is None:
+        session.metadata.pop("active_data_file", None)
+    else:
+        session.metadata["active_data_file"] = payload.active_data_file
+    session.updated_at = datetime.now()
+    nanobot_service.agent.sessions.save(session)
+    return {"status": "success", "metadata": session.metadata}
 
 @app.post("/api/v1/agent/nl2sql", response_model=NL2SQLResponse)
 async def run_nl2sql(request: NL2SQLRequest):
