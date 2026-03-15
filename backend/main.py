@@ -7,12 +7,16 @@ import asyncio
 import json
 from datetime import datetime
 
-from app.api import upload, llm, skills, users
+from app.api import upload, llm, skills, users, datasources
 from app.connectors.postgres import postgres_connector
 from app.connectors.clickhouse import clickhouse_connector
 from app.core.nanobot import nanobot_service
 from app.core.session_alias_store import session_alias_store
 from app.agent.nl2sql import process_nl2sql, NL2SQLRequest, NL2SQLResponse
+from app.database import engine, Base
+# Import all models to ensure they are registered
+from app.models.user import User
+from app.models.datasource import DataSource
 
 app = FastAPI()
 
@@ -24,10 +28,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Initialize database tables
+Base.metadata.create_all(bind=engine)
+
 app.include_router(upload.router, prefix="/api/v1")
 app.include_router(llm.router, prefix="/api/v1")
 app.include_router(skills.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
+app.include_router(datasources.router, prefix="/api/v1")
 
 @app.on_event("startup")
 async def startup_event():

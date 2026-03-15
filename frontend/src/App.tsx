@@ -7,6 +7,7 @@ import { Settings } from "./pages/Settings";
 import { Users } from "./pages/Users";
 import { Login } from "./pages/Login";
 import { ModelConfigs } from "./pages/ModelConfigs";
+import { DataSources } from "./pages/DataSources";
 import { useAuthStore } from "./store/authStore";
 
 // Protected Route Component
@@ -88,6 +89,14 @@ function App() {
           <ProtectedRoute>
             <MainLayout>
               <ModelConfigs />
+            </MainLayout>
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/datasources" element={
+          <ProtectedRoute requireAdmin={true}>
+            <MainLayout>
+              <DataSources />
             </MainLayout>
           </ProtectedRoute>
         } />

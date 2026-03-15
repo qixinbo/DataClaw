@@ -72,6 +72,12 @@ export function ChatInterface() {
   const [models, setModels] = useState<ModelConfig[]>([]);
   const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [modelOpen, setModelOpen] = useState(false);
+  
+  // Data Source selection state
+  const [availableDataSources, setAvailableDataSources] = useState<{id: string, name: string}[]>([
+    { id: "postgres-main", name: "PostgreSQL" },
+    { id: "clickhouse-main", name: "ClickHouse" }
+  ]);
 
   // Try to parse active session from URL query
   const queryParams = new URLSearchParams(location.search);
@@ -86,7 +92,20 @@ export function ChatInterface() {
 
   useEffect(() => {
     fetchModels();
+    fetchDataSources();
   }, []);
+
+  const fetchDataSources = async () => {
+    try {
+      const data = await api.get<Array<{id: number, name: string}>>("/api/v1/datasources");
+      setAvailableDataSources(prev => [
+        ...prev.filter(d => !d.id.startsWith("ds:")),
+        ...data.map(d => ({ id: `ds:${d.id}`, name: d.name }))
+      ]);
+    } catch (e) {
+      console.error("Failed to fetch data sources", e);
+    }
+  };
 
   const syncSessionFileContext = async (file: DataFileContext | null) => {
     try {
@@ -506,8 +525,9 @@ export function ChatInterface() {
             onChange={(e) => setSelectedDataSource(e.target.value)}
             className="bg-transparent border-none outline-none text-sm font-medium"
           >
-            <option value="postgres-main">PostgreSQL</option>
-            <option value="clickhouse-main">ClickHouse</option>
+            {availableDataSources.map(ds => (
+              <option key={ds.id} value={ds.id}>{ds.name}</option>
+            ))}
             {activeDataFile?.url?.startsWith("local://") ? (
               <option value="upload-main">上传文件</option>
             ) : null}

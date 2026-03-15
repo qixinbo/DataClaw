@@ -19,7 +19,7 @@ class ClickHouseConnector:
 
     def execute_query(self, query: str):
         try:
-            return self.client.execute(query)
+            return self.client.execute(query, with_column_types=True)
         except Exception as e:
             print(f"ClickHouse Query Error: {e}")
             raise e
