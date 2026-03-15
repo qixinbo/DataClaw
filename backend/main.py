@@ -299,12 +299,3 @@ def update_session_context_file(session_id: str, payload: SessionFileContextUpda
     session.updated_at = datetime.now()
     nanobot_service.agent.sessions.save(session)
     return {"status": "success", "metadata": session.metadata}
-
-@app.post("/api/v1/agent/nl2sql", response_model=NL2SQLResponse)
-async def run_nl2sql(request: NL2SQLRequest):
-    result = await process_nl2sql(request)
-    if request.session_id:
-        text = _build_sql_chart_text(result)
-        viz_payload = _build_sql_chart_viz(result)
-        _persist_session_turn(request.session_id, request.query, text, {"viz": viz_payload})
-    return result

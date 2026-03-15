@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { User, Loader2, Sparkles, Search, ArrowUp, ChevronDown, Table, Paperclip, Check, X, File as FileIcon, Square } from "lucide-react";
+import { User, Loader2, Sparkles, ArrowUp, ChevronDown, Paperclip, Check, X, File as FileIcon, Square } from "lucide-react";
 import { api } from "@/lib/api";
 import { type ChartSpec } from "@/store/visualizationStore";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -62,7 +62,6 @@ interface SessionData {
 export function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [selectedCapability, setSelectedCapability] = useState<string>("智能问答");
   const [selectedDataSource, setSelectedDataSource] = useState<string>("postgres-main");
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -172,11 +171,6 @@ export function ChatInterface() {
 
   const currentModel = models.find(m => m.id === selectedModelId);
   
-  const capabilities = [
-    { icon: Sparkles, label: "智能问答", color: "text-purple-500", bg: "bg-purple-50" },
-    { icon: Table, label: "表格问答", color: "text-orange-500", bg: "bg-orange-50" },
-    { icon: Search, label: "深度问数", color: "text-blue-500", bg: "bg-blue-50" },
-  ];
   const chartIntentPattern = /(图表|可视化|画图|作图|柱状图|折线图|饼图|趋势|分布|chart|plot|visuali[sz]e)/i;
 
   const buildMessageViz = (payload: {
@@ -281,176 +275,132 @@ export function ChatInterface() {
     setIsLoading(true);
     
     try {
-      if (selectedCapability === "智能问答") {
-         const assistantId = (Date.now() + 1).toString();
-         setMessages(prev => [...prev, {
-            id: assistantId,
-            role: "assistant",
-            content: "",
-            awaitingFirstToken: true
-         }]);
+       const assistantId = (Date.now() + 1).toString();
+       setMessages(prev => [...prev, {
+          id: assistantId,
+          role: "assistant",
+          content: "",
+          awaitingFirstToken: true
+       }]);
 
-         const token = localStorage.getItem("token");
-         const effectiveModelId = selectedModelId || currentModel?.id || "";
-         const selectedSource = selectedDataSource.split('-')[0];
-         const useUploadSource = Boolean(
-           currentAttachedFile?.url?.startsWith("local://") ||
-           (selectedSource === "upload" && activeDataFile?.url?.startsWith("local://"))
-         );
-         const source = useUploadSource ? "upload" : selectedSource;
-         const fileUrl = useUploadSource ? (currentAttachedFile?.url || activeDataFile?.url) : undefined;
-         const preferSqlChart = chartIntentPattern.test(messagePayload);
-         const response = await fetch("/nanobot/chat/stream", {
-           method: "POST",
-           headers: {
-             "Content-Type": "application/json",
-             ...(token ? { Authorization: `Bearer ${token}` } : {}),
-           },
-           body: JSON.stringify({
-               message: messagePayload,
-               session_id: activeSessionKey,
-               model_id: effectiveModelId,
-               source,
-               prefer_sql_chart: preferSqlChart,
-               file_url: fileUrl,
-             }),
-           signal: controller.signal,
-         });
-
-         if (!response.ok || !response.body) {
-           const err = await response.json().catch(() => ({}));
-           throw new Error(err.detail || "流式响应失败");
-         }
-
-         const reader = response.body.getReader();
-         const decoder = new TextDecoder("utf-8");
-         let buffer = "";
-         let streamedText = "";
-         let streamedViz: MessageViz | null = null;
-
-         while (true) {
-           const { done, value } = await reader.read();
-           if (done) break;
-           buffer += decoder.decode(value, { stream: true });
-           const events = buffer.split("\n\n");
-           buffer = events.pop() || "";
-
-           for (const eventBlock of events) {
-             const line = eventBlock
-               .split("\n")
-               .find((item) => item.startsWith("data:"));
-             if (!line) continue;
-             const payloadText = line.slice(5).trim();
-             if (!payloadText) continue;
-            const payload = JSON.parse(payloadText) as {
-              type: string;
-              content?: string;
-              sql?: string;
-              result?: unknown;
-              error?: string;
-              chart?: { chart_spec?: ChartSpec | null; reasoning?: string; can_visualize?: boolean; chart_type?: string } | null;
-            };
-
-             if (payload.type === "delta" && payload.content) {
-               streamedText = `${streamedText}${payload.content}`;
-               setMessages((prev) =>
-                 prev.map((msg) =>
-                    msg.id === assistantId ? { ...msg, content: streamedText, awaitingFirstToken: false } : msg
-                 )
-               );
-             }
-
-             if (payload.type === "final" && payload.content) {
-               streamedText = payload.content;
-               setMessages((prev) =>
-                 prev.map((msg) =>
-                   msg.id === assistantId ? { ...msg, content: payload.content || "", awaitingFirstToken: false, viz: streamedViz ?? msg.viz } : msg
-                 )
-               );
-             }
-
-             if (payload.type === "error") {
-               throw new Error(payload.content || "流式响应错误");
-             }
-
-            if (payload.type === "viz") {
-              streamedViz = buildMessageViz(payload);
-              setMessages((prev) =>
-                prev.map((msg) =>
-                   msg.id === assistantId ? { ...msg, viz: streamedViz || undefined } : msg
-                )
-              );
-            }
-           }
-         }
-
-         if (!streamedText) {
-          const fallback = await api.post<{
-            response: string;
-            viz?: {
-              sql?: string;
-              result?: unknown;
-              error?: string | null;
-              chart?: { chart_spec?: ChartSpec | null; reasoning?: string; can_visualize?: boolean; chart_type?: string } | null;
-            };
-          }>("/nanobot/chat", {
+       const token = localStorage.getItem("token");
+       const effectiveModelId = selectedModelId || currentModel?.id || "";
+       const selectedSource = selectedDataSource.split('-')[0];
+       const useUploadSource = Boolean(
+         currentAttachedFile?.url?.startsWith("local://") ||
+         (selectedSource === "upload" && activeDataFile?.url?.startsWith("local://"))
+       );
+       const source = useUploadSource ? "upload" : selectedSource;
+       const fileUrl = useUploadSource ? (currentAttachedFile?.url || activeDataFile?.url) : undefined;
+       const preferSqlChart = chartIntentPattern.test(messagePayload);
+       const response = await fetch("/nanobot/chat/stream", {
+         method: "POST",
+         headers: {
+           "Content-Type": "application/json",
+           ...(token ? { Authorization: `Bearer ${token}` } : {}),
+         },
+         body: JSON.stringify({
              message: messagePayload,
              session_id: activeSessionKey,
              model_id: effectiveModelId,
-            source,
-            prefer_sql_chart: preferSqlChart,
-            file_url: fileUrl,
-           }, { signal: controller.signal });
-          const fallbackViz = fallback.viz ? buildMessageViz(fallback.viz) : undefined;
-           setMessages((prev) =>
-             prev.map((msg) =>
-             msg.id === assistantId ? { ...msg, content: fallback.response || "暂无回复", awaitingFirstToken: false, viz: fallbackViz } : msg
-             )
-           );
-         }
-      } else {
-         // Fallback to existing NL2SQL or other skills (e.g. for "表格问答" or "深度问数")
-         const selectedSource = selectedDataSource.split('-')[0];
-         const useUploadSource = Boolean(
-           currentAttachedFile?.url?.startsWith("local://") ||
-           (selectedSource === "upload" && activeDataFile?.url?.startsWith("local://"))
-         );
-         const source = useUploadSource ? "upload" : selectedSource;
-         const fileUrl = useUploadSource ? (currentAttachedFile?.url || activeDataFile?.url) : undefined;
-         const response = await api.post<{
-             sql?: string, 
-             result?: unknown, 
-             error?: string,
-             chart?: { chart_spec?: ChartSpec | null, reasoning?: string, can_visualize?: boolean, chart_type?: string }
-         }>('/api/v1/agent/nl2sql', {
-            query: messagePayload,
-            source: source,
-           file_url: fileUrl,
-            session_id: activeSessionKey,
-            model_id: selectedModelId 
-         }, { signal: controller.signal });
+             source,
+             prefer_sql_chart: preferSqlChart,
+             file_url: fileUrl,
+           }),
+         signal: controller.signal,
+       });
 
-         if (response.error) {
-            setMessages(prev => [...prev, { 
-                id: (Date.now() + 1).toString(), 
-                role: 'assistant', 
-                content: `Error: ${response.error}` 
-            }]);
-         } else {
-           const canVisualize = Boolean(response.chart?.can_visualize);
-           const viz = buildMessageViz({
-             sql: response.sql,
-             result: response.result,
-             chart: response.chart,
-           });
-            setMessages(prev => [...prev, { 
-                id: (Date.now() + 1).toString(), 
-                role: 'assistant', 
-                content: `已为你生成 SQL 并查询到 ${viz.rows.length} 行数据。${canVisualize ? '图表已附在回答下方。' : '本次结果不适合图表展示。'}${response.chart?.reasoning ? `\n\n可视化说明：${response.chart.reasoning}` : ''}`,
-                viz,
-            }]);
+       if (!response.ok || !response.body) {
+         const err = await response.json().catch(() => ({}));
+         throw new Error(err.detail || "流式响应失败");
+       }
+
+       const reader = response.body.getReader();
+       const decoder = new TextDecoder("utf-8");
+       let buffer = "";
+       let streamedText = "";
+       let streamedViz: MessageViz | null = null;
+
+       while (true) {
+         const { done, value } = await reader.read();
+         if (done) break;
+         buffer += decoder.decode(value, { stream: true });
+         const events = buffer.split("\n\n");
+         buffer = events.pop() || "";
+
+         for (const eventBlock of events) {
+           const line = eventBlock
+             .split("\n")
+             .find((item) => item.startsWith("data:"));
+           if (!line) continue;
+           const payloadText = line.slice(5).trim();
+           if (!payloadText) continue;
+          const payload = JSON.parse(payloadText) as {
+            type: string;
+            content?: string;
+            sql?: string;
+            result?: unknown;
+            error?: string;
+            chart?: { chart_spec?: ChartSpec | null; reasoning?: string; can_visualize?: boolean; chart_type?: string } | null;
+          };
+
+           if (payload.type === "delta" && payload.content) {
+             streamedText = `${streamedText}${payload.content}`;
+             setMessages((prev) =>
+               prev.map((msg) =>
+                  msg.id === assistantId ? { ...msg, content: streamedText, awaitingFirstToken: false } : msg
+               )
+             );
+           }
+
+           if (payload.type === "final" && payload.content) {
+             streamedText = payload.content;
+             setMessages((prev) =>
+               prev.map((msg) =>
+                 msg.id === assistantId ? { ...msg, content: payload.content || "", awaitingFirstToken: false, viz: streamedViz ?? msg.viz } : msg
+               )
+             );
+           }
+
+           if (payload.type === "error") {
+             throw new Error(payload.content || "流式响应错误");
+           }
+
+          if (payload.type === "viz") {
+            streamedViz = buildMessageViz(payload);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                 msg.id === assistantId ? { ...msg, viz: streamedViz || undefined } : msg
+              )
+            );
+          }
          }
-      }
+       }
+
+       if (!streamedText) {
+        const fallback = await api.post<{
+          response: string;
+          viz?: {
+            sql?: string;
+            result?: unknown;
+            error?: string | null;
+            chart?: { chart_spec?: ChartSpec | null; reasoning?: string; can_visualize?: boolean; chart_type?: string } | null;
+          };
+        }>("/nanobot/chat", {
+           message: messagePayload,
+           session_id: activeSessionKey,
+           model_id: effectiveModelId,
+          source,
+          prefer_sql_chart: preferSqlChart,
+          file_url: fileUrl,
+         }, { signal: controller.signal });
+        const fallbackViz = fallback.viz ? buildMessageViz(fallback.viz) : undefined;
+         setMessages((prev) =>
+           prev.map((msg) =>
+           msg.id === assistantId ? { ...msg, content: fallback.response || "暂无回复", awaitingFirstToken: false, viz: fallbackViz } : msg
+           )
+         );
+       }
     } catch (error: any) {
         if (error?.name === "AbortError" || String(error?.message || "").toLowerCase().includes("aborted")) {
           setMessages((prev) =>
@@ -598,20 +548,6 @@ export function ChatInterface() {
                   
                   <div className="flex items-center justify-between mt-4 pt-2 border-t border-zinc-50">
                     <div className="flex items-center gap-2">
-                      {capabilities.map((cap) => (
-                        <button
-                          key={cap.label}
-                          onClick={() => setSelectedCapability(cap.label)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                            selectedCapability === cap.label 
-                              ? `${cap.bg} ${cap.color} ring-1 ring-${cap.color.split('-')[1]}-200 shadow-sm` 
-                              : 'bg-zinc-50 text-zinc-500 hover:bg-zinc-100'
-                          }`}
-                        >
-                          <cap.icon className="h-3.5 w-3.5" />
-                          {cap.label}
-                        </button>
-                      ))}
                     </div>
                     
                     <div className="flex items-center gap-3">
