@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Code, Table as TableIcon, BarChart as ChartIcon, LayoutDashboard } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useDashboardStore } from "@/store/dashboardStore";
+import { useDashboardStore, type ChartConfig } from "@/store/dashboardStore";
 import type { ChartSpec } from "@/store/visualizationStore";
 import { VegaChart } from "./VegaChart";
 
@@ -22,22 +22,37 @@ interface InlineVisualizationCardProps {
 
 export function InlineVisualizationCard({ viz }: InlineVisualizationCardProps) {
   const [view, setView] = useState<'table' | 'chart'>('chart');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingChart, setPendingChart] = useState<Omit<ChartConfig, 'layout'> | null>(null);
   const { addChart } = useDashboardStore();
   const objectRows = viz.rows.filter((row) => row && typeof row === "object" && !Array.isArray(row)) as Record<string, unknown>[];
   const columns = objectRows.length > 0 ? Object.keys(objectRows[0]) : [];
 
-  const handleAddToDashboard = () => {
+  const buildPendingChart = (): Omit<ChartConfig, 'layout'> => {
     const mark = viz.chartSpec?.mark;
     const markType = typeof mark === "string" ? mark : mark?.type;
     const dashboardType = markType === "line" ? "line" : "bar";
-    addChart({
+    return {
       id: Date.now().toString(),
       title: viz.chartSpec?.title || "Generated Analysis",
       type: dashboardType,
       data: objectRows,
       sql: viz.sql,
       chartSpec: viz.chartSpec,
-    });
+    };
+  };
+
+  const handleAddToDashboard = () => {
+    const chart = buildPendingChart();
+    setPendingChart(chart);
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmAdd = () => {
+    if (!pendingChart) return;
+    addChart(pendingChart);
+    setConfirmOpen(false);
+    setPendingChart(null);
   };
 
   if (viz.error) {
@@ -128,6 +143,30 @@ export function InlineVisualizationCard({ viz }: InlineVisualizationCardProps) {
           <div className="text-sm text-zinc-500">当前结果没有可渲染的结构化数据。</div>
         )}
       </CardContent>
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>确认加入 Dashboard</DialogTitle>
+            <DialogDescription>
+              将当前图表添加到 Dashboard，是否继续？
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setConfirmOpen(false);
+                setPendingChart(null);
+              }}
+            >
+              取消
+            </Button>
+            <Button onClick={handleConfirmAdd}>
+              确认添加
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

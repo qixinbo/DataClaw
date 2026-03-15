@@ -1,33 +1,48 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Code, Table as TableIcon, BarChart as ChartIcon, Download, LayoutDashboard, Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useDashboardStore } from "@/store/dashboardStore";
+import { useDashboardStore, type ChartConfig } from "@/store/dashboardStore";
 import { useVisualizationStore } from "@/store/visualizationStore";
 import { VegaChart } from "./VegaChart";
 
 export function VisualizationPanel() {
   const [view, setView] = useState<'table' | 'chart'>('chart');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingChart, setPendingChart] = useState<Omit<ChartConfig, 'layout'> | null>(null);
   const { addChart } = useDashboardStore();
   const { currentData, currentSQL, currentChartSpec, currentChartInfo, isLoading, error } = useVisualizationStore();
 
-  const handleAddToDashboard = () => {
-    if (!currentData || !currentSQL) return;
+  const buildPendingChart = (): Omit<ChartConfig, 'layout'> | null => {
+    if (!currentData || !currentSQL) return null;
     const mark = currentChartSpec?.mark;
     const markType = typeof mark === "string" ? mark : mark?.type;
     const dashboardType = markType === "line" ? "line" : "bar";
-    addChart({
+    return {
       id: Date.now().toString(),
       title: currentChartSpec?.title || 'Generated Analysis',
       type: dashboardType,
       data: currentData,
       sql: currentSQL,
       chartSpec: currentChartSpec,
-    });
-    alert("Added to Dashboard!");
+    };
+  };
+
+  const handleAddToDashboard = () => {
+    const chart = buildPendingChart();
+    if (!chart) return;
+    setPendingChart(chart);
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmAdd = () => {
+    if (!pendingChart) return;
+    addChart(pendingChart);
+    setConfirmOpen(false);
+    setPendingChart(null);
   };
 
   if (isLoading) {
@@ -175,6 +190,28 @@ export function VisualizationPanel() {
           </CardContent>
         </Card>
       </div>
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>确认加入 Dashboard</DialogTitle>
+            <DialogDescription>
+              将当前图表添加到 Dashboard，是否继续？
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setConfirmOpen(false);
+                setPendingChart(null);
+              }}
+            >
+              取消
+            </Button>
+            <Button onClick={handleConfirmAdd}>确认添加</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
