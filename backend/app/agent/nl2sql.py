@@ -23,6 +23,7 @@ from app.schemas.chart import ChartGenerationResponse
 from app.agent.chart import generate_chart
 from app.database import SessionLocal
 from app.models.datasource import DataSource
+from app.core.files import resolve_upload_file_path
 
 SCHEMA_CACHE_TTL_SECONDS = 300
 CONNECTION_CACHE_TTL_SECONDS = 30
@@ -100,15 +101,10 @@ The final answer must be a ANSI SQL query in JSON format:
 """
 
 def _resolve_upload_file_path(file_url: Optional[str]) -> Path:
-    if not file_url or not file_url.startswith("local://"):
-        raise ValueError("Invalid uploaded file URL")
-    raw_name = file_url.replace("local://", "", 1)
-    safe_name = os.path.basename(raw_name)
-    upload_dir = Path(__file__).resolve().parents[2] / "data" / "uploads"
-    file_path = upload_dir / safe_name
-    if not file_path.exists():
-        raise ValueError(f"Uploaded file not found: {safe_name}")
-    return file_path
+    try:
+        return resolve_upload_file_path(file_url)
+    except ValueError as e:
+        raise ValueError(f"Invalid uploaded file URL: {e}")
 
 def _load_upload_dataframe_from_path(file_path: Path) -> pd.DataFrame:
     suffix = file_path.suffix.lower()

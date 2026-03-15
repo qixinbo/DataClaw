@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Check, AlertTriangle } from "lucide-react";
+import { Loader2, Check, AlertTriangle, Upload } from "lucide-react";
+import { api } from "@/lib/api";
 
 export interface DataSourceConfig {
   id?: number;
@@ -24,9 +25,41 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleConfigChange = (key: string, value: any) => {
     setConfig(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleFileSelect = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      // @ts-ignore
+      const res = await api.post("/api/v1/upload/file", formData);
+      if (res && (res as any).url) {
+        handleConfigChange("file_path", (res as any).url);
+      }
+    } catch (error) {
+      console.error("Upload failed", error);
+      alert("上传失败");
+    } finally {
+      setIsUploading(false);
+      // Clear input value so same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   };
 
   const handleTest = async () => {
@@ -175,11 +208,24 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">File Path (Server Side)</label>
-              <Input 
-                value={config.file_path || ""} 
-                onChange={e => handleConfigChange("file_path", e.target.value)} 
-                placeholder="/path/to/database.db" 
-              />
+              <div className="flex gap-2">
+                <Input 
+                  value={config.file_path || ""} 
+                  onChange={e => handleConfigChange("file_path", e.target.value)} 
+                  placeholder="/path/to/database.db" 
+                />
+                <Button type="button" variant="outline" onClick={handleFileSelect} disabled={isUploading}>
+                   {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                </Button>
+                <input 
+                  key="sqlite-input"
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  accept=".db,.sqlite,.sqlite3"
+                  onChange={handleFileUpload}
+                />
+              </div>
             </div>
           </div>
         );
@@ -188,11 +234,24 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
            <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">File Path (Server Side)</label>
-              <Input 
-                value={config.file_path || ""} 
-                onChange={e => handleConfigChange("file_path", e.target.value)} 
-                placeholder="/path/to/data.parquet" 
-              />
+              <div className="flex gap-2">
+                <Input 
+                  value={config.file_path || ""} 
+                  onChange={e => handleConfigChange("file_path", e.target.value)} 
+                  placeholder="/path/to/data.parquet" 
+                />
+                <Button type="button" variant="outline" onClick={handleFileSelect} disabled={isUploading}>
+                   {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                </Button>
+                <input 
+                  key="parquet-input"
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  accept=".parquet"
+                  onChange={handleFileUpload}
+                />
+              </div>
             </div>
           </div>
         );

@@ -5,6 +5,7 @@ from app.connectors.postgres import PostgresConnector
 from app.connectors.clickhouse import ClickHouseConnector
 from app.connectors.parquet import ParquetConnector
 from app.models.datasource import DataSource
+from app.core.files import resolve_upload_file_path
 
 @functools.lru_cache(maxsize=32)
 def _get_cached_connector(ds_type: str, config_json: str):
@@ -20,7 +21,8 @@ def _get_cached_connector(ds_type: str, config_json: str):
         # SQLite uses connection string usually file path
         db_url = config.get("connection_string")
         if not db_url and config.get("file_path"):
-             db_url = f"sqlite:///{config.get('file_path')}"
+             file_path = str(resolve_upload_file_path(config.get("file_path")))
+             db_url = f"sqlite:///{file_path}"
         return PostgresConnector(db_url=db_url)
 
     elif ds_type == "clickhouse":
@@ -33,7 +35,8 @@ def _get_cached_connector(ds_type: str, config_json: str):
         )
         
     elif ds_type == "parquet":
-        return ParquetConnector(file_path=config.get("file_path"))
+        file_path = str(resolve_upload_file_path(config.get("file_path")))
+        return ParquetConnector(file_path=file_path)
         
     else:
         raise ValueError(f"Unsupported data source type: {ds_type}")
