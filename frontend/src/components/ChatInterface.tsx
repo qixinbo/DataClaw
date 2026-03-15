@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { User, Loader2, Sparkles, ArrowUp, ChevronDown, Paperclip, Check, X, File as FileIcon, Square } from "lucide-react";
+import { User, Loader2, Sparkles, ArrowUp, ChevronDown, Paperclip, Check, X, File as FileIcon, Square, Plus, Database, Wand2, Search, Zap, LayoutGrid, CheckCircle2, Table, XCircle } from "lucide-react";
 import { api } from "@/lib/api";
 import { type ChartSpec } from "@/store/visualizationStore";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -46,6 +46,13 @@ interface DataFileContext {
   summary?: string;
 }
 
+interface Skill {
+  id: string;
+  name: string;
+  description?: string;
+  type: string;
+}
+
 interface SessionData {
   key: string;
   metadata?: {
@@ -63,6 +70,9 @@ export function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [selectedDataSource, setSelectedDataSource] = useState<string>("postgres-main");
+  const [availableSkills, setAvailableSkills] = useState<Skill[]>([]);
+  const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
@@ -236,6 +246,51 @@ export function ChatInterface() {
     }
   };
 
+  const handleRemoveFile = async () => {
+    setAttachedFile(null);
+    setActiveDataFile(null);
+    if (selectedDataSource.startsWith("upload")) {
+      setSelectedDataSource("postgres-main");
+    }
+    await syncSessionFileContext(null);
+  };
+
+  const renderFileCard = () => {
+    const file = attachedFile || activeDataFile;
+    if (!file) return null;
+    return (
+      <div className="px-2 pt-2">
+        <div className="p-2.5 bg-white border border-zinc-100 rounded-2xl flex items-center gap-3 relative group/file shadow-sm max-w-[280px]">
+          <div className="h-10 w-10 bg-emerald-600 rounded-xl flex items-center justify-center shrink-0">
+            <Table className="h-6 w-6 text-white" />
+          </div>
+          <div className="flex-1 min-w-0 pr-6">
+            <div className="text-sm font-bold text-zinc-900 truncate">{file.filename}</div>
+            <div className="text-xs text-zinc-500">电子表格</div>
+          </div>
+          <button 
+            onClick={handleRemoveFile}
+            className="absolute top-1.5 right-1.5 h-5 w-5 rounded-full flex items-center justify-center transition-colors group/close"
+          >
+            <XCircle className="h-5 w-5 fill-zinc-900 text-white" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  useEffect(() => {
+    const fetchSkills = async () => {
+      try {
+        const skills = await api.get<Skill[]>("/api/v1/skills");
+        setAvailableSkills(skills);
+      } catch (err) {
+        console.error("Failed to fetch skills:", err);
+      }
+    };
+    fetchSkills();
+  }, []);
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -303,6 +358,7 @@ export function ChatInterface() {
              message: messagePayload,
              session_id: activeSessionKey,
              model_id: effectiveModelId,
+             skill_ids: selectedSkillIds,
              source,
              prefer_sql_chart: preferSqlChart,
              file_url: fileUrl,
@@ -390,6 +446,7 @@ export function ChatInterface() {
            message: messagePayload,
            session_id: activeSessionKey,
            model_id: effectiveModelId,
+           skill_ids: selectedSkillIds,
           source,
           prefer_sql_chart: preferSqlChart,
           file_url: fileUrl,
@@ -427,32 +484,33 @@ export function ChatInterface() {
   };
 
   return (
-    <div className="h-full min-h-0 bg-white flex flex-col">
-      {/* Top Bar */}
-      <div className="sticky top-0 left-0 w-full px-6 py-4 z-20 flex justify-between items-center bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 border-b border-zinc-100">
+    <div className="flex flex-col h-full bg-white relative">
+      {/* Header with Model Selection */}
+      <div className="px-4 py-3 flex items-center justify-between border-b border-zinc-100 bg-white/50 backdrop-blur-md sticky top-0 z-20">
         <Popover open={modelOpen} onOpenChange={setModelOpen}>
-          <PopoverTrigger className="w-[200px] flex justify-between items-center bg-white/80 backdrop-blur-sm rounded-md px-3 py-2 text-sm hover:bg-zinc-50 hover:text-zinc-900 text-zinc-700 font-medium transition-all outline-none border-none shadow-none ring-0">
-              {currentModel ? (currentModel.name || currentModel.model) : "选择模型..."}
-              <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <PopoverTrigger className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-zinc-100 transition-colors group">
+            <span className="font-semibold text-zinc-900">
+              {selectedModelId ? models.find(m => m.id === selectedModelId)?.name || 'DataClaw' : 'DataClaw'}
+            </span>
+            <ChevronDown className="h-4 w-4 text-zinc-400 group-hover:text-zinc-600 transition-colors" />
           </PopoverTrigger>
-          <PopoverContent className="w-[240px] p-0" align="start">
+          <PopoverContent className="w-[280px] p-0" align="start">
             <Command>
-              <CommandInput placeholder="搜索模型..." className="h-9" />
-              <CommandList>
+              <CommandInput placeholder="搜索模型..." />
+              <CommandList className="max-h-[300px]">
                 <CommandEmpty>未找到模型</CommandEmpty>
                 <CommandGroup heading="可用模型">
                   {models.map((model) => (
                     <CommandItem
                       key={model.id}
-                      value={model.name || model.model}
                       onSelect={() => {
                         setSelectedModelId(model.id);
                         setModelOpen(false);
                       }}
-                      className="cursor-pointer"
+                      className="flex items-center gap-2 py-2.5 cursor-pointer"
                     >
                       <div className="flex flex-col">
-                        <span className="font-medium">{model.name || model.model}</span>
+                        <span className="font-medium text-zinc-900">{model.name || model.model}</span>
                         <span className="text-xs text-zinc-400">{model.provider}</span>
                       </div>
                       <Check
@@ -468,21 +526,6 @@ export function ChatInterface() {
             </Command>
           </PopoverContent>
         </Popover>
-        <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-md px-3 py-2 text-sm text-zinc-700">
-          <span className="text-zinc-500">数据源</span>
-          <select
-            value={selectedDataSource}
-            onChange={(e) => setSelectedDataSource(e.target.value)}
-            className="bg-transparent border-none outline-none text-sm font-medium"
-          >
-            {availableDataSources.map(ds => (
-              <option key={ds.id} value={ds.id}>{ds.name}</option>
-            ))}
-            {activeDataFile?.url?.startsWith("local://") ? (
-              <option value="upload-main">上传文件</option>
-            ) : null}
-          </select>
-        </div>
       </div>
 
       <ScrollArea className="flex-1 min-h-0">
@@ -508,73 +551,150 @@ export function ChatInterface() {
               </div>
 
               {/* Input Area */}
-              <div className="w-full max-w-3xl relative">
-                <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-zinc-100 p-4 transition-shadow hover:shadow-[0_8px_40px_rgb(0,0,0,0.08)]">
-                  {activeDataFile && (
-                    <div className="mx-2 mb-3 p-2.5 bg-blue-50/50 border border-blue-100/50 rounded-xl flex items-center justify-between">
-                      <div className="flex items-center gap-2.5 text-sm text-blue-900">
-                        <div className="p-1.5 bg-blue-100 rounded-md">
-                          <FileIcon className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <span className="font-medium truncate max-w-[300px]">{activeDataFile.filename}</span>
+              <div className="w-full max-w-4xl px-4">
+                <div className="relative group">
+                  <div className="flex flex-col bg-white rounded-[26px] border border-zinc-200 shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-all duration-200">
+                    {renderFileCard()}
+                    <div className="flex items-center pl-2 pr-2 py-2">
+                      <div className="flex items-center">
+                        <Popover open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+                          <PopoverTrigger className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-zinc-100 transition-colors text-zinc-500">
+                            <Plus className="h-5 w-5" />
+                          </PopoverTrigger>
+                          <PopoverContent side="top" align="start" className="w-[480px] p-0 mb-2 overflow-hidden rounded-2xl border-zinc-200 shadow-xl">
+                            <div className="flex divide-x divide-zinc-100">
+                              {/* Left Column: Data Source */}
+                              <div className="flex-1 p-3 bg-zinc-50/50">
+                                <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
+                                  <Database className="h-3 w-3" />
+                                  数据源
+                                </div>
+                                <div className="space-y-0.5">
+                                  {[
+                                    { id: 'postgres-main', label: 'Postgres (Main)', icon: Database },
+                                    { id: 'clickhouse-main', label: 'Clickhouse', icon: Database },
+                                    { id: 'upload', label: '本地文件上传', icon: FileIcon },
+                                  ].map((ds) => (
+                                    <button
+                                      key={ds.id}
+                                      onClick={() => {
+                                        setSelectedDataSource(ds.id);
+                                        if (ds.id === 'upload') {
+                                          fileInputRef.current?.click();
+                                          setIsMenuOpen(false);
+                                        }
+                                      }}
+                                      className={cn(
+                                        "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
+                                        selectedDataSource === ds.id 
+                                          ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200" 
+                                          : "text-zinc-600 hover:bg-white hover:shadow-sm"
+                                      )}
+                                    >
+                                      <div className="flex items-center gap-2.5">
+                                        <ds.icon className={cn("h-4 w-4", selectedDataSource === ds.id ? "text-blue-500" : "text-zinc-400")} />
+                                        <span className="font-medium">{ds.label}</span>
+                                      </div>
+                                      {selectedDataSource === ds.id && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Right Column: Skills */}
+                              <div className="flex-1 p-3 bg-white">
+                                <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
+                                  <Wand2 className="h-3 w-3" />
+                                  Skills
+                                </div>
+                                <div className="space-y-0.5 max-h-[300px] overflow-y-auto pr-1">
+                                  {availableSkills.length > 0 ? (
+                                    availableSkills.map((skill) => {
+                                      const isSelected = selectedSkillIds.includes(skill.id);
+                                      return (
+                                        <button
+                                          key={skill.id}
+                                          onClick={() => {
+                                            setSelectedSkillIds(prev => 
+                                              isSelected 
+                                                ? prev.filter(id => id !== skill.id) 
+                                                : [...prev, skill.id]
+                                            );
+                                          }}
+                                          className={cn(
+                                            "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200 group/item",
+                                            isSelected 
+                                              ? "bg-zinc-50 text-zinc-900 ring-1 ring-zinc-100" 
+                                              : "text-zinc-600 hover:bg-zinc-50"
+                                          )}
+                                        >
+                                          <div className="flex flex-col items-start gap-0.5">
+                                            <span className="font-medium">{skill.name}</span>
+                                            {skill.description && (
+                                              <span className="text-[11px] text-zinc-400 line-clamp-1 group-hover/item:text-zinc-500">
+                                                {skill.description}
+                                              </span>
+                                            )}
+                                          </div>
+                                          {isSelected && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
+                                        </button>
+                                      );
+                                    })
+                                  ) : (
+                                    <div className="px-3 py-8 text-center">
+                                      <Zap className="h-8 w-8 text-zinc-100 mx-auto mb-2" />
+                                      <p className="text-xs text-zinc-400">暂无可用技能</p>
+                                    </div>
+                                  )}
+                                </div>
+                                {selectedSkillIds.length > 0 && (
+                                  <div className="mt-2 pt-2 border-t border-zinc-100">
+                                    <button 
+                                      onClick={() => setSelectedSkillIds([])}
+                                      className="w-full py-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 transition-colors flex items-center justify-center gap-1"
+                                    >
+                                      清除已选 ({selectedSkillIds.length})
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       </div>
-                      <button
-                        onClick={async () => {
-                          setAttachedFile(null);
-                          setActiveDataFile(null);
-                          if (selectedDataSource.startsWith("upload")) {
-                            setSelectedDataSource("postgres-main");
-                          }
-                          await syncSessionFileContext(null);
-                        }}
-                        className="p-1 text-blue-400 hover:text-blue-600 hover:bg-blue-100/50 rounded-md transition-colors"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+
+                      <input
+                        type="text"
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleSend()}
+                        placeholder="有问题，尽管问"
+                        className="flex-1 bg-transparent border-none focus:ring-0 text-lg px-3 py-2 text-zinc-900 placeholder:text-zinc-300 outline-none"
+                        disabled={isLoading}
+                      />
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={handleSend}
+                          disabled={isLoading || (!input.trim() && !attachedFile && !activeDataFile)}
+                          className={cn(
+                            "flex items-center justify-center h-10 w-10 rounded-full transition-all duration-200",
+                            (input.trim() || attachedFile || activeDataFile) && !isLoading
+                              ? "bg-zinc-900 text-white hover:bg-zinc-800 shadow-sm"
+                              : "bg-zinc-100 text-zinc-300"
+                          )}
+                        >
+                          {isLoading ? (
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                          ) : (
+                            <ArrowUp className="h-6 w-6" />
+                          )}
+                        </button>
+                      </div>
                     </div>
-                  )}
-                  <textarea
-                    className="w-full min-h-[60px] max-h-[200px] resize-none border-none focus:ring-0 text-lg text-zinc-700 placeholder:text-zinc-300 bg-transparent p-2"
-                    placeholder="先思考后回答，解决更有难度的问题"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSend();
-                      }
-                    }}
-                  />
-                  
-                  <div className="flex items-center justify-between mt-4 pt-2 border-t border-zinc-50">
-                    <div className="flex items-center gap-2">
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-9 w-9 text-zinc-400 hover:text-zinc-600 rounded-full"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isUploading}
-                      >
-                        {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Paperclip className="h-5 w-5" />}
-                      </Button>
-                      <Button
-                        onClick={isLoading ? handleForceStop : handleSend}
-                        size="icon"
-                        disabled={isLoading ? false : !input.trim()}
-                        className={`h-9 w-9 rounded-full transition-all ${
-                          isLoading
-                            ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                            : input.trim()
-                              ? 'bg-zinc-100 text-zinc-900 hover:bg-zinc-200'
-                              : 'bg-zinc-50 text-zinc-300 cursor-not-allowed'
-                        }`}
-                      >
-                        {isLoading ? <Square className="h-4 w-4" /> : <ArrowUp className="h-5 w-5" />}
-                      </Button>
-                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap justify-center gap-2">
+                    {/* Common Questions or suggestions could go here */}
                   </div>
                 </div>
               </div>
@@ -636,65 +756,154 @@ export function ChatInterface() {
       </ScrollArea>
       
       {/* Floating Input for Chat State */}
-      {messages.length > 1 && (
+      {messages.length > 0 && (
         <div className="px-4 pb-6 pt-3 border-t border-zinc-100 bg-white">
-          <div className="max-w-3xl mx-auto">
-             <div className="bg-white rounded-2xl shadow-xl border border-zinc-200/60 p-2 flex flex-col gap-2 ring-1 ring-zinc-100">
-                {activeDataFile && (
-                  <div className="mx-2 mt-1 p-2 bg-blue-50/50 border border-blue-100/50 rounded-lg flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs text-blue-900">
-                      <FileIcon className="h-3.5 w-3.5 text-blue-600" />
-                      <span className="font-medium truncate max-w-[200px]">{activeDataFile.filename}</span>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        setAttachedFile(null);
-                        setActiveDataFile(null);
-                        if (selectedDataSource.startsWith("upload")) {
-                          setSelectedDataSource("postgres-main");
-                        }
-                        await syncSessionFileContext(null);
-                      }}
-                      className="text-blue-400 hover:text-blue-600"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                )}
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-9 w-9 text-zinc-400 hover:text-zinc-600 rounded-full shrink-0"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading || isLoading}
-                  >
-                    {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Paperclip className="h-5 w-5" />}
-                  </Button>
-                  <Input
-                    className="flex-1 border-none shadow-none focus-visible:ring-0 text-base text-zinc-700 placeholder:text-zinc-400 h-11 bg-transparent"
-                    placeholder="Send a message..."
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                    disabled={isLoading}
-                  />
-                  <Button
+          <div className="relative group max-w-4xl mx-auto">
+            <div className="flex flex-col bg-white rounded-[26px] border border-zinc-200 shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-all duration-200">
+              {renderFileCard()}
+              <div className="flex items-center pl-2 pr-2 py-2">
+                <div className="flex items-center">
+                  <Popover open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+                    <PopoverTrigger className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-zinc-100 transition-colors text-zinc-500">
+                      <Plus className="h-5 w-5" />
+                    </PopoverTrigger>
+                    <PopoverContent side="top" align="start" className="w-[480px] p-0 mb-2 overflow-hidden rounded-2xl border-zinc-200 shadow-xl">
+                      <div className="flex divide-x divide-zinc-100">
+                        {/* Left Column: Data Source */}
+                        <div className="flex-1 p-3 bg-zinc-50/50">
+                          <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
+                            <Database className="h-3 w-3" />
+                            数据源
+                          </div>
+                          <div className="space-y-0.5">
+                            {[
+                              { id: 'postgres-main', label: 'Postgres (Main)', icon: Database },
+                              { id: 'clickhouse-main', label: 'Clickhouse', icon: Database },
+                              { id: 'upload', label: '本地文件上传', icon: FileIcon },
+                            ].map((ds) => (
+                              <button
+                                key={ds.id}
+                                onClick={() => {
+                                  setSelectedDataSource(ds.id);
+                                  if (ds.id === 'upload') {
+                                    fileInputRef.current?.click();
+                                    setIsMenuOpen(false);
+                                  }
+                                }}
+                                className={cn(
+                                  "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
+                                  selectedDataSource === ds.id 
+                                    ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200" 
+                                    : "text-zinc-600 hover:bg-white hover:shadow-sm"
+                                )}
+                              >
+                                <div className="flex items-center gap-2.5">
+                                  <ds.icon className={cn("h-4 w-4", selectedDataSource === ds.id ? "text-blue-500" : "text-zinc-400")} />
+                                  <span className="font-medium">{ds.label}</span>
+                                </div>
+                                {selectedDataSource === ds.id && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Right Column: Skills */}
+                        <div className="flex-1 p-3 bg-white">
+                          <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
+                            <Wand2 className="h-3 w-3" />
+                            Skills
+                          </div>
+                          <div className="space-y-0.5 max-h-[300px] overflow-y-auto pr-1">
+                            {availableSkills.length > 0 ? (
+                              availableSkills.map((skill) => {
+                                const isSelected = selectedSkillIds.includes(skill.id);
+                                return (
+                                  <button
+                                    key={skill.id}
+                                    onClick={() => {
+                                      setSelectedSkillIds(prev => 
+                                        isSelected 
+                                          ? prev.filter(id => id !== skill.id) 
+                                          : [...prev, skill.id]
+                                      );
+                                    }}
+                                    className={cn(
+                                      "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200 group/item",
+                                      isSelected 
+                                        ? "bg-zinc-50 text-zinc-900 ring-1 ring-zinc-100" 
+                                        : "text-zinc-600 hover:bg-zinc-50"
+                                    )}
+                                  >
+                                    <div className="flex flex-col items-start gap-0.5">
+                                      <span className="font-medium">{skill.name}</span>
+                                      {skill.description && (
+                                        <span className="text-[11px] text-zinc-400 line-clamp-1 group-hover/item:text-zinc-500">
+                                          {skill.description}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {isSelected && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
+                                  </button>
+                                );
+                              })
+                            ) : (
+                              <div className="px-3 py-8 text-center">
+                                <Zap className="h-8 w-8 text-zinc-100 mx-auto mb-2" />
+                                <p className="text-xs text-zinc-400">暂无可用技能</p>
+                              </div>
+                            )}
+                          </div>
+                          {selectedSkillIds.length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-zinc-100">
+                              <button 
+                                onClick={() => setSelectedSkillIds([])}
+                                className="w-full py-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 transition-colors flex items-center justify-center gap-1"
+                              >
+                                清除已选 ({selectedSkillIds.length})
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleSend()}
+                  placeholder="有问题，尽管问"
+                  className="flex-1 bg-transparent border-none focus:ring-0 text-lg px-3 py-2 text-zinc-900 placeholder:text-zinc-300 outline-none"
+                  disabled={isLoading}
+                />
+
+                <div className="flex items-center gap-1">
+                  <button
                     onClick={isLoading ? handleForceStop : handleSend}
-                    size="icon"
                     disabled={isLoading ? false : !input.trim()}
-                    className={`h-9 w-9 rounded-lg shrink-0 transition-all ${
-                      isLoading
-                        ? 'bg-red-600 hover:bg-red-700 text-white shadow-md'
-                        : input.trim()
-                          ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
-                          : 'bg-zinc-100 text-zinc-300 hover:bg-zinc-100 cursor-not-allowed'
-                    }`}
+                    className={cn(
+                      "flex items-center justify-center h-10 w-10 rounded-full transition-all duration-200",
+                      (input.trim() || isLoading)
+                        ? (isLoading ? "bg-red-600 text-white hover:bg-red-700" : "bg-zinc-900 text-white hover:bg-zinc-800")
+                        : "bg-zinc-100 text-zinc-300"
+                    )}
                   >
-                    {isLoading ? <Square className="h-4 w-4" /> : <ArrowUp className="h-5 w-5" />}
-                  </Button>
+                    {isLoading ? (
+                      <Square className="h-4 w-4" />
+                    ) : (
+                      <ArrowUp className="h-6 w-6" />
+                    )}
+                  </button>
                 </div>
               </div>
+            </div>
+            <div className="mt-2 flex justify-center">
+              <p className="text-[11px] text-zinc-400">
+                DataClaw 可能会出错。请核查重要信息。
+              </p>
+            </div>
           </div>
         </div>
       )}
