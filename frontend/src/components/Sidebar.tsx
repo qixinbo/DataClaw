@@ -321,7 +321,7 @@ function SidebarBody() {
   });
 
   return (
-    <div className="h-full flex flex-col bg-zinc-50/30 border-r border-zinc-200 relative">
+    <div className="h-full min-h-0 flex flex-col bg-zinc-50/30 border-r border-zinc-200 relative">
       {/* Header */}
       <div className="h-14 px-4 flex items-center justify-between border-b border-zinc-100">
         <Link to="/" className="flex items-center gap-1.5 text-zinc-700 font-bold text-lg hover:opacity-80 transition-opacity">
@@ -353,7 +353,7 @@ function SidebarBody() {
         </Button>
       </div>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="px-3 pt-4">
           <div className="relative">
             <Search className="h-4 w-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />

@@ -458,9 +458,9 @@ export function ChatInterface() {
   };
 
   return (
-    <div className="h-full bg-white relative flex flex-col">
+    <div className="h-full min-h-0 bg-white flex flex-col">
       {/* Top Bar */}
-      <div className="absolute top-0 left-0 w-full px-6 py-4 z-10 flex justify-between items-center">
+      <div className="sticky top-0 left-0 w-full px-6 py-4 z-20 flex justify-between items-center bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 border-b border-zinc-100">
         <Popover open={modelOpen} onOpenChange={setModelOpen}>
           <PopoverTrigger className="w-[200px] flex justify-between items-center bg-white/80 backdrop-blur-sm rounded-md px-3 py-2 text-sm hover:bg-zinc-50 hover:text-zinc-900 text-zinc-700 font-medium transition-all outline-none border-none shadow-none ring-0">
               {currentModel ? (currentModel.name || currentModel.model) : "选择模型..."}
@@ -515,7 +515,7 @@ export function ChatInterface() {
         </div>
       </div>
 
-      <ScrollArea className="flex-1 h-[calc(100vh-100px)]">
+      <ScrollArea className="flex-1 min-h-0">
         {/* Hidden file input available in all states */}
         <input
           type="file"
@@ -624,7 +624,7 @@ export function ChatInterface() {
               </div>
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto pt-24 px-4 pb-48 space-y-8">
+            <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
               {messages.map((msg) => (
                 <div
                   key={msg.id}
@@ -681,7 +681,7 @@ export function ChatInterface() {
       
       {/* Floating Input for Chat State */}
       {messages.length > 1 && (
-        <div className="absolute bottom-6 left-0 right-0 px-4">
+        <div className="px-4 pb-6 pt-3 border-t border-zinc-100 bg-white">
           <div className="max-w-3xl mx-auto">
              <div className="bg-white rounded-2xl shadow-xl border border-zinc-200/60 p-2 flex flex-col gap-2 ring-1 ring-zinc-100">
                 {activeDataFile && (
