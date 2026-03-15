@@ -1,7 +1,7 @@
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Menu, LayoutDashboard, Plus, MoreVertical, User, Search, Wrench, Settings, Brain, Trash2, Pencil, Pin, Archive, Database } from "lucide-react";
+import { Menu, LayoutDashboard, Plus, MoreVertical, User, Search, Wrench, Settings, Brain, Trash2, Pencil, Pin, Archive, Database, CheckSquare, Square, ListChecks, RotateCcw } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
@@ -31,6 +31,7 @@ function Section({
   onRename,
   onTogglePinned,
   onToggleArchived,
+  onBatchDelete,
   activeKey
 }: {
   title: string;
@@ -41,37 +42,138 @@ function Section({
   onRename: (key: string, currentTitle: string) => void;
   onTogglePinned: (key: string, pinned: boolean) => void;
   onToggleArchived: (key: string, archived: boolean) => void;
+  onBatchDelete: (keys: string[]) => void;
   activeKey: string | null;
 }) {
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+
+  const toggleSelect = (key: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedKeys(prev => 
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+  };
+
+  const handleSelectAll = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (selectedKeys.length === items.length && items.length > 0) {
+      setSelectedKeys([]);
+    } else {
+      setSelectedKeys(items.map(item => item.key));
+    }
+  };
+
+  const handleInvertSelection = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const allKeys = items.map(item => item.key);
+    setSelectedKeys(allKeys.filter(key => !selectedKeys.includes(key)));
+  };
+
+  const handleBatchDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (selectedKeys.length === 0) return;
+    onBatchDelete(selectedKeys);
+    setSelectedKeys([]);
+    setIsSelectionMode(false);
+  };
+
+  useEffect(() => {
+    if (!isSelectionMode) {
+      setSelectedKeys([]);
+    }
+  }, [isSelectionMode]);
+
   return (
     <div className="px-3 pt-6">
-      <div className="flex items-center justify-between mb-2 px-1">
+      <div className="flex items-center justify-between mb-2 px-1 group">
         <div className="text-xs font-semibold text-zinc-500 flex items-center gap-1 uppercase tracking-wider">
           {title}
           <span>({count})</span>
+        </div>
+        <div className="flex items-center gap-1">
+          {isSelectionMode ? (
+            <>
+              <button
+                onClick={handleSelectAll}
+                title="全选/取消全选"
+                className="p-1 hover:bg-zinc-200 rounded text-zinc-500 transition-colors"
+              >
+                <ListChecks className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={handleInvertSelection}
+                title="反选"
+                className="p-1 hover:bg-zinc-200 rounded text-zinc-500 transition-colors"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={handleBatchDelete}
+                disabled={selectedKeys.length === 0}
+                title="批量删除"
+                className={`p-1 rounded transition-colors ${
+                  selectedKeys.length > 0 
+                    ? "hover:bg-red-100 text-red-500" 
+                    : "text-zinc-300 cursor-not-allowed"
+                }`}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => setIsSelectionMode(false)}
+                className="text-[10px] font-medium px-1.5 py-0.5 hover:bg-zinc-200 rounded text-zinc-500 transition-colors ml-1"
+              >
+                取消
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setIsSelectionMode(true)}
+              className="p-1 hover:bg-zinc-200 rounded text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity"
+              style={{ opacity: count > 0 ? undefined : 0 }}
+            >
+              <CheckSquare className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
       <div className="space-y-0.5 mt-2">
         {items.map((item) => {
           const displayTitle = item.metadata?.title || item.key.replace("api:", "");
           const isActive = activeKey === item.key;
+          const isSelected = selectedKeys.includes(item.key);
           
           return (
             <div
               key={item.key}
               className={`w-full h-9 px-2 text-left rounded-md text-[14px] flex items-center justify-between group transition-colors cursor-pointer ${
-                isActive ? 'bg-zinc-100 text-zinc-900 font-medium' : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'
-              }`}
-              onClick={() => onSelect(item.key)}
+                isActive && !isSelectionMode ? 'bg-zinc-100 text-zinc-900 font-medium' : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'
+              } ${isSelected ? 'bg-indigo-50/50 text-indigo-700' : ''}`}
+              onClick={(e) => isSelectionMode ? toggleSelect(item.key, e) : onSelect(item.key)}
             >
               <div className="truncate pr-2 flex-1 flex items-center gap-1.5 min-w-0">
-                <span className="w-4 shrink-0 flex items-center justify-center">
-                  {item.pinned && <Pin className="h-3.5 w-3.5 text-zinc-500" />}
-                </span>
+                {isSelectionMode ? (
+                  <span 
+                    className="w-4 shrink-0 flex items-center justify-center"
+                    onClick={(e) => toggleSelect(item.key, e)}
+                  >
+                    {isSelected ? (
+                      <CheckSquare className="h-3.5 w-3.5 text-indigo-600" />
+                    ) : (
+                      <Square className="h-3.5 w-3.5 text-zinc-300" />
+                    )}
+                  </span>
+                ) : (
+                  <span className="w-4 shrink-0 flex items-center justify-center">
+                    {item.pinned && <Pin className="h-3.5 w-3.5 text-zinc-500" />}
+                  </span>
+                )}
                 <span className="truncate">{displayTitle}</span>
               </div>
               
-              <DropdownMenu>
+              {!isSelectionMode && (
+                <DropdownMenu>
                 <DropdownMenuTrigger onClick={(e) => e.stopPropagation()} className="h-6 w-6 flex items-center justify-center rounded hover:bg-zinc-200 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity outline-none">
                   <MoreVertical className="h-4 w-4" />
                 </DropdownMenuTrigger>
@@ -139,6 +241,7 @@ function Section({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              )}
             </div>
           );
         })}
@@ -231,6 +334,20 @@ function SidebarBody() {
       window.dispatchEvent(new Event("nanobot:sessions-changed"));
     } catch (e) {
       console.error("Failed to delete session", e);
+    }
+  };
+
+  const handleBatchDelete = async (keys: string[]) => {
+    if (!window.confirm(`确定要删除选中的 ${keys.length} 个会话吗？`)) return;
+    try {
+      await api.post("/nanobot/sessions/batch-delete", { session_ids: keys });
+      if (keys.includes(activeSessionKey)) {
+        navigate("/");
+      }
+      fetchSessions();
+      window.dispatchEvent(new Event("nanobot:sessions-changed"));
+    } catch (e) {
+      console.error("Failed to batch delete sessions", e);
     }
   };
 
@@ -371,17 +488,19 @@ function SidebarBody() {
           items={activeSessions} 
           onSelect={handleSelectSession}
           onDelete={handleDeleteSession}
+          onBatchDelete={handleBatchDelete}
           onRename={openRenameDialog}
           onTogglePinned={handleTogglePinned}
           onToggleArchived={handleToggleArchived}
           activeKey={activeSessionKey}
         />
         <Section 
-          title="ARCIVED_THREADS" 
+          title="ARCHIVED_THREADS" 
           count={archivedSessions.length} 
           items={archivedSessions} 
           onSelect={handleSelectSession}
           onDelete={handleDeleteSession}
+          onBatchDelete={handleBatchDelete}
           onRename={openRenameDialog}
           onTogglePinned={handleTogglePinned}
           onToggleArchived={handleToggleArchived}

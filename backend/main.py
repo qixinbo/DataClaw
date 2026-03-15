@@ -87,6 +87,10 @@ class SessionAliasUpdateRequest(BaseModel):
     archived: Optional[bool] = None
 
 
+class BatchDeleteRequest(BaseModel):
+    session_ids: List[str]
+
+
 class SessionFileContextUpdateRequest(BaseModel):
     active_data_file: Optional[Dict[str, Any]] = None
 
@@ -247,6 +251,30 @@ def delete_session(session_id: str):
         session_alias_store.delete_session(session_id)
         return {"status": "success"}
     raise HTTPException(status_code=404, detail="Session not found")
+
+
+@app.post("/nanobot/sessions/batch-delete")
+def batch_delete_sessions(request: BatchDeleteRequest):
+    if not nanobot_service.agent:
+        raise HTTPException(status_code=400, detail="Nanobot not running")
+    
+    deleted_ids = []
+    for session_id in request.session_ids:
+        try:
+            # Try to remove from cache and delete file
+            session = nanobot_service.agent.sessions.get_or_create(session_id)
+            if session:
+                nanobot_service.agent.sessions.invalidate(session_id)
+                path = nanobot_service.agent.sessions._get_session_path(session_id)
+                if path.exists():
+                    path.unlink()
+                session_alias_store.delete_session(session_id)
+                deleted_ids.append(session_id)
+        except Exception as e:
+            print(f"Failed to delete session {session_id}: {e}")
+    
+    return {"status": "success", "deleted_count": len(deleted_ids), "deleted_ids": deleted_ids}
+
 
 @app.put("/nanobot/sessions/{session_id}")
 def update_session(session_id: str, payload: SessionAliasUpdateRequest):
