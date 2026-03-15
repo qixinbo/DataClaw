@@ -12,7 +12,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import { useLocation } from "react-router-dom";
-import { VegaChart } from "./VegaChart";
+import { InlineVisualizationCard } from "./InlineVisualizationCard";
 
 interface Message {
   id: string;
@@ -581,21 +581,7 @@ export function ChatInterface() {
                           </div>
                           {msg.viz ? (
                             <div className="mt-3 pt-3 border-t border-zinc-100">
-                              {msg.viz.error ? (
-                                <div className="text-sm text-red-500">{msg.viz.error}</div>
-                              ) : msg.viz.canVisualize && msg.viz.chartSpec ? (
-                                (() => {
-                                  const objectRows = msg.viz?.rows?.filter((row) => row && typeof row === "object" && !Array.isArray(row)) || [];
-                                  if (objectRows.length === 0) {
-                                    return <div className="text-sm text-zinc-500">当前结果没有可渲染的结构化数据。</div>;
-                                  }
-                                  return (
-                                    <div className="w-full h-80 rounded-xl border border-zinc-100 p-2">
-                                      <VegaChart data={objectRows} spec={msg.viz.chartSpec} />
-                                    </div>
-                                  );
-                                })()
-                              ) : null}
+                              <InlineVisualizationCard viz={msg.viz} />
                             </div>
                           ) : null}
                         </>
