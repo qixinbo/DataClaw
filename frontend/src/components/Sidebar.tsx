@@ -208,8 +208,15 @@ function SidebarBody() {
     navigate(`/?session=${encodeURIComponent(key)}`);
   };
 
-  const handleNewThread = () => {
+  const handleNewThread = async () => {
     const newSessionId = `api:${Date.now()}`;
+    try {
+      await api.post(`/nanobot/sessions/${encodeURIComponent(newSessionId)}/ensure`, {});
+      await fetchSessions();
+      window.dispatchEvent(new Event("nanobot:sessions-changed"));
+    } catch (e) {
+      console.error("Failed to create session", e);
+    }
     navigate(`/?session=${encodeURIComponent(newSessionId)}`);
   };
 

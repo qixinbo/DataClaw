@@ -186,6 +186,21 @@ def get_session(session_id: str):
         "messages": session.messages
     }
 
+@app.post("/nanobot/sessions/{session_id}/ensure")
+def ensure_session(session_id: str):
+    if not nanobot_service.agent:
+        raise HTTPException(status_code=400, detail="Nanobot not running")
+    session = nanobot_service.agent.sessions.get_or_create(session_id)
+    nanobot_service.agent.sessions.save(session)
+    alias = session_alias_store.get_alias(session_id)
+    return {
+        "key": session.key,
+        "created_at": session.created_at,
+        "updated_at": session.updated_at,
+        "metadata": session.metadata,
+        "alias": alias,
+    }
+
 @app.delete("/nanobot/sessions/{session_id}")
 def delete_session(session_id: str):
     if not nanobot_service.agent:
