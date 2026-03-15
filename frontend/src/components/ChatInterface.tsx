@@ -41,7 +41,7 @@ export function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [selectedCapability, setSelectedCapability] = useState<string>("智能问答");
-  const selectedDataSource = "postgres-main";
+  const [selectedDataSource, setSelectedDataSource] = useState<string>("postgres-main");
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { setVisualization, setLoading: setVizLoading, setError: setVizError } = useVisualizationStore();
@@ -114,6 +114,7 @@ export function ChatInterface() {
     { icon: Table, label: "表格问答", color: "text-orange-500", bg: "bg-orange-50" },
     { icon: Search, label: "深度问数", color: "text-blue-500", bg: "bg-blue-50" },
   ];
+  const chartIntentPattern = /(图表|可视化|画图|作图|柱状图|折线图|饼图|趋势|分布|chart|plot|visuali[sz]e)/i;
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -168,8 +169,9 @@ export function ChatInterface() {
     setInput("");
     
     let messagePayload = newMessage.content;
-    if (attachedFile) {
-      messagePayload = `[用户上传了文件: ${attachedFile.filename}]\n[文件内容摘要: ${attachedFile.summary || "无"}]\n[数据列: ${attachedFile.columns?.join(", ") || "无"}]\n[文件下载链接: ${attachedFile.url}]\n\n${newMessage.content}`;
+    const currentAttachedFile = attachedFile;
+    if (currentAttachedFile) {
+      messagePayload = `[用户上传了文件: ${currentAttachedFile.filename}]\n[文件内容摘要: ${currentAttachedFile.summary || "无"}]\n[数据列: ${currentAttachedFile.columns?.join(", ") || "无"}]\n[文件下载链接: ${currentAttachedFile.url}]\n\n${newMessage.content}`;
       setAttachedFile(null);
     }
     
@@ -189,6 +191,9 @@ export function ChatInterface() {
 
          const token = localStorage.getItem("token");
          const effectiveModelId = selectedModelId || currentModel?.id || "";
+         const source = currentAttachedFile?.url?.startsWith("local://") ? "upload" : selectedDataSource.split('-')[0];
+         const fileUrl = currentAttachedFile?.url || undefined;
+         const preferSqlChart = chartIntentPattern.test(messagePayload);
          const response = await fetch("/nanobot/chat/stream", {
            method: "POST",
            headers: {
@@ -199,6 +204,9 @@ export function ChatInterface() {
                message: messagePayload,
                session_id: activeSessionKey,
                model_id: effectiveModelId,
+               source,
+               prefer_sql_chart: preferSqlChart,
+               file_url: fileUrl,
              }),
          });
 
@@ -226,7 +234,14 @@ export function ChatInterface() {
              if (!line) continue;
              const payloadText = line.slice(5).trim();
              if (!payloadText) continue;
-             const payload = JSON.parse(payloadText) as { type: string; content?: string };
+            const payload = JSON.parse(payloadText) as {
+              type: string;
+              content?: string;
+              sql?: string;
+              result?: unknown;
+              error?: string;
+              chart?: { chart_spec?: ChartSpec | null; reasoning?: string; can_visualize?: boolean; chart_type?: string } | null;
+            };
 
              if (payload.type === "delta" && payload.content) {
                streamedText = `${streamedText}${payload.content}`;
@@ -249,15 +264,69 @@ export function ChatInterface() {
              if (payload.type === "error") {
                throw new Error(payload.content || "流式响应错误");
              }
+
+            if (payload.type === "viz") {
+              if (payload.error) {
+                setVizError(payload.error);
+              } else {
+                const rows = Array.isArray(payload.result) ? payload.result : [];
+                const sql = typeof payload.sql === "string" ? payload.sql : "";
+                const chart = payload.chart ?? undefined;
+                const canVisualize = Boolean(chart?.can_visualize);
+                const chartSpec = canVisualize ? (chart?.chart_spec ?? null) : null;
+                setVisualization(
+                  rows,
+                  sql,
+                  chartSpec,
+                  {
+                    canVisualize,
+                    reasoning: chart?.reasoning,
+                    chartType: chart?.chart_type,
+                    description: canVisualize ? "根据模型返回的 Vega-Lite schema 渲染" : "当前结果不适合可视化",
+                  }
+                );
+              }
+            }
            }
          }
 
          if (!streamedText) {
-           const fallback = await api.post<{ response: string }>("/nanobot/chat", {
+          const fallback = await api.post<{
+            response: string;
+            viz?: {
+              sql?: string;
+              result?: unknown;
+              error?: string | null;
+              chart?: { chart_spec?: ChartSpec | null; reasoning?: string; can_visualize?: boolean; chart_type?: string } | null;
+            };
+          }>("/nanobot/chat", {
              message: messagePayload,
              session_id: activeSessionKey,
              model_id: effectiveModelId,
+            source,
+            prefer_sql_chart: preferSqlChart,
+            file_url: fileUrl,
            });
+          if (fallback.viz?.error) {
+            setVizError(fallback.viz.error);
+          } else if (fallback.viz) {
+            const rows = Array.isArray(fallback.viz.result) ? fallback.viz.result : [];
+            const sql = typeof fallback.viz.sql === "string" ? fallback.viz.sql : "";
+            const chart = fallback.viz.chart ?? undefined;
+            const canVisualize = Boolean(chart?.can_visualize);
+            const chartSpec = canVisualize ? (chart?.chart_spec ?? null) : null;
+            setVisualization(
+              rows,
+              sql,
+              chartSpec,
+              {
+                canVisualize,
+                reasoning: chart?.reasoning,
+                chartType: chart?.chart_type,
+                description: canVisualize ? "根据模型返回的 Vega-Lite schema 渲染" : "当前结果不适合可视化",
+              }
+            );
+          }
            setMessages((prev) =>
              prev.map((msg) =>
               msg.id === assistantId ? { ...msg, content: fallback.response || "暂无回复", awaitingFirstToken: false } : msg
@@ -266,15 +335,16 @@ export function ChatInterface() {
          }
       } else {
          // Fallback to existing NL2SQL or other skills (e.g. for "表格问答" or "深度问数")
-         const source = selectedDataSource.split('-')[0]; // postgres-main -> postgres
+         const source = currentAttachedFile?.url?.startsWith("local://") ? "upload" : selectedDataSource.split('-')[0];
          const response = await api.post<{
              sql?: string, 
              result?: unknown, 
              error?: string,
-             chart?: { chart_spec: ChartSpec, reasoning: string, can_visualize: boolean }
+             chart?: { chart_spec?: ChartSpec | null, reasoning?: string, can_visualize?: boolean, chart_type?: string }
          }>('/api/v1/agent/nl2sql', {
             query: messagePayload,
             source: source,
+           file_url: currentAttachedFile?.url,
             session_id: activeSessionKey,
             model_id: selectedModelId 
          });
@@ -289,12 +359,25 @@ export function ChatInterface() {
          } else {
             const rows = Array.isArray(response.result) ? response.result : [];
             const sql = typeof response.sql === "string" ? response.sql : "";
+           const chart = response.chart;
+           const canVisualize = Boolean(chart?.can_visualize);
+           const chartSpec = canVisualize ? (chart?.chart_spec ?? null) : null;
             setMessages(prev => [...prev, { 
                 id: (Date.now() + 1).toString(), 
                 role: 'assistant', 
-                content: `I've generated a SQL query and fetched ${rows.length} rows for you. Check the visualization panel.${response.chart?.reasoning ? `\n\nVisualization reasoning: ${response.chart.reasoning}` : ''}` 
+                content: `已为你生成 SQL 并查询到 ${rows.length} 行数据。${canVisualize ? '可视化面板已同步更新图表。' : '本次结果不适合图表展示。'}${chart?.reasoning ? `\n\n可视化说明：${chart.reasoning}` : ''}` 
             }]);
-            setVisualization(rows, sql, response.chart?.chart_spec);
+            setVisualization(
+              rows,
+              sql,
+              chartSpec,
+              {
+                canVisualize,
+                reasoning: chart?.reasoning,
+                chartType: chart?.chart_type,
+                description: canVisualize ? "根据模型返回的 Vega-Lite schema 渲染" : "当前结果不适合可视化",
+              }
+            );
          }
       }
     } catch (error: any) {
@@ -353,6 +436,17 @@ export function ChatInterface() {
             </Command>
           </PopoverContent>
         </Popover>
+        <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-md px-3 py-2 text-sm text-zinc-700">
+          <span className="text-zinc-500">数据源</span>
+          <select
+            value={selectedDataSource}
+            onChange={(e) => setSelectedDataSource(e.target.value)}
+            className="bg-transparent border-none outline-none text-sm font-medium"
+          >
+            <option value="postgres-main">PostgreSQL</option>
+            <option value="clickhouse-main">ClickHouse</option>
+          </select>
+        </div>
       </div>
 
       <ScrollArea className="flex-1 h-[calc(100vh-100px)]">

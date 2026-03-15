@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Sidebar } from "./components/Sidebar";
 import { ChatInterface } from "./components/ChatInterface";
+import { VisualizationPanel } from "./components/VisualizationPanel";
 import { Dashboard } from "./pages/Dashboard";
 import { Skills } from "./pages/Skills";
 import { Settings } from "./pages/Settings";
@@ -45,8 +46,13 @@ function App() {
         <Route path="/" element={
           <ProtectedRoute>
             <MainLayout>
-              <div className="h-full overflow-hidden bg-white">
-                <ChatInterface />
+              <div className="h-full overflow-hidden bg-white flex">
+                <div className="flex-1 min-w-0">
+                  <ChatInterface />
+                </div>
+                <div className="w-[42%] min-w-[420px] border-l bg-background">
+                  <VisualizationPanel />
+                </div>
               </div>
             </MainLayout>
           </ProtectedRoute>

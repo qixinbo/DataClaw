@@ -67,6 +67,9 @@ class ChatRequest(BaseModel):
     session_id: str = "api:default"
     skill_ids: Optional[List[str]] = None
     model_id: Optional[str] = None
+    source: str = "postgres"
+    prefer_sql_chart: bool = False
+    file_url: Optional[str] = None
 
 
 class SessionAliasUpdateRequest(BaseModel):
@@ -77,6 +80,27 @@ class SessionAliasUpdateRequest(BaseModel):
 @app.post("/nanobot/chat")
 async def nanobot_chat(request: ChatRequest):
     try:
+        if request.prefer_sql_chart:
+            nl2sql_result = await process_nl2sql(
+                NL2SQLRequest(query=request.message, source=request.source, file_url=request.file_url)
+            )
+            chart = nl2sql_result.chart
+            can_visualize = bool(chart and chart.can_visualize and chart.chart_spec)
+            text = (
+                f"已为你生成 SQL 并查询到 {len(nl2sql_result.result)} 行数据。"
+                f"{'可视化面板已同步更新图表。' if can_visualize else '本次结果不适合图表展示。'}"
+            )
+            if chart and chart.reasoning:
+                text = f"{text}\n\n可视化说明：{chart.reasoning}"
+            return {
+                "response": text,
+                "viz": {
+                    "sql": nl2sql_result.sql,
+                    "result": nl2sql_result.result,
+                    "chart": chart.model_dump() if chart else None,
+                    "error": nl2sql_result.error,
+                },
+            }
         response = await nanobot_service.process_message(
             request.message,
             session_id=request.session_id,
@@ -91,6 +115,29 @@ async def nanobot_chat(request: ChatRequest):
 async def nanobot_chat_stream(request: ChatRequest):
     async def event_generator():
         try:
+            if request.prefer_sql_chart:
+                nl2sql_result = await process_nl2sql(
+                    NL2SQLRequest(query=request.message, source=request.source, file_url=request.file_url)
+                )
+                chart = nl2sql_result.chart
+                viz_payload = {
+                    "type": "viz",
+                    "sql": nl2sql_result.sql,
+                    "result": nl2sql_result.result,
+                    "chart": chart.model_dump() if chart else None,
+                    "error": nl2sql_result.error,
+                }
+                yield f"data: {json.dumps(viz_payload, ensure_ascii=False)}\n\n"
+                can_visualize = bool(chart and chart.can_visualize and chart.chart_spec)
+                text = (
+                    f"已为你生成 SQL 并查询到 {len(nl2sql_result.result)} 行数据。"
+                    f"{'可视化面板已同步更新图表。' if can_visualize else '本次结果不适合图表展示。'}"
+                )
+                if chart and chart.reasoning:
+                    text = f"{text}\n\n可视化说明：{chart.reasoning}"
+                yield f"data: {json.dumps({'type': 'final', 'content': text}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+                return
             response = await nanobot_service.process_message(
                 request.message,
                 session_id=request.session_id,

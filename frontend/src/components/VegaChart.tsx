@@ -9,22 +9,13 @@ interface VegaChartProps {
 
 export const VegaChart: React.FC<VegaChartProps> = ({ data, spec }) => {
   const vegaSpec: any = {
-    $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
-    description: spec.description,
-    title: spec.title,
+    $schema: typeof spec.$schema === 'string' ? spec.$schema : 'https://vega.github.io/schema/vega-lite/v5.json',
+    ...spec,
     width: "container",
     height: "container",
-    mark: { type: spec.chart_type, tooltip: true },
-    encoding: {
-      x: { field: spec.x_axis, type: 'nominal', axis: { labelAngle: -45 } },
-      y: { field: spec.y_axis, type: 'quantitative' },
-    },
-    data: { values: data }
+    data: { values: data },
+    autosize: { type: "fit", contains: "padding" },
   };
-
-  if (spec.color) {
-    vegaSpec.encoding.color = { field: spec.color, type: 'nominal' };
-  }
 
   return (
     <div className="w-full h-full">

@@ -12,15 +12,17 @@ import { VegaChart } from "./VegaChart";
 export function VisualizationPanel() {
   const [view, setView] = useState<'table' | 'chart'>('chart');
   const { addChart } = useDashboardStore();
-  const { currentData, currentSQL, currentChartSpec, isLoading, error } = useVisualizationStore();
+  const { currentData, currentSQL, currentChartSpec, currentChartInfo, isLoading, error } = useVisualizationStore();
 
   const handleAddToDashboard = () => {
     if (!currentData || !currentSQL) return;
-    
+    const mark = currentChartSpec?.mark;
+    const markType = typeof mark === "string" ? mark : mark?.type;
+    const dashboardType = markType === "line" ? "line" : "bar";
     addChart({
       id: Date.now().toString(),
       title: currentChartSpec?.title || 'Generated Analysis',
-      type: currentChartSpec?.chart_type as any || 'bar',
+      type: dashboardType,
       data: currentData,
       sql: currentSQL,
     });
@@ -134,7 +136,7 @@ export function VisualizationPanel() {
         <Card className="h-full flex flex-col shadow-sm border-muted">
           <CardHeader className="pb-2 shrink-0">
             <CardTitle>{currentChartSpec?.title || 'Analysis Result'}</CardTitle>
-            <CardDescription>{currentChartSpec?.description || 'Generated from your query'}</CardDescription>
+            <CardDescription>{currentChartInfo?.reasoning || currentChartSpec?.description || 'Generated from your query'}</CardDescription>
           </CardHeader>
           <CardContent className="flex-1 min-h-0 p-4">
              {view === 'chart' ? (
