@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { User, Loader2, Sparkles, Search, ArrowUp, ChevronDown, Table, Paperclip, Check, X, File as FileIcon } from "lucide-react";
+import { User, Loader2, Sparkles, Search, ArrowUp, ChevronDown, Table, Paperclip, Check, X, File as FileIcon, Square } from "lucide-react";
 import { api } from "@/lib/api";
 import { type ChartSpec } from "@/store/visualizationStore";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -82,6 +82,7 @@ export function ChatInterface() {
   const [activeDataFile, setActiveDataFile] = useState<DataFileContext | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     fetchModels();
@@ -228,6 +229,20 @@ export function ChatInterface() {
     }
   }, [messages]);
 
+  const handleForceStop = () => {
+    const controller = abortControllerRef.current;
+    if (!controller) return;
+    controller.abort();
+    setIsLoading(false);
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.awaitingFirstToken
+          ? { ...msg, awaitingFirstToken: false, content: msg.content || "已中断输出" }
+          : msg
+      )
+    );
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
     
@@ -242,6 +257,8 @@ export function ChatInterface() {
       setAttachedFile(null);
     }
     
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setIsLoading(true);
     
     try {
@@ -278,6 +295,7 @@ export function ChatInterface() {
                prefer_sql_chart: preferSqlChart,
                file_url: fileUrl,
              }),
+           signal: controller.signal,
          });
 
          if (!response.ok || !response.body) {
@@ -363,7 +381,7 @@ export function ChatInterface() {
             source,
             prefer_sql_chart: preferSqlChart,
             file_url: fileUrl,
-           });
+           }, { signal: controller.signal });
           const fallbackViz = fallback.viz ? buildMessageViz(fallback.viz) : undefined;
            setMessages((prev) =>
              prev.map((msg) =>
@@ -391,7 +409,7 @@ export function ChatInterface() {
            file_url: fileUrl,
             session_id: activeSessionKey,
             model_id: selectedModelId 
-         });
+         }, { signal: controller.signal });
 
          if (response.error) {
             setMessages(prev => [...prev, { 
@@ -415,12 +433,25 @@ export function ChatInterface() {
          }
       }
     } catch (error: any) {
+        if (error?.name === "AbortError" || String(error?.message || "").toLowerCase().includes("aborted")) {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.awaitingFirstToken
+                ? { ...msg, awaitingFirstToken: false, content: msg.content || "已中断输出" }
+                : msg
+            )
+          );
+          return;
+        }
         setMessages(prev => [...prev, { 
             id: (Date.now() + 1).toString(), 
             role: 'assistant', 
             content: `Sorry, something went wrong: ${error.message}` 
         }]);
     } finally {
+        if (abortControllerRef.current === controller) {
+          abortControllerRef.current = null;
+        }
         setIsLoading(false);
         window.dispatchEvent(new Event("nanobot:sessions-changed"));
     }
@@ -574,16 +605,18 @@ export function ChatInterface() {
                         {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Paperclip className="h-5 w-5" />}
                       </Button>
                       <Button
-                        onClick={handleSend}
+                        onClick={isLoading ? handleForceStop : handleSend}
                         size="icon"
-                        disabled={!input.trim() || isLoading}
+                        disabled={isLoading ? false : !input.trim()}
                         className={`h-9 w-9 rounded-full transition-all ${
-                          input.trim() 
-                            ? 'bg-zinc-100 text-zinc-900 hover:bg-zinc-200' 
-                            : 'bg-zinc-50 text-zinc-300 cursor-not-allowed'
+                          isLoading
+                            ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                            : input.trim()
+                              ? 'bg-zinc-100 text-zinc-900 hover:bg-zinc-200'
+                              : 'bg-zinc-50 text-zinc-300 cursor-not-allowed'
                         }`}
                       >
-                        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-5 w-5" />}
+                        {isLoading ? <Square className="h-4 w-4" /> : <ArrowUp className="h-5 w-5" />}
                       </Button>
                     </div>
                   </div>
@@ -691,16 +724,18 @@ export function ChatInterface() {
                     disabled={isLoading}
                   />
                   <Button
-                    onClick={handleSend}
+                    onClick={isLoading ? handleForceStop : handleSend}
                     size="icon"
-                    disabled={!input.trim() || isLoading}
+                    disabled={isLoading ? false : !input.trim()}
                     className={`h-9 w-9 rounded-lg shrink-0 transition-all ${
-                      input.trim() 
-                        ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md' 
-                        : 'bg-zinc-100 text-zinc-300 hover:bg-zinc-100 cursor-not-allowed'
+                      isLoading
+                        ? 'bg-red-600 hover:bg-red-700 text-white shadow-md'
+                        : input.trim()
+                          ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
+                          : 'bg-zinc-100 text-zinc-300 hover:bg-zinc-100 cursor-not-allowed'
                     }`}
                   >
-                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-5 w-5" />}
+                    {isLoading ? <Square className="h-4 w-4" /> : <ArrowUp className="h-5 w-5" />}
                   </Button>
                 </div>
               </div>
