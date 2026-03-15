@@ -23,6 +23,7 @@ class NL2SQLRequest(BaseModel):
     query: str = Field(..., description="User's natural language query")
     source: str = Field(..., description="Data source to query (postgres, clickhouse, upload)")
     file_url: Optional[str] = Field(None, description="Uploaded file URL when source is upload")
+    session_id: Optional[str] = Field(None, description="Conversation session identifier")
 
 class NL2SQLResponse(BaseModel):
     sql: str

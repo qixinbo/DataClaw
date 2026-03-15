@@ -25,6 +25,7 @@ export function VisualizationPanel() {
       type: dashboardType,
       data: currentData,
       sql: currentSQL,
+      chartSpec: currentChartSpec,
     });
     alert("Added to Dashboard!");
   };

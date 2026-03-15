@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { ChartSpec } from './visualizationStore';
 
 type ChartRow = Record<string, unknown>;
 type GridLayout = { i: string; x: number; y: number; w: number; h: number };
@@ -9,6 +10,7 @@ export interface ChartConfig {
   type: 'bar' | 'line';
   data: ChartRow[];
   sql: string;
+  chartSpec?: ChartSpec | null;
   layout: GridLayout;
 }
 

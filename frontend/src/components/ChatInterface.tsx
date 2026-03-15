@@ -85,7 +85,8 @@ export function ChatInterface() {
           const formattedMessages = data.messages.map((m, idx) => ({
             id: `${Date.now()}-${idx}`,
             role: m.role as 'user' | 'assistant',
-            content: m.content
+            content: m.content,
+            viz: m.viz ? buildMessageViz(m.viz) : undefined,
           }));
           setMessages(formattedMessages);
         } else {
@@ -461,7 +462,7 @@ export function ChatInterface() {
           onChange={handleFileUpload}
         />
         <div className="min-h-full">
-          {messages.length <= 1 ? (
+          {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center pt-[20vh] px-4 pb-32">
               {/* Logo Area */}
               <div className="mb-16 flex items-center justify-center gap-4 select-none">

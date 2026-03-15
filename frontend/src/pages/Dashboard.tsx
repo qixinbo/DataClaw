@@ -5,8 +5,38 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { VegaChart } from "@/components/VegaChart";
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
+
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+
+function isNumericValue(value: unknown) {
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return false;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed);
+  }
+  return false;
+}
+
+function inferChartKeys(data: Record<string, unknown>[]) {
+  if (data.length === 0) {
+    return { xKey: null as string | null, yKeys: [] as string[] };
+  }
+  const allKeys = Object.keys(data[0] || {});
+  if (allKeys.length === 0) {
+    return { xKey: null as string | null, yKeys: [] as string[] };
+  }
+  const preferredX = ['name', 'date', 'time', 'category', 'label'];
+  const xKey = preferredX.find((k) => allKeys.includes(k)) || allKeys[0];
+  const candidateY = allKeys.filter((k) => k !== xKey);
+  const numericY = candidateY.filter((key) => data.some((row) => isNumericValue(row[key])));
+  const yKeys = (numericY.length > 0 ? numericY : candidateY).slice(0, 3);
+  return { xKey, yKeys };
+}
 
 export function Dashboard() {
   const { charts, removeChart } = useDashboardStore();
@@ -65,32 +95,54 @@ export function Dashboard() {
                 </Button>
               </CardHeader>
               <CardContent className="flex-1 min-h-0 p-2">
-                <ResponsiveContainer width="100%" height="100%">
-                  {chart.type === 'bar' ? (
-                    <BarChart data={chart.data}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                      <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} />
-                      <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} />
-                      <Tooltip 
-                        cursor={{ fill: 'rgba(0,0,0,0.05)' }}
-                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                      />
-                      <Bar dataKey="sales" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Sales" />
-                      <Bar dataKey="profit" fill="#10b981" radius={[4, 4, 0, 0]} name="Profit" />
-                    </BarChart>
-                  ) : (
-                    <LineChart data={chart.data}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                      <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} />
-                      <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} />
-                      <Tooltip 
-                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                      />
-                      <Line type="monotone" dataKey="sales" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
-                      <Line type="monotone" dataKey="profit" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} />
-                    </LineChart>
-                  )}
-                </ResponsiveContainer>
+                {(() => {
+                  const rows = chart.data as Record<string, unknown>[];
+                  if (chart.chartSpec && rows.length > 0) {
+                    return (
+                      <div className="h-full w-full rounded-xl border border-zinc-100 p-2">
+                        <VegaChart data={rows} spec={chart.chartSpec} />
+                      </div>
+                    );
+                  }
+                  const { xKey, yKeys } = inferChartKeys(rows);
+                  if (!xKey || yKeys.length === 0) {
+                    return (
+                      <div className="h-full w-full flex items-center justify-center text-xs text-zinc-500">
+                        当前图表数据缺少可绘制字段
+                      </div>
+                    );
+                  }
+                  return (
+                    <ResponsiveContainer width="100%" height="100%">
+                      {chart.type === 'bar' ? (
+                        <BarChart data={rows}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                          <XAxis dataKey={xKey} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} />
+                          <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} />
+                          <Tooltip
+                            cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                          />
+                          {yKeys.map((key, index) => (
+                            <Bar key={key} dataKey={key} fill={CHART_COLORS[index % CHART_COLORS.length]} radius={[4, 4, 0, 0]} name={key} />
+                          ))}
+                        </BarChart>
+                      ) : (
+                        <LineChart data={rows}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                          <XAxis dataKey={xKey} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} />
+                          <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#6b7280' }} />
+                          <Tooltip
+                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                          />
+                          {yKeys.map((key, index) => (
+                            <Line key={key} type="monotone" dataKey={key} stroke={CHART_COLORS[index % CHART_COLORS.length]} strokeWidth={2} dot={{ r: 3 }} />
+                          ))}
+                        </LineChart>
+                      )}
+                    </ResponsiveContainer>
+                  );
+                })()}
               </CardContent>
             </Card>
           </div>

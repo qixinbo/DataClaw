@@ -36,6 +36,7 @@ export function InlineVisualizationCard({ viz }: InlineVisualizationCardProps) {
       type: dashboardType,
       data: objectRows,
       sql: viz.sql,
+      chartSpec: viz.chartSpec,
     });
   };
 
