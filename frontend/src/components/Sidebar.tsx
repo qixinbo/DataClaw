@@ -1,7 +1,7 @@
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Menu, LayoutDashboard, Plus, MoreVertical, User, Search, Wrench, Settings, Brain, Trash2, Pencil, Pin, Archive, Database, CheckSquare, Square, ListChecks, RotateCcw } from "lucide-react";
+import { Menu, LayoutDashboard, Plus, MoreVertical, User, Search, Wrench, Settings, Brain, Trash2, Pencil, Pin, Archive, Database, CheckSquare, Square, ListChecks, RotateCcw, Wand2 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
@@ -548,7 +548,7 @@ function SidebarBody() {
           </button>
           
           <button className="flex items-center gap-1.5 text-sm hover:text-zinc-900 transition-colors px-2 py-1.5 rounded-md hover:bg-zinc-100">
-            <Wrench className="h-4 w-4" />
+            <Wand2 className="h-4 w-4" />
             技能中心
           </button>
         </div>
