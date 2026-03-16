@@ -94,7 +94,12 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
   const renderConfigFields = () => {
     switch (type) {
       case "postgres":
+      case "postgresql":
       case "supabase":
+      case "mysql":
+      case "sqlserver":
+      case "oracle":
+      case "redshift":
         return (
           <div className="space-y-4">
              <div className="grid grid-cols-2 gap-4">
@@ -110,9 +115,9 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
                 <label className="text-sm font-medium">Port</label>
                 <Input 
                   type="number"
-                  value={config.port || 5432} 
+                  value={config.port || (type === "postgres" ? 5432 : type === "mysql" ? 3306 : 5432)} 
                   onChange={e => handleConfigChange("port", parseInt(e.target.value))} 
-                  placeholder="5432" 
+                  placeholder={type === "postgres" ? "5432" : type === "mysql" ? "3306" : "5432"}
                 />
               </div>
             </div>
@@ -121,7 +126,7 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
               <Input 
                 value={config.database || ""} 
                 onChange={e => handleConfigChange("database", e.target.value)} 
-                placeholder="postgres" 
+                placeholder="database_name" 
               />
             </div>
             <div className="space-y-2">
@@ -129,7 +134,7 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
               <Input 
                 value={config.user || ""} 
                 onChange={e => handleConfigChange("user", e.target.value)} 
-                placeholder="postgres" 
+                placeholder="username" 
               />
             </div>
             <div className="space-y-2">
@@ -149,7 +154,7 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
               <Input 
                 value={config.connection_string || ""} 
                 onChange={e => handleConfigChange("connection_string", e.target.value)} 
-                placeholder="postgresql://user:pass@host:5432/db" 
+                placeholder={type === "postgres" ? "postgresql://user:pass@host:5432/db" : "mysql://user:pass@host:3306/db"}
               />
             </div>
           </div>
@@ -204,59 +209,44 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
           </div>
         );
       case "sqlite":
+      case "parquet":
+      case "csv":
         return (
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">File Path (Server Side)</label>
+              <label className="text-sm font-medium">文件上传</label>
               <div className="flex gap-2">
                 <Input 
                   value={config.file_path || ""} 
                   onChange={e => handleConfigChange("file_path", e.target.value)} 
-                  placeholder="/path/to/database.db" 
+                  placeholder="/path/to/file" 
                 />
                 <Button type="button" variant="outline" onClick={handleFileSelect} disabled={isUploading}>
                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                 </Button>
                 <input 
-                  key="sqlite-input"
+                  key={`${type}-input`}
                   type="file" 
                   ref={fileInputRef} 
                   className="hidden" 
-                  accept=".db,.sqlite,.sqlite3"
+                  accept={type === "sqlite" ? ".db,.sqlite,.sqlite3" : type === "parquet" ? ".parquet" : ".csv"}
                   onChange={handleFileUpload}
                 />
               </div>
-            </div>
-          </div>
-        );
-      case "parquet":
-        return (
-           <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">File Path (Server Side)</label>
-              <div className="flex gap-2">
-                <Input 
-                  value={config.file_path || ""} 
-                  onChange={e => handleConfigChange("file_path", e.target.value)} 
-                  placeholder="/path/to/data.parquet" 
-                />
-                <Button type="button" variant="outline" onClick={handleFileSelect} disabled={isUploading}>
-                   {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                </Button>
-                <input 
-                  key="parquet-input"
-                  type="file" 
-                  ref={fileInputRef} 
-                  className="hidden" 
-                  accept=".parquet"
-                  onChange={handleFileUpload}
-                />
-              </div>
+              <p className="text-xs text-zinc-500">上传文件或输入服务器路径</p>
             </div>
           </div>
         );
       default:
-        return null;
+        return (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <AlertTriangle className="h-10 w-10 text-amber-500 mb-3" />
+            <h3 className="font-medium text-zinc-900">暂不支持该数据源类型</h3>
+            <p className="text-sm text-zinc-500 mt-1 max-w-[300px]">
+              该数据源连接器正在开发中。请尝试使用 PostgreSQL, ClickHouse 或文件上传。
+            </p>
+          </div>
+        );
     }
   };
 
@@ -272,20 +262,24 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
         />
       </div>
 
-      <div className="space-y-2">
-        <label className="text-sm font-medium">类型</label>
-        <select
-          className="w-full h-10 px-3 rounded-md border border-zinc-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-zinc-950 focus:border-transparent"
-          value={type}
-          onChange={e => setType(e.target.value)}
-        >
-          <option value="postgres">PostgreSQL</option>
-          <option value="clickhouse">ClickHouse</option>
-          <option value="sqlite">SQLite</option>
-          <option value="supabase">Supabase</option>
-          <option value="parquet">Parquet</option>
-        </select>
-      </div>
+      {!initialData?.type && (
+        <div className="space-y-2">
+          <label className="text-sm font-medium">类型</label>
+          <select
+            className="w-full h-10 px-3 rounded-md border border-zinc-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-zinc-950 focus:border-transparent"
+            value={type}
+            onChange={e => setType(e.target.value)}
+          >
+            <option value="postgres">PostgreSQL</option>
+            <option value="clickhouse">ClickHouse</option>
+            <option value="sqlite">SQLite</option>
+            <option value="supabase">Supabase</option>
+            <option value="parquet">Parquet</option>
+            <option value="mysql">MySQL</option>
+            <option value="csv">CSV</option>
+          </select>
+        </div>
+      )}
 
       <div className="p-4 border border-zinc-200 rounded-lg bg-zinc-50/50">
         {renderConfigFields()}

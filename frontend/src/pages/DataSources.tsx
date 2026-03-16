@@ -2,17 +2,39 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { DataSourceForm, type DataSourceConfig } from "@/components/DataSourceForm";
 import { Button } from "@/components/ui/button";
-import { Plus, Database, Pencil, Trash2, Loader2, FolderOpen } from "lucide-react";
+import { Plus, Database, Pencil, Trash2, Loader2, FolderOpen, Info, ChevronLeft, FileText, Search } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuthStore } from "@/store/authStore";
 import { useProjectStore } from "@/store/projectStore";
 import { useNavigate } from "react-router-dom";
 
+const SOURCE_TYPES = [
+  { id: "csv", name: "CSV Upload", icon: <FileText className="h-6 w-6 text-green-600" /> },
+  { id: "bigquery", name: "BigQuery", icon: <Database className="h-6 w-6 text-blue-500" /> },
+  { id: "postgres", name: "PostgreSQL", icon: <Database className="h-6 w-6 text-indigo-600" /> },
+  { id: "mysql", name: "MySQL", icon: <Database className="h-6 w-6 text-cyan-600" /> },
+  { id: "oracle", name: "Oracle", icon: <Database className="h-6 w-6 text-red-600" /> },
+  { id: "sqlserver", name: "SQL Server", icon: <Database className="h-6 w-6 text-red-500" /> },
+  { id: "clickhouse", name: "ClickHouse", icon: <Database className="h-6 w-6 text-yellow-500" /> },
+  { id: "trino", name: "Trino", icon: <Database className="h-6 w-6 text-pink-500" /> },
+  { id: "snowflake", name: "Snowflake", icon: <Database className="h-6 w-6 text-blue-400" /> },
+  { id: "athena-trino", name: "Athena (Trino)", icon: <Search className="h-6 w-6 text-purple-600" /> },
+  { id: "redshift", name: "Redshift", icon: <Database className="h-6 w-6 text-purple-700" /> },
+  { id: "databricks", name: "Databricks", icon: <Database className="h-6 w-6 text-orange-600" /> },
+  { id: "emr-spark", name: "EMR (Spark)", icon: <Database className="h-6 w-6 text-indigo-800" /> },
+  { id: "athena-spark", name: "Athena (Spark)", icon: <Search className="h-6 w-6 text-purple-500" /> },
+  { id: "spark", name: "Spark", icon: <Database className="h-6 w-6 text-orange-500" /> },
+  { id: "sqlite", name: "SQLite", icon: <Database className="h-6 w-6 text-blue-600" /> },
+  { id: "parquet", name: "Parquet", icon: <FileText className="h-6 w-6 text-yellow-600" /> },
+];
+
 export function DataSources() {
   const [datasources, setDatasources] = useState<DataSourceConfig[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [view, setView] = useState<"list" | "select-type">("list");
   const [isOpen, setIsOpen] = useState(false);
   const [editingDs, setEditingDs] = useState<DataSourceConfig | null>(null);
+  const [selectedType, setSelectedType] = useState<string | null>(null);
   const { user } = useAuthStore();
   const { currentProject } = useProjectStore();
   const navigate = useNavigate();
@@ -34,15 +56,22 @@ export function DataSources() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
   const handleCreate = () => {
     setEditingDs(null);
+    setSelectedType(null);
+    setView("select-type");
+  };
+
+  const handleSelectType = (typeId: string) => {
+    setSelectedType(typeId);
     setIsOpen(true);
   };
 
   const handleEdit = (ds: DataSourceConfig) => {
     setEditingDs(ds);
+    setSelectedType(ds.type);
     setIsOpen(true);
   };
 
@@ -81,6 +110,69 @@ export function DataSources() {
       throw e;
     }
   };
+
+  if (view === "select-type") {
+    return (
+      <div className="h-full flex flex-col bg-[#F9FAFB]">
+        <div className="px-12 py-8">
+          <button 
+            onClick={() => setView("list")}
+            className="flex items-center text-zinc-500 hover:text-zinc-800 transition-colors mb-6 group"
+          >
+            <ChevronLeft className="h-4 w-4 mr-1 group-hover:-translate-x-0.5 transition-transform" />
+            返回列表
+          </button>
+          
+          <h1 className="text-2xl font-semibold text-zinc-800 mb-6">Connect an external data source</h1>
+          
+          <div className="bg-blue-50 border border-blue-100 rounded-md p-3 mb-8 flex items-start gap-3">
+            <Info className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
+            <p className="text-sm text-blue-800">
+              <span className="font-semibold">dbt integration</span> is available for PostgreSQL, MySQL, BigQuery, Redshift, and Snowflake (For Essential Plan and above). <a href="#" className="text-blue-600 hover:underline">Contact Us</a> to suggest new data sources.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {SOURCE_TYPES.map((type) => (
+              <button
+                key={type.id}
+                onClick={() => handleSelectType(type.id)}
+                className="flex items-center gap-4 bg-white p-4 rounded-lg border border-zinc-200 hover:border-blue-500 hover:shadow-sm transition-all text-left group"
+              >
+                <div className="w-10 h-10 flex items-center justify-center rounded bg-zinc-50 group-hover:bg-blue-50 transition-colors">
+                  {type.icon}
+                </div>
+                <span className="font-medium text-zinc-700 group-hover:text-blue-600 transition-colors">
+                  {type.name}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <Dialog open={isOpen} onOpenChange={(open) => {
+          setIsOpen(open);
+          if (!open && !editingDs) setSelectedType(null);
+        }}>
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {editingDs ? "编辑数据源" : `新建 ${SOURCE_TYPES.find(t => t.id === selectedType)?.name || ""} 数据源`}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <DataSourceForm 
+                initialData={editingDs ? editingDs : (selectedType ? { name: "", type: selectedType, config: {} } : null)} 
+                onSubmit={handleSubmit} 
+                onTest={handleTest}
+                onCancel={() => setIsOpen(false)}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col bg-white">
@@ -153,14 +245,19 @@ export function DataSources() {
         )}
       </div>
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <Dialog open={isOpen} onOpenChange={(open) => {
+        setIsOpen(open);
+        if (!open && !editingDs) setSelectedType(null);
+      }}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingDs ? "编辑数据源" : "新建数据源"}</DialogTitle>
+            <DialogTitle>
+              {editingDs ? `编辑 ${SOURCE_TYPES.find(t => t.id === editingDs.type)?.name || editingDs.type} 数据源` : `新建 ${SOURCE_TYPES.find(t => t.id === selectedType)?.name || ""} 数据源`}
+            </DialogTitle>
           </DialogHeader>
           <div className="py-4">
             <DataSourceForm 
-              initialData={editingDs} 
+              initialData={editingDs ? editingDs : (selectedType ? { name: "", type: selectedType, config: {} } : null)} 
               onSubmit={handleSubmit} 
               onTest={handleTest}
               onCancel={() => setIsOpen(false)}
