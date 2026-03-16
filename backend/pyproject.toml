@@ -34,6 +34,7 @@ dependencies = [
     "python-socketio>=5.16.0,<6.0.0",
     "python-socks[asyncio]>=2.8.0,<3.0.0",
     "python-telegram-bot[socks]>=22.6,<23.0",
+    "pyyaml>=6.0.3",
     "qq-botpy>=1.2.0,<2.0.0",
     "readability-lxml>=0.8.4,<1.0.0",
     "rich>=14.0.0,<15.0.0",

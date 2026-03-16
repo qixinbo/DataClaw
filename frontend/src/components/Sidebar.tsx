@@ -547,7 +547,10 @@ function SidebarBody() {
             </div>
           </button>
           
-          <button className="flex items-center gap-1.5 text-sm hover:text-zinc-900 transition-colors px-2 py-1.5 rounded-md hover:bg-zinc-100">
+          <button 
+            className="flex items-center gap-1.5 text-sm hover:text-zinc-900 transition-colors px-2 py-1.5 rounded-md hover:bg-zinc-100"
+            onClick={() => navigate("/skills")}
+          >
             <Wand2 className="h-4 w-4" />
             技能中心
           </button>

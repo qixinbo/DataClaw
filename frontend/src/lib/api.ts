@@ -7,10 +7,14 @@ interface RequestOptions extends RequestInit {
 async function request<T>(url: string, options: RequestOptions = {}): Promise<T> {
   const token = localStorage.getItem('token');
   
-  const defaultHeaders = {
-    'Content-Type': 'application/json',
+  const defaultHeaders: Record<string, string> = {
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
   };
+
+  // Only set Content-Type to application/json if data is not FormData
+  if (!(options.body instanceof FormData)) {
+    defaultHeaders['Content-Type'] = 'application/json';
+  }
 
   const config: RequestInit = {
     ...options,
@@ -50,10 +54,10 @@ async function request<T>(url: string, options: RequestOptions = {}): Promise<T>
 export const api = {
   get: <T>(url: string, options?: RequestOptions) => request<T>(url, { ...options, method: 'GET' }),
   post: <T>(url: string, data: any, options?: RequestOptions) => 
-    request<T>(url, { ...options, method: 'POST', body: JSON.stringify(data) }),
+    request<T>(url, { ...options, method: 'POST', body: data instanceof FormData ? data : JSON.stringify(data) }),
   put: <T>(url: string, data: any, options?: RequestOptions) => 
-    request<T>(url, { ...options, method: 'PUT', body: JSON.stringify(data) }),
+    request<T>(url, { ...options, method: 'PUT', body: data instanceof FormData ? data : JSON.stringify(data) }),
   delete: <T>(url: string, options?: RequestOptions) => request<T>(url, { ...options, method: 'DELETE' }),
   patch: <T>(url: string, data: any, options?: RequestOptions) => 
-    request<T>(url, { ...options, method: 'PATCH', body: JSON.stringify(data) }),
+    request<T>(url, { ...options, method: 'PATCH', body: data instanceof FormData ? data : JSON.stringify(data) }),
 };
