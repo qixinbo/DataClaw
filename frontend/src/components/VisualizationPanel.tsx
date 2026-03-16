@@ -7,6 +7,7 @@ import { Code, Table as TableIcon, BarChart as ChartIcon, Download, LayoutDashbo
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useDashboardStore, type ChartConfig } from "@/store/dashboardStore";
 import { useVisualizationStore } from "@/store/visualizationStore";
+import { useProjectStore } from "@/store/projectStore";
 import { VegaChart } from "./VegaChart";
 
 export function VisualizationPanel() {
@@ -14,6 +15,7 @@ export function VisualizationPanel() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingChart, setPendingChart] = useState<Omit<ChartConfig, 'layout'> | null>(null);
   const { addChart } = useDashboardStore();
+  const { currentProject } = useProjectStore();
   const { currentData, currentSQL, currentChartSpec, currentChartInfo, isLoading, error } = useVisualizationStore();
 
   const buildPendingChart = (): Omit<ChartConfig, 'layout'> | null => {
@@ -32,6 +34,7 @@ export function VisualizationPanel() {
   };
 
   const handleAddToDashboard = () => {
+    if (!currentProject) return;
     const chart = buildPendingChart();
     if (!chart) return;
     setPendingChart(chart);
@@ -39,8 +42,8 @@ export function VisualizationPanel() {
   };
 
   const handleConfirmAdd = () => {
-    if (!pendingChart) return;
-    addChart(pendingChart);
+    if (!pendingChart || !currentProject) return;
+    addChart(pendingChart, currentProject.id);
     setConfirmOpen(false);
     setPendingChart(null);
   };

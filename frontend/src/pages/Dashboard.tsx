@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy';
 import { useDashboardStore } from '../store/dashboardStore';
+import { useProjectStore } from '../store/projectStore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
@@ -39,7 +40,15 @@ function inferChartKeys(data: Record<string, unknown>[]) {
 }
 
 export function Dashboard() {
-  const { charts, removeChart, updateLayout } = useDashboardStore();
+  const { charts, removeChart, updateLayout, loadCharts } = useDashboardStore();
+  const { currentProject } = useProjectStore();
+
+  useEffect(() => {
+    if (currentProject) {
+      loadCharts(currentProject.id);
+    }
+  }, [currentProject, loadCharts]);
+
   const ResponsiveGridLayout = useMemo(
     () => WidthProvider(Responsive as any) as any,
     []
@@ -50,22 +59,33 @@ export function Dashboard() {
   }), [charts]);
 
   const onLayoutChange = (currentLayout: any[]) => {
-    updateLayout(
-      currentLayout.map((item) => ({
-        i: item.i,
-        x: item.x,
-        y: item.y,
-        w: item.w,
-        h: item.h,
-      }))
-    );
+    if (currentProject) {
+      updateLayout(
+        currentLayout.map((item) => ({
+          i: item.i,
+          x: item.x,
+          y: item.y,
+          w: item.w,
+          h: item.h,
+        })),
+        currentProject.id
+      );
+    }
   };
+
+  if (!currentProject) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+        <p>请选择一个项目以查看仪表板。</p>
+      </div>
+    );
+  }
 
   if (charts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-        <p>No charts in dashboard.</p>
-        <p className="text-sm">Go to Chat and add some visualizations!</p>
+        <p>当前项目暂无图表。</p>
+        <p className="text-sm">前往对话页并添加可视化结果！</p>
       </div>
     );
   }
@@ -95,7 +115,7 @@ export function Dashboard() {
                   variant="ghost" 
                   size="icon" 
                   className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={() => removeChart(chart.id)}
+                  onClick={() => removeChart(chart.id, currentProject.id)}
                 >
                   <X className="h-4 w-4" />
                 </Button>

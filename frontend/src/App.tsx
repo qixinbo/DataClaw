@@ -1,10 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Sidebar } from "./components/Sidebar";
+import { ProjectSwitcher } from "./components/ProjectSwitcher";
 import { ChatInterface } from "./components/ChatInterface";
 import { Dashboard } from "./pages/Dashboard";
 import { Skills } from "./pages/Skills";
 import { Settings } from "./pages/Settings";
 import { Users } from "./pages/Users";
+import { Projects } from "./pages/Projects";
 import { Login } from "./pages/Login";
 import { ModelConfigs } from "./pages/ModelConfigs";
 import { DataSources } from "./pages/DataSources";
@@ -29,8 +31,13 @@ function MainLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
       <Sidebar />
-      <main className="flex-1 flex flex-col overflow-hidden h-screen relative">
-        {children}
+      <main className="flex-1 flex flex-col overflow-hidden h-screen">
+        <div className="flex justify-center border-b">
+          <ProjectSwitcher />
+        </div>
+        <div className="flex-1 overflow-hidden">
+          {children}
+        </div>
       </main>
     </div>
   );
@@ -73,6 +80,14 @@ function App() {
           <ProtectedRoute>
             <MainLayout>
               <Settings />
+            </MainLayout>
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/projects" element={
+          <ProtectedRoute>
+            <MainLayout>
+              <Projects />
             </MainLayout>
           </ProtectedRoute>
         } />

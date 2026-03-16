@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { DataSourceForm, type DataSourceConfig } from "@/components/DataSourceForm";
 import { Button } from "@/components/ui/button";
-import { Plus, Database, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Plus, Database, Pencil, Trash2, Loader2, FolderOpen } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuthStore } from "@/store/authStore";
+import { useProjectStore } from "@/store/projectStore";
 import { useNavigate } from "react-router-dom";
 
 export function DataSources() {
@@ -13,20 +14,20 @@ export function DataSources() {
   const [isOpen, setIsOpen] = useState(false);
   const [editingDs, setEditingDs] = useState<DataSourceConfig | null>(null);
   const { user } = useAuthStore();
+  const { currentProject } = useProjectStore();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!user?.is_admin) {
-      navigate("/");
-      return;
+    if (currentProject) {
+      fetchDataSources();
     }
-    fetchDataSources();
-  }, [user]);
+  }, [currentProject]);
 
   const fetchDataSources = async () => {
+    if (!currentProject) return;
     setIsLoading(true);
     try {
-      const data = await api.get<DataSourceConfig[]>("/api/v1/datasources");
+      const data = await api.get<DataSourceConfig[]>(`/api/v1/datasources?project_id=${currentProject.id}`);
       setDatasources(data);
     } catch (e) {
       console.error("Failed to fetch data sources", e);
@@ -56,11 +57,12 @@ export function DataSources() {
   };
 
   const handleSubmit = async (data: Omit<DataSourceConfig, "id">) => {
+    if (!currentProject) return;
     try {
       if (editingDs?.id) {
-        await api.put(`/api/v1/datasources/${editingDs.id}`, data);
+        await api.put(`/api/v1/datasources/${editingDs.id}`, { ...data, project_id: currentProject.id });
       } else {
-        await api.post("/api/v1/datasources", data);
+        await api.post("/api/v1/datasources", { ...data, project_id: currentProject.id });
       }
       setIsOpen(false);
       fetchDataSources();

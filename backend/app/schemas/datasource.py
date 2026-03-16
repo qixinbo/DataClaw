@@ -6,6 +6,7 @@ class DataSourceBase(BaseModel):
     name: str
     type: str  # sqlite, postgres, clickhouse, supabase, parquet
     config: Dict[str, Any]
+    project_id: int
 
 class DataSourceCreate(DataSourceBase):
     pass

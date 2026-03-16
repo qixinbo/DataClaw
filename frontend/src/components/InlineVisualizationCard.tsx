@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Code, Table as TableIcon, BarChart as ChartIcon, LayoutDashboard } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useDashboardStore, type ChartConfig } from "@/store/dashboardStore";
+import { useProjectStore } from "@/store/projectStore";
 import type { ChartSpec } from "@/store/visualizationStore";
 import { VegaChart } from "./VegaChart";
 
@@ -25,6 +26,7 @@ export function InlineVisualizationCard({ viz }: InlineVisualizationCardProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingChart, setPendingChart] = useState<Omit<ChartConfig, 'layout'> | null>(null);
   const { addChart } = useDashboardStore();
+  const { currentProject } = useProjectStore();
   const objectRows = viz.rows.filter((row) => row && typeof row === "object" && !Array.isArray(row)) as Record<string, unknown>[];
   const columns = objectRows.length > 0 ? Object.keys(objectRows[0]) : [];
 
@@ -43,14 +45,15 @@ export function InlineVisualizationCard({ viz }: InlineVisualizationCardProps) {
   };
 
   const handleAddToDashboard = () => {
+    if (!currentProject) return;
     const chart = buildPendingChart();
     setPendingChart(chart);
     setConfirmOpen(true);
   };
 
   const handleConfirmAdd = () => {
-    if (!pendingChart) return;
-    addChart(pendingChart);
+    if (!pendingChart || !currentProject) return;
+    addChart(pendingChart, currentProject.id);
     setConfirmOpen(false);
     setPendingChart(null);
   };

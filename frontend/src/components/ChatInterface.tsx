@@ -13,6 +13,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import { useLocation } from "react-router-dom";
 import { InlineVisualizationCard } from "./InlineVisualizationCard";
+import { useProjectStore } from "@/store/projectStore";
 
 interface Message {
   id: string;
@@ -76,6 +77,7 @@ export function ChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
+  const { currentProject } = useProjectStore();
   
   // Model selection state
   const [models, setModels] = useState<ModelConfig[]>([]);
@@ -83,10 +85,7 @@ export function ChatInterface() {
   const [modelOpen, setModelOpen] = useState(false);
   
   // Data Source selection state
-  const [availableDataSources, setAvailableDataSources] = useState<{id: string, name: string}[]>([
-    { id: "postgres-main", name: "PostgreSQL" },
-    { id: "clickhouse-main", name: "ClickHouse" }
-  ]);
+  const [availableDataSources, setAvailableDataSources] = useState<{id: string, name: string}[]>([]);
 
   // Try to parse active session from URL query
   const queryParams = new URLSearchParams(location.search);
@@ -101,16 +100,29 @@ export function ChatInterface() {
 
   useEffect(() => {
     fetchModels();
-    fetchDataSources();
   }, []);
 
+  useEffect(() => {
+    if (currentProject) {
+      fetchDataSources();
+    }
+  }, [currentProject]);
+
   const fetchDataSources = async () => {
+    if (!currentProject) return;
     try {
-      const data = await api.get<Array<{id: number, name: string}>>("/api/v1/datasources");
-      setAvailableDataSources(prev => [
-        ...prev.filter(d => !d.id.startsWith("ds:")),
-        ...data.map(d => ({ id: `ds:${d.id}`, name: d.name }))
-      ]);
+      const data = await api.get<Array<{id: number, name: string}>>(`/api/v1/datasources?project_id=${currentProject.id}`);
+      const projectSources = data.map(d => ({ id: `ds:${d.id}`, name: d.name }));
+      setAvailableDataSources(projectSources);
+      
+      // Default select the first one if current selection is not in the list
+      if (projectSources.length > 0) {
+        if (!selectedDataSource.startsWith("ds:") || !projectSources.find(ds => ds.id === selectedDataSource)) {
+          setSelectedDataSource(projectSources[0].id);
+        }
+      } else {
+        setSelectedDataSource("upload"); // Default to upload if no data sources
+      }
     } catch (e) {
       console.error("Failed to fetch data sources", e);
     }
@@ -282,14 +294,18 @@ export function ChatInterface() {
   useEffect(() => {
     const fetchSkills = async () => {
       try {
-        const skills = await api.get<Skill[]>("/api/v1/skills");
+        let url = "/api/v1/skills";
+        if (currentProject) {
+          url += `?project_id=${currentProject.id}`;
+        }
+        const skills = await api.get<Skill[]>(url);
         setAvailableSkills(skills);
       } catch (err) {
         console.error("Failed to fetch skills:", err);
       }
     };
     fetchSkills();
-  }, []);
+  }, [currentProject]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -340,12 +356,21 @@ export function ChatInterface() {
 
        const token = localStorage.getItem("token");
        const effectiveModelId = selectedModelId || currentModel?.id || "";
-       const selectedSource = selectedDataSource.split('-')[0];
+       
+       // Correctly parse source from selectedDataSource (could be 'ds:ID', 'upload', or legacy 'postgres-main')
+       let source = selectedDataSource;
+       if (selectedDataSource.includes("-")) {
+         source = selectedDataSource.split("-")[0];
+       }
+       
        const useUploadSource = Boolean(
          currentAttachedFile?.url?.startsWith("local://") ||
-         (selectedSource === "upload" && activeDataFile?.url?.startsWith("local://"))
+         (source === "upload" && activeDataFile?.url?.startsWith("local://"))
        );
-       const source = useUploadSource ? "upload" : selectedSource;
+       if (useUploadSource) {
+         source = "upload";
+       }
+       
        const fileUrl = useUploadSource ? (currentAttachedFile?.url || activeDataFile?.url) : undefined;
        const preferSqlChart = chartIntentPattern.test(messagePayload);
        const response = await fetch("/nanobot/chat/stream", {
@@ -570,19 +595,11 @@ export function ChatInterface() {
                                   数据源
                                 </div>
                                 <div className="space-y-0.5">
-                                  {[
-                                    { id: 'postgres-main', label: 'Postgres (Main)', icon: Database },
-                                    { id: 'clickhouse-main', label: 'Clickhouse', icon: Database },
-                                    { id: 'upload', label: '本地文件上传', icon: FileIcon },
-                                  ].map((ds) => (
+                                  {availableDataSources.map((ds) => (
                                     <button
                                       key={ds.id}
                                       onClick={() => {
                                         setSelectedDataSource(ds.id);
-                                        if (ds.id === 'upload') {
-                                          fileInputRef.current?.click();
-                                          setIsMenuOpen(false);
-                                        }
                                       }}
                                       className={cn(
                                         "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
@@ -592,12 +609,32 @@ export function ChatInterface() {
                                       )}
                                     >
                                       <div className="flex items-center gap-2.5">
-                                        <ds.icon className={cn("h-4 w-4", selectedDataSource === ds.id ? "text-blue-500" : "text-zinc-400")} />
-                                        <span className="font-medium">{ds.label}</span>
+                                        <Database className={cn("h-4 w-4", selectedDataSource === ds.id ? "text-blue-500" : "text-zinc-400")} />
+                                        <span className="font-medium">{ds.name}</span>
                                       </div>
                                       {selectedDataSource === ds.id && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
                                     </button>
                                   ))}
+                                  
+                                  <button
+                                    onClick={() => {
+                                      setSelectedDataSource('upload');
+                                      fileInputRef.current?.click();
+                                      setIsMenuOpen(false);
+                                    }}
+                                    className={cn(
+                                      "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
+                                      selectedDataSource === 'upload' || selectedDataSource === 'upload-main'
+                                        ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200" 
+                                        : "text-zinc-600 hover:bg-white hover:shadow-sm"
+                                    )}
+                                  >
+                                    <div className="flex items-center gap-2.5">
+                                      <FileIcon className={cn("h-4 w-4", (selectedDataSource === 'upload' || selectedDataSource === 'upload-main') ? "text-blue-500" : "text-zinc-400")} />
+                                      <span className="font-medium">本地文件上传</span>
+                                    </div>
+                                    {(selectedDataSource === 'upload' || selectedDataSource === 'upload-main') && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
+                                  </button>
                                 </div>
                               </div>
 
@@ -776,19 +813,11 @@ export function ChatInterface() {
                             数据源
                           </div>
                           <div className="space-y-0.5">
-                            {[
-                              { id: 'postgres-main', label: 'Postgres (Main)', icon: Database },
-                              { id: 'clickhouse-main', label: 'Clickhouse', icon: Database },
-                              { id: 'upload', label: '本地文件上传', icon: FileIcon },
-                            ].map((ds) => (
+                            {availableDataSources.map((ds) => (
                               <button
                                 key={ds.id}
                                 onClick={() => {
                                   setSelectedDataSource(ds.id);
-                                  if (ds.id === 'upload') {
-                                    fileInputRef.current?.click();
-                                    setIsMenuOpen(false);
-                                  }
                                 }}
                                 className={cn(
                                   "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
@@ -798,12 +827,32 @@ export function ChatInterface() {
                                 )}
                               >
                                 <div className="flex items-center gap-2.5">
-                                  <ds.icon className={cn("h-4 w-4", selectedDataSource === ds.id ? "text-blue-500" : "text-zinc-400")} />
-                                  <span className="font-medium">{ds.label}</span>
+                                  <Database className={cn("h-4 w-4", selectedDataSource === ds.id ? "text-blue-500" : "text-zinc-400")} />
+                                  <span className="font-medium">{ds.name}</span>
                                 </div>
                                 {selectedDataSource === ds.id && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
                               </button>
                             ))}
+                            
+                            <button
+                              onClick={() => {
+                                setSelectedDataSource('upload');
+                                fileInputRef.current?.click();
+                                setIsMenuOpen(false);
+                              }}
+                              className={cn(
+                                "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
+                                selectedDataSource === 'upload' || selectedDataSource === 'upload-main'
+                                  ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200" 
+                                  : "text-zinc-600 hover:bg-white hover:shadow-sm"
+                              )}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <FileIcon className={cn("h-4 w-4", (selectedDataSource === 'upload' || selectedDataSource === 'upload-main') ? "text-blue-500" : "text-zinc-400")} />
+                                <span className="font-medium">本地文件上传</span>
+                              </div>
+                              {(selectedDataSource === 'upload' || selectedDataSource === 'upload-main') && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
+                            </button>
                           </div>
                         </div>
 

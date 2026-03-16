@@ -1,7 +1,7 @@
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Menu, LayoutDashboard, Plus, MoreVertical, User, Search, Wrench, Settings, Brain, Trash2, Pencil, Pin, Archive, Database, CheckSquare, Square, ListChecks, RotateCcw, Wand2 } from "lucide-react";
+import { Menu, LayoutDashboard, Plus, MoreVertical, User, Search, Wrench, Settings, Brain, Trash2, Pencil, Pin, Archive, Database, CheckSquare, Square, ListChecks, RotateCcw, Wand2, Folder } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
@@ -564,6 +564,28 @@ function SidebarBody() {
             <button 
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 transition-colors"
               onClick={() => {
+                navigate("/projects");
+                setShowUserMenu(false);
+              }}
+            >
+              <Folder className="h-4 w-4 text-zinc-500" />
+              项目管理
+            </button>
+
+            <button 
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 transition-colors"
+              onClick={() => {
+                navigate("/datasources");
+                setShowUserMenu(false);
+              }}
+            >
+              <Database className="h-4 w-4 text-zinc-500" />
+              数据源管理
+            </button>
+
+            <button 
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 transition-colors"
+              onClick={() => {
                 navigate("/settings");
                 setShowUserMenu(false);
               }}
@@ -583,17 +605,6 @@ function SidebarBody() {
                 >
                   <Brain className="h-4 w-4 text-zinc-500" />
                   模型配置
-                </button>
-
-                <button
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 transition-colors"
-                  onClick={() => {
-                    navigate("/datasources");
-                    setShowUserMenu(false);
-                  }}
-                >
-                  <Database className="h-4 w-4 text-zinc-500" />
-                  数据源配置
                 </button>
                 
                 <button 

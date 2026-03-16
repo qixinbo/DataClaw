@@ -14,6 +14,7 @@ class Skill(BaseModel):
     description: Optional[str] = Field(None, description="Description of what the skill does")
     content: str = Field(..., description="The content/prompt/logic of the skill")
     type: str = Field("python", description="Type of the skill (python, sql, api)")
+    project_id: Optional[int] = Field(None, description="The ID of the project this skill belongs to")
 
 class SkillCreate(BaseModel):
     id: str
@@ -21,12 +22,14 @@ class SkillCreate(BaseModel):
     description: Optional[str] = None
     content: str
     type: str = "python"
+    project_id: Optional[int] = None
 
 class SkillUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     content: Optional[str] = None
     type: Optional[str] = None
+    project_id: Optional[int] = None
 
 def _load_data() -> List[Dict[str, Any]]:
     if not os.path.exists(DATA_FILE):
@@ -42,19 +45,24 @@ def _save_data(data: List[Dict[str, Any]]):
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
-def load_skills() -> List[Dict[str, Any]]:
-    return _load_data()
+def load_skills(project_id: Optional[int] = None) -> List[Dict[str, Any]]:
+    data = _load_data()
+    if project_id is not None:
+        return [item for item in data if item.get("project_id") == project_id]
+    return data
 
 @router.get("/skills", response_model=List[Skill])
-def list_skills():
-    data = load_skills()
+def list_skills(project_id: Optional[int] = None):
+    data = load_skills(project_id)
     return [Skill(**item) for item in data]
 
 @router.get("/skills/{skill_id}", response_model=Skill)
-def get_skill(skill_id: str):
+def get_skill(skill_id: str, project_id: Optional[int] = None):
     data = _load_data()
     for item in data:
         if item["id"] == skill_id:
+            if project_id is not None and item.get("project_id") != project_id:
+                continue
             return Skill(**item)
     raise HTTPException(status_code=404, detail="Skill not found")
 
@@ -70,10 +78,12 @@ def create_skill(skill: SkillCreate):
     return Skill(**new_skill)
 
 @router.put("/skills/{skill_id}", response_model=Skill)
-def update_skill(skill_id: str, skill: SkillUpdate):
+def update_skill(skill_id: str, skill: SkillUpdate, project_id: Optional[int] = None):
     data = _load_data()
     for i, item in enumerate(data):
         if item["id"] == skill_id:
+            if project_id is not None and item.get("project_id") != project_id:
+                continue
             updated_item = item.copy()
             update_data = skill.dict(exclude_unset=True)
             updated_item.update(update_data)
@@ -83,11 +93,24 @@ def update_skill(skill_id: str, skill: SkillUpdate):
     raise HTTPException(status_code=404, detail="Skill not found")
 
 @router.delete("/skills/{skill_id}")
-def delete_skill(skill_id: str):
+def delete_skill(skill_id: str, project_id: Optional[int] = None):
     data = _load_data()
     initial_len = len(data)
-    data = [item for item in data if item["id"] != skill_id]
-    if len(data) == initial_len:
+    
+    # If project_id is provided, we only delete if it matches
+    new_data = []
+    found = False
+    for item in data:
+        if item["id"] == skill_id:
+            if project_id is not None and item.get("project_id") != project_id:
+                new_data.append(item)
+                continue
+            found = True
+        else:
+            new_data.append(item)
+            
+    if not found:
         raise HTTPException(status_code=404, detail="Skill not found")
-    _save_data(data)
+        
+    _save_data(new_data)
     return {"message": "Skill deleted successfully"}

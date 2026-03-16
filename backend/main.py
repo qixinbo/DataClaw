@@ -7,7 +7,7 @@ import asyncio
 import json
 from datetime import datetime
 
-from app.api import upload, llm, skills, users, datasources
+from app.api import upload, llm, skills, users, datasources, projects
 from app.connectors.postgres import postgres_connector
 from app.connectors.clickhouse import clickhouse_connector
 from app.core.nanobot import nanobot_service
@@ -16,6 +16,7 @@ from app.agent.nl2sql import process_nl2sql, NL2SQLRequest, NL2SQLResponse
 from app.database import engine, Base
 # Import all models to ensure they are registered
 from app.models.user import User
+from app.models.project import Project
 from app.models.datasource import DataSource
 
 app = FastAPI()
@@ -35,6 +36,7 @@ app.include_router(upload.router, prefix="/api/v1")
 app.include_router(llm.router, prefix="/api/v1")
 app.include_router(skills.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
+app.include_router(projects.router, prefix="/api/v1")
 app.include_router(datasources.router, prefix="/api/v1")
 
 @app.on_event("startup")

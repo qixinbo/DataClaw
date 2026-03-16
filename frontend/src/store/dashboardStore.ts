@@ -16,17 +16,22 @@ export interface ChartConfig {
 
 interface DashboardState {
   charts: ChartConfig[];
-  addChart: (chart: Omit<ChartConfig, 'layout'>) => void;
-  removeChart: (id: string) => void;
-  updateLayout: (layouts: GridLayout[]) => void;
+  addChart: (chart: Omit<ChartConfig, 'layout'>, projectId: number) => void;
+  removeChart: (id: string, projectId: number) => void;
+  updateLayout: (layouts: GridLayout[], projectId: number) => void;
+  loadCharts: (projectId: number) => void;
 }
 
-const DASHBOARD_STORAGE_KEY = 'dashboard_charts_v1';
+const DASHBOARD_STORAGE_KEY_PREFIX = 'dashboard_charts_v1_project_';
 
-function loadChartsFromStorage(): ChartConfig[] {
+function getStorageKey(projectId: number) {
+  return `${DASHBOARD_STORAGE_KEY_PREFIX}${projectId}`;
+}
+
+function loadChartsFromStorage(projectId: number): ChartConfig[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = window.localStorage.getItem(DASHBOARD_STORAGE_KEY);
+    const raw = window.localStorage.getItem(getStorageKey(projectId));
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -47,14 +52,17 @@ function loadChartsFromStorage(): ChartConfig[] {
   }
 }
 
-function saveChartsToStorage(charts: ChartConfig[]) {
+function saveChartsToStorage(charts: ChartConfig[], projectId: number) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(DASHBOARD_STORAGE_KEY, JSON.stringify(charts));
+  window.localStorage.setItem(getStorageKey(projectId), JSON.stringify(charts));
 }
 
-export const useDashboardStore = create<DashboardState>((set) => ({
-  charts: loadChartsFromStorage(),
-  addChart: (chart) => set((state) => {
+export const useDashboardStore = create<DashboardState>((set, get) => ({
+  charts: [],
+  loadCharts: (projectId) => {
+    set({ charts: loadChartsFromStorage(projectId) });
+  },
+  addChart: (chart, projectId) => set((state) => {
     const colSize = 4;
     const cols = 12 / colSize;
     const index = state.charts.length;
@@ -66,22 +74,20 @@ export const useDashboardStore = create<DashboardState>((set) => ({
       h: 4,
     };
     const nextCharts = [...state.charts, { ...chart, layout: newLayout }];
-    saveChartsToStorage(nextCharts);
+    saveChartsToStorage(nextCharts, projectId);
     return { charts: nextCharts };
   }),
-  removeChart: (id) => set((state) => ({
-    charts: (() => {
-      const nextCharts = state.charts.filter((c) => c.id !== id);
-      saveChartsToStorage(nextCharts);
-      return nextCharts;
-    })(),
-  })),
-  updateLayout: (layouts) => set((state) => {
+  removeChart: (id, projectId) => set((state) => {
+    const nextCharts = state.charts.filter((c) => c.id !== id);
+    saveChartsToStorage(nextCharts, projectId);
+    return { charts: nextCharts };
+  }),
+  updateLayout: (layouts, projectId) => set((state) => {
     const nextCharts = state.charts.map((chart) => {
       const layout = layouts.find((l) => l.i === chart.id);
       return layout ? { ...chart, layout } : chart;
     });
-    saveChartsToStorage(nextCharts);
+    saveChartsToStorage(nextCharts, projectId);
     return { charts: nextCharts };
   }),
 }));
