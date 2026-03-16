@@ -41,11 +41,6 @@ export function ProjectSwitcher() {
 
   return (
     <div className="flex items-center gap-2 px-4 py-2 bg-background h-12">
-      <div className="flex items-center text-sm font-medium text-muted-foreground">
-        <span>DataClaw</span>
-        <span className="mx-2 text-zinc-300">/</span>
-      </div>
-      
       <DropdownMenu>
         <DropdownMenuTrigger className="flex h-8 items-center gap-1 rounded-md px-2 font-semibold hover:bg-accent hover:text-accent-foreground outline-none transition-colors">
           <Folder className="h-4 w-4 mr-1 text-blue-500" />
