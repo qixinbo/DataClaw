@@ -58,6 +58,7 @@ interface SessionData {
   key: string;
   metadata?: {
     active_data_file?: DataFileContext | null;
+    selected_data_source?: string | null;
     [key: string]: any;
   };
   messages: Array<{
@@ -104,7 +105,6 @@ export function ChatInterface() {
 
   useEffect(() => {
     if (currentProject) {
-      setSelectedDataSource("");
       fetchDataSources();
     }
   }, [currentProject]);
@@ -117,26 +117,37 @@ export function ChatInterface() {
       setAvailableDataSources(projectSources);
       if (selectedDataSource && !projectSources.find(ds => ds.id === selectedDataSource)) {
         setSelectedDataSource("");
+        void syncSessionContext({ selected_data_source: null });
       }
     } catch (e) {
       console.error("Failed to fetch data sources", e);
     }
   };
 
-  const syncSessionFileContext = async (file: DataFileContext | null) => {
+  const syncSessionContext = async (payload: {
+    active_data_file?: DataFileContext | null;
+    selected_data_source?: string | null;
+  }) => {
     try {
-      await api.put(`/nanobot/sessions/${encodeURIComponent(activeSessionKey)}/context-file`, {
-        active_data_file: file,
-      });
+      await api.put(`/nanobot/sessions/${encodeURIComponent(activeSessionKey)}/context-file`, payload);
     } catch (e) {
-      console.error("Failed to sync session file context", e);
+      console.error("Failed to sync session context", e);
     }
+  };
+
+  const handleSelectDataSource = async (sourceId: string) => {
+    setSelectedDataSource(sourceId);
+    await syncSessionContext({ selected_data_source: sourceId });
+  };
+
+  const handleClearDataSource = async () => {
+    setSelectedDataSource("");
+    await syncSessionContext({ selected_data_source: null });
   };
 
   useEffect(() => {
     const fetchSessionData = async () => {
       setIsLoading(true);
-      setSelectedDataSource("");
       setSelectedSkillIds([]);
       try {
         const data = await api.get<SessionData>(`/nanobot/sessions/${activeSessionKey}`);
@@ -152,12 +163,15 @@ export function ChatInterface() {
           setMessages([]);
         }
         const restoredFile = data.metadata?.active_data_file || null;
+        const restoredSource = data.metadata?.selected_data_source || "";
         setActiveDataFile(restoredFile);
+        setSelectedDataSource(restoredSource);
         setAttachedFile(null);
       } catch (e) {
         console.error("Failed to fetch session messages", e);
         setMessages([]);
         setActiveDataFile(null);
+        setSelectedDataSource("");
         setAttachedFile(null);
       } finally {
         setIsLoading(false);
@@ -238,7 +252,7 @@ export function ChatInterface() {
       setAttachedFile(uploadedFile);
       setActiveDataFile(uploadedFile);
       setSelectedDataSource("");
-      await syncSessionFileContext(uploadedFile);
+      await syncSessionContext({ active_data_file: uploadedFile, selected_data_source: null });
     } catch (error) {
       console.error("File upload error:", error);
       // Could show a toast notification here
@@ -253,7 +267,7 @@ export function ChatInterface() {
   const handleRemoveFile = async () => {
     setAttachedFile(null);
     setActiveDataFile(null);
-    await syncSessionFileContext(null);
+    await syncSessionContext({ active_data_file: null });
   };
 
   const selectedDataSourceName = availableDataSources.find(ds => ds.id === selectedDataSource)?.name || "";
@@ -610,7 +624,7 @@ export function ChatInterface() {
                                     <button
                                       key={ds.id}
                                       onClick={() => {
-                                        setSelectedDataSource(ds.id);
+                                        void handleSelectDataSource(ds.id);
                                       }}
                                       className={cn(
                                         "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
@@ -629,7 +643,9 @@ export function ChatInterface() {
                                   {selectedDataSource && (
                                     <div className="mt-2 pt-2 border-t border-zinc-100">
                                       <button
-                                        onClick={() => setSelectedDataSource("")}
+                                        onClick={() => {
+                                          void handleClearDataSource();
+                                        }}
                                         className="w-full py-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 transition-colors flex items-center justify-center gap-1"
                                       >
                                         清除已选
@@ -814,7 +830,7 @@ export function ChatInterface() {
                               <button
                                 key={ds.id}
                                 onClick={() => {
-                                  setSelectedDataSource(ds.id);
+                                  void handleSelectDataSource(ds.id);
                                 }}
                                 className={cn(
                                   "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
@@ -833,7 +849,9 @@ export function ChatInterface() {
                             {selectedDataSource && (
                               <div className="mt-2 pt-2 border-t border-zinc-100">
                                 <button
-                                  onClick={() => setSelectedDataSource("")}
+                                  onClick={() => {
+                                    void handleClearDataSource();
+                                  }}
                                   className="w-full py-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 transition-colors flex items-center justify-center gap-1"
                                 >
                                   清除已选
