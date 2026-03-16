@@ -10,6 +10,7 @@ import { Projects } from "./pages/Projects";
 import { Login } from "./pages/Login";
 import { ModelConfigs } from "./pages/ModelConfigs";
 import { DataSources } from "./pages/DataSources";
+import { Modeling } from "./pages/Modeling";
 import { useAuthStore } from "./store/authStore";
 
 // Protected Route Component
@@ -112,6 +113,14 @@ function App() {
           <ProtectedRoute requireAdmin={true}>
             <MainLayout>
               <DataSources />
+            </MainLayout>
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/modeling/:id" element={
+          <ProtectedRoute requireAdmin={true}>
+            <MainLayout>
+              <Modeling />
             </MainLayout>
           </ProtectedRoute>
         } />

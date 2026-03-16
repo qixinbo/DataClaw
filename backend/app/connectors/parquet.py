@@ -31,7 +31,7 @@ class ParquetConnector:
         finally:
             conn.close()
 
-    def get_schema(self) -> Dict[str, List[str]]:
+    def get_schema(self) -> Dict[str, List[Dict[str, str]]]:
         conn = duckdb.connect(":memory:")
         table_name = os.path.splitext(os.path.basename(self.file_path))[0]
         conn.execute(f"CREATE OR REPLACE VIEW {table_name} AS SELECT * FROM read_parquet('{self.file_path}')")
@@ -39,7 +39,7 @@ class ParquetConnector:
         try:
             # Get columns
             columns = conn.execute(f"DESCRIBE {table_name}").fetchall()
-            schema = {table_name: [f"{col[0]} ({col[1]})" for col in columns]}
+            schema = {table_name: [{"name": col[0], "type": col[1]} for col in columns]}
             return schema
         except Exception as e:
             print(f"Error getting schema: {e}")

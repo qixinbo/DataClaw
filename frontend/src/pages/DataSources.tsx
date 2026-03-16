@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { DataSourceForm, type DataSourceConfig } from "@/components/DataSourceForm";
 import { Button } from "@/components/ui/button";
-import { Plus, Database, Pencil, Trash2, Loader2, FolderOpen, Info, ChevronLeft, FileText, Search } from "lucide-react";
+import { Plus, Database, Pencil, Trash2, Loader2, FolderOpen, Info, ChevronLeft, FileText, Search, Network } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuthStore } from "@/store/authStore";
 import { useProjectStore } from "@/store/projectStore";
@@ -216,9 +216,12 @@ export function DataSources() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-600" onClick={() => handleEdit(ds)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-blue-600" onClick={() => navigate(`/modeling/${ds.id}`)} title="Data Modeling">
+                    <Network className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-600" onClick={() => handleEdit(ds)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(ds.id!)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>

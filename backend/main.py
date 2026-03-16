@@ -7,7 +7,7 @@ import asyncio
 import json
 from datetime import datetime
 
-from app.api import upload, llm, skills, users, datasources, projects
+from app.api import upload, llm, skills, users, datasources, projects, semantic
 from app.connectors.postgres import postgres_connector
 from app.connectors.clickhouse import clickhouse_connector
 from app.core.nanobot import nanobot_service
@@ -38,6 +38,7 @@ app.include_router(skills.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
 app.include_router(projects.router, prefix="/api/v1")
 app.include_router(datasources.router, prefix="/api/v1")
+app.include_router(semantic.router, prefix="/api/v1")
 
 @app.on_event("startup")
 async def startup_event():

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { User, Loader2, Sparkles, ArrowUp, ChevronDown, Paperclip, Check, X, File as FileIcon, Square, Plus, Database, Wand2, Search, Zap, LayoutGrid, CheckCircle2, Table, XCircle } from "lucide-react";
+import { User, Loader2, Sparkles, ArrowUp, ChevronDown, Paperclip, Check, X, Square, Plus, Database, Wand2, Search, Zap, LayoutGrid, CheckCircle2, Table, XCircle } from "lucide-react";
 import { api } from "@/lib/api";
 import { type ChartSpec } from "@/store/visualizationStore";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -70,7 +70,7 @@ interface SessionData {
 export function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [selectedDataSource, setSelectedDataSource] = useState<string>("postgres-main");
+  const [selectedDataSource, setSelectedDataSource] = useState<string>("");
   const [availableSkills, setAvailableSkills] = useState<Skill[]>([]);
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -104,6 +104,7 @@ export function ChatInterface() {
 
   useEffect(() => {
     if (currentProject) {
+      setSelectedDataSource("");
       fetchDataSources();
     }
   }, [currentProject]);
@@ -114,14 +115,8 @@ export function ChatInterface() {
       const data = await api.get<Array<{id: number, name: string}>>(`/api/v1/datasources?project_id=${currentProject.id}`);
       const projectSources = data.map(d => ({ id: `ds:${d.id}`, name: d.name }));
       setAvailableDataSources(projectSources);
-      
-      // Default select the first one if current selection is not in the list
-      if (projectSources.length > 0) {
-        if (!selectedDataSource.startsWith("ds:") || !projectSources.find(ds => ds.id === selectedDataSource)) {
-          setSelectedDataSource(projectSources[0].id);
-        }
-      } else {
-        setSelectedDataSource("upload"); // Default to upload if no data sources
+      if (selectedDataSource && !projectSources.find(ds => ds.id === selectedDataSource)) {
+        setSelectedDataSource("");
       }
     } catch (e) {
       console.error("Failed to fetch data sources", e);
@@ -141,6 +136,8 @@ export function ChatInterface() {
   useEffect(() => {
     const fetchSessionData = async () => {
       setIsLoading(true);
+      setSelectedDataSource("");
+      setSelectedSkillIds([]);
       try {
         const data = await api.get<SessionData>(`/nanobot/sessions/${activeSessionKey}`);
         if (data.messages && data.messages.length > 0) {
@@ -157,11 +154,6 @@ export function ChatInterface() {
         const restoredFile = data.metadata?.active_data_file || null;
         setActiveDataFile(restoredFile);
         setAttachedFile(null);
-        if (restoredFile) {
-          setSelectedDataSource("upload-main");
-        } else if (selectedDataSource.startsWith("upload")) {
-          setSelectedDataSource("postgres-main");
-        }
       } catch (e) {
         console.error("Failed to fetch session messages", e);
         setMessages([]);
@@ -245,7 +237,7 @@ export function ChatInterface() {
       };
       setAttachedFile(uploadedFile);
       setActiveDataFile(uploadedFile);
-      setSelectedDataSource("upload-main");
+      setSelectedDataSource("");
       await syncSessionFileContext(uploadedFile);
     } catch (error) {
       console.error("File upload error:", error);
@@ -261,10 +253,35 @@ export function ChatInterface() {
   const handleRemoveFile = async () => {
     setAttachedFile(null);
     setActiveDataFile(null);
-    if (selectedDataSource.startsWith("upload")) {
-      setSelectedDataSource("postgres-main");
-    }
     await syncSessionFileContext(null);
+  };
+
+  const selectedDataSourceName = availableDataSources.find(ds => ds.id === selectedDataSource)?.name || "";
+  const selectedSkills = availableSkills.filter(skill => selectedSkillIds.includes(skill.id));
+
+  const renderActiveSelections = () => {
+    if (!selectedDataSource && selectedSkills.length === 0) return null;
+    return (
+      <div className="px-2 pt-2">
+        <div className="flex flex-wrap gap-2">
+          {selectedDataSource ? (
+            <div className="px-3 py-1.5 rounded-full text-xs border flex items-center gap-1.5 bg-blue-50 text-blue-700 border-blue-200">
+              <Database className="h-3.5 w-3.5" />
+              {`数据源：${selectedDataSourceName}`}
+            </div>
+          ) : null}
+          {selectedSkills.map((skill) => (
+            <div
+              key={skill.id}
+              className="px-3 py-1.5 rounded-full text-xs border flex items-center gap-1.5 bg-orange-50 text-orange-700 border-orange-200"
+            >
+              <Wand2 className="h-3.5 w-3.5" />
+              {`Skill：${skill.name}`}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   const renderFileCard = () => {
@@ -328,7 +345,7 @@ export function ChatInterface() {
   };
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || !selectedDataSource) return;
     
     const newMessage: Message = { id: Date.now().toString(), role: 'user', content: input };
     setMessages(prev => [...prev, newMessage]);
@@ -357,16 +374,9 @@ export function ChatInterface() {
        const token = localStorage.getItem("token");
        const effectiveModelId = selectedModelId || currentModel?.id || "";
        
-       // Correctly parse source from selectedDataSource (could be 'ds:ID', 'upload', or legacy 'postgres-main')
-       let source = selectedDataSource;
-       if (selectedDataSource.includes("-")) {
-         source = selectedDataSource.split("-")[0];
-       }
+      let source = selectedDataSource;
        
-       const useUploadSource = Boolean(
-         currentAttachedFile?.url?.startsWith("local://") ||
-         (source === "upload" && activeDataFile?.url?.startsWith("local://"))
-       );
+       const useUploadSource = Boolean(currentAttachedFile?.url?.startsWith("local://"));
        if (useUploadSource) {
          source = "upload";
        }
@@ -580,6 +590,7 @@ export function ChatInterface() {
                 <div className="relative group">
                   <div className="flex flex-col bg-white rounded-[26px] border border-zinc-200 shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-all duration-200">
                     {renderFileCard()}
+                    {renderActiveSelections()}
                     <div className="flex items-center pl-2 pr-2 py-2">
                       <div className="flex items-center">
                         <Popover open={isMenuOpen} onOpenChange={setIsMenuOpen}>
@@ -615,26 +626,16 @@ export function ChatInterface() {
                                       {selectedDataSource === ds.id && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
                                     </button>
                                   ))}
-                                  
-                                  <button
-                                    onClick={() => {
-                                      setSelectedDataSource('upload');
-                                      fileInputRef.current?.click();
-                                      setIsMenuOpen(false);
-                                    }}
-                                    className={cn(
-                                      "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
-                                      selectedDataSource === 'upload' || selectedDataSource === 'upload-main'
-                                        ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200" 
-                                        : "text-zinc-600 hover:bg-white hover:shadow-sm"
-                                    )}
-                                  >
-                                    <div className="flex items-center gap-2.5">
-                                      <FileIcon className={cn("h-4 w-4", (selectedDataSource === 'upload' || selectedDataSource === 'upload-main') ? "text-blue-500" : "text-zinc-400")} />
-                                      <span className="font-medium">本地文件上传</span>
+                                  {selectedDataSource && (
+                                    <div className="mt-2 pt-2 border-t border-zinc-100">
+                                      <button
+                                        onClick={() => setSelectedDataSource("")}
+                                        className="w-full py-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 transition-colors flex items-center justify-center gap-1"
+                                      >
+                                        清除已选
+                                      </button>
                                     </div>
-                                    {(selectedDataSource === 'upload' || selectedDataSource === 'upload-main') && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
-                                  </button>
+                                  )}
                                 </div>
                               </div>
 
@@ -652,26 +653,21 @@ export function ChatInterface() {
                                         <button
                                           key={skill.id}
                                           onClick={() => {
-                                            setSelectedSkillIds(prev => 
-                                              isSelected 
-                                                ? prev.filter(id => id !== skill.id) 
+                                            setSelectedSkillIds((prev) =>
+                                              isSelected
+                                                ? prev.filter((id) => id !== skill.id)
                                                 : [...prev, skill.id]
                                             );
                                           }}
                                           className={cn(
-                                            "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200 group/item",
+                                            "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
                                             isSelected 
-                                              ? "bg-zinc-50 text-zinc-900 ring-1 ring-zinc-100" 
-                                              : "text-zinc-600 hover:bg-zinc-50"
+                                              ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200" 
+                                              : "text-zinc-600 hover:bg-white hover:shadow-sm"
                                           )}
                                         >
-                                          <div className="flex flex-col items-start gap-0.5">
+                                          <div className="flex items-center text-left">
                                             <span className="font-medium">{skill.name}</span>
-                                            {skill.description && (
-                                              <span className="text-[11px] text-zinc-400 line-clamp-1 group-hover/item:text-zinc-500">
-                                                {skill.description}
-                                              </span>
-                                            )}
                                           </div>
                                           {isSelected && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
                                         </button>
@@ -713,7 +709,7 @@ export function ChatInterface() {
                       <div className="flex items-center gap-1">
                         <button
                           onClick={handleSend}
-                          disabled={isLoading || (!input.trim() && !attachedFile && !activeDataFile)}
+                          disabled={isLoading || !selectedDataSource || !input.trim()}
                           className={cn(
                             "flex items-center justify-center h-10 w-10 rounded-full transition-all duration-200",
                             (input.trim() || attachedFile || activeDataFile) && !isLoading
@@ -798,6 +794,7 @@ export function ChatInterface() {
           <div className="relative group max-w-4xl mx-auto">
             <div className="flex flex-col bg-white rounded-[26px] border border-zinc-200 shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-all duration-200">
               {renderFileCard()}
+              {renderActiveSelections()}
               <div className="flex items-center pl-2 pr-2 py-2">
                 <div className="flex items-center">
                   <Popover open={isMenuOpen} onOpenChange={setIsMenuOpen}>
@@ -833,26 +830,16 @@ export function ChatInterface() {
                                 {selectedDataSource === ds.id && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
                               </button>
                             ))}
-                            
-                            <button
-                              onClick={() => {
-                                setSelectedDataSource('upload');
-                                fileInputRef.current?.click();
-                                setIsMenuOpen(false);
-                              }}
-                              className={cn(
-                                "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
-                                selectedDataSource === 'upload' || selectedDataSource === 'upload-main'
-                                  ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200" 
-                                  : "text-zinc-600 hover:bg-white hover:shadow-sm"
-                              )}
-                            >
-                              <div className="flex items-center gap-2.5">
-                                <FileIcon className={cn("h-4 w-4", (selectedDataSource === 'upload' || selectedDataSource === 'upload-main') ? "text-blue-500" : "text-zinc-400")} />
-                                <span className="font-medium">本地文件上传</span>
+                            {selectedDataSource && (
+                              <div className="mt-2 pt-2 border-t border-zinc-100">
+                                <button
+                                  onClick={() => setSelectedDataSource("")}
+                                  className="w-full py-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 transition-colors flex items-center justify-center gap-1"
+                                >
+                                  清除已选
+                                </button>
                               </div>
-                              {(selectedDataSource === 'upload' || selectedDataSource === 'upload-main') && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
-                            </button>
+                            )}
                           </div>
                         </div>
 
@@ -870,26 +857,21 @@ export function ChatInterface() {
                                   <button
                                     key={skill.id}
                                     onClick={() => {
-                                      setSelectedSkillIds(prev => 
-                                        isSelected 
-                                          ? prev.filter(id => id !== skill.id) 
+                                      setSelectedSkillIds((prev) =>
+                                        isSelected
+                                          ? prev.filter((id) => id !== skill.id)
                                           : [...prev, skill.id]
                                       );
                                     }}
                                     className={cn(
-                                      "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200 group/item",
+                                      "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
                                       isSelected 
-                                        ? "bg-zinc-50 text-zinc-900 ring-1 ring-zinc-100" 
-                                        : "text-zinc-600 hover:bg-zinc-50"
+                                        ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200" 
+                                        : "text-zinc-600 hover:bg-white hover:shadow-sm"
                                     )}
                                   >
-                                    <div className="flex flex-col items-start gap-0.5">
+                                    <div className="flex items-center text-left">
                                       <span className="font-medium">{skill.name}</span>
-                                      {skill.description && (
-                                        <span className="text-[11px] text-zinc-400 line-clamp-1 group-hover/item:text-zinc-500">
-                                          {skill.description}
-                                        </span>
-                                      )}
                                     </div>
                                     {isSelected && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
                                   </button>
@@ -931,7 +913,7 @@ export function ChatInterface() {
                 <div className="flex items-center gap-1">
                   <button
                     onClick={isLoading ? handleForceStop : handleSend}
-                    disabled={isLoading ? false : !input.trim()}
+                    disabled={isLoading ? false : !selectedDataSource || !input.trim()}
                     className={cn(
                       "flex items-center justify-center h-10 w-10 rounded-full transition-all duration-200",
                       (input.trim() || isLoading)

@@ -33,7 +33,7 @@ class ClickHouseConnector:
                 table = row[0]
                 if table not in schema:
                     schema[table] = []
-                schema[table].append(f"{row[1]} ({row[2]})")
+                schema[table].append({"name": row[1], "type": row[2]})
             return schema
         except Exception as e:
             print(f"Error getting schema: {e}")

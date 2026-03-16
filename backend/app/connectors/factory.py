@@ -4,6 +4,7 @@ import functools
 from app.connectors.postgres import PostgresConnector
 from app.connectors.clickhouse import ClickHouseConnector
 from app.connectors.parquet import ParquetConnector
+from app.connectors.csv import CSVConnector
 from app.models.datasource import DataSource
 from app.core.files import resolve_upload_file_path
 
@@ -37,6 +38,10 @@ def _get_cached_connector(ds_type: str, config_json: str):
     elif ds_type == "parquet":
         file_path = str(resolve_upload_file_path(config.get("file_path")))
         return ParquetConnector(file_path=file_path)
+    
+    elif ds_type == "csv":
+        file_path = str(resolve_upload_file_path(config.get("file_path")))
+        return CSVConnector(file_path=file_path)
         
     else:
         raise ValueError(f"Unsupported data source type: {ds_type}")
