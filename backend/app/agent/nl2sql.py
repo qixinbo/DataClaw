@@ -4,6 +4,7 @@ import os
 import json
 import time
 import threading
+import re
 from pathlib import Path
 from typing import List, Optional, Dict, Any, Callable, Awaitable
 from pydantic import BaseModel, Field
@@ -354,7 +355,13 @@ Language: Chinese (Simplified)
             ),
             timeout=NL2SQL_LLM_TIMEOUT_SECONDS,
         )
-        content = response.content.strip()
+        
+        if response.finish_reason == "error":
+            return NL2SQLResponse(sql="", result=[], error=response.content or "LLM Error")
+            
+        content = (response.content or "").strip()
+        if not content:
+            return NL2SQLResponse(sql="", result=[], error="LLM returned empty response")
         
         # Clean up code blocks
         if "```json" in content:

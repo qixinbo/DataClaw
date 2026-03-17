@@ -278,7 +278,7 @@ async def nanobot_chat_stream(request: ChatRequest):
                         continue
                 nl2sql_result = await sql_task
                 if nl2sql_result.error:
-                    yield f"data: {json.dumps({'type': 'progress', 'content': '数据查询阶段返回错误，正在整理结果'}, ensure_ascii=False)}\n\n"
+                    yield f"data: {json.dumps({'type': 'progress', 'content': f'出错：{nl2sql_result.error}，正在整理结果'}, ensure_ascii=False)}\n\n"
                 else:
                     yield f"data: {json.dumps({'type': 'progress', 'content': 'SQL 已执行完成，正在整理回答'}, ensure_ascii=False)}\n\n"
                 persisted_viz_payload = _build_sql_chart_viz(nl2sql_result)
