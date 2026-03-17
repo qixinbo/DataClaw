@@ -359,7 +359,7 @@ export function ChatInterface() {
   };
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading || !selectedDataSource) return;
+    if (!input.trim() || isLoading) return;
     
     const newMessage: Message = { id: Date.now().toString(), role: 'user', content: input };
     setMessages(prev => [...prev, newMessage]);
@@ -388,7 +388,7 @@ export function ChatInterface() {
        const token = localStorage.getItem("token");
        const effectiveModelId = selectedModelId || currentModel?.id || "";
        
-      let source = selectedDataSource;
+      let source = selectedDataSource || "postgres";
        
        const useUploadSource = Boolean(currentAttachedFile?.url?.startsWith("local://"));
        if (useUploadSource) {
@@ -411,6 +411,7 @@ export function ChatInterface() {
              source,
              prefer_sql_chart: preferSqlChart,
              file_url: fileUrl,
+             route_mode: "auto",
            }),
          signal: controller.signal,
        });
@@ -499,6 +500,7 @@ export function ChatInterface() {
           source,
           prefer_sql_chart: preferSqlChart,
           file_url: fileUrl,
+          route_mode: "auto",
          }, { signal: controller.signal });
         const fallbackViz = fallback.viz ? buildMessageViz(fallback.viz) : undefined;
          setMessages((prev) =>
@@ -725,7 +727,7 @@ export function ChatInterface() {
                       <div className="flex items-center gap-1">
                         <button
                           onClick={handleSend}
-                          disabled={isLoading || !selectedDataSource || !input.trim()}
+                          disabled={isLoading || !input.trim()}
                           className={cn(
                             "flex items-center justify-center h-10 w-10 rounded-full transition-all duration-200",
                             (input.trim() || attachedFile || activeDataFile) && !isLoading
@@ -931,7 +933,7 @@ export function ChatInterface() {
                 <div className="flex items-center gap-1">
                   <button
                     onClick={isLoading ? handleForceStop : handleSend}
-                    disabled={isLoading ? false : !selectedDataSource || !input.trim()}
+                    disabled={isLoading ? false : !input.trim()}
                     className={cn(
                       "flex items-center justify-center h-10 w-10 rounded-full transition-all duration-200",
                       (input.trim() || isLoading)
