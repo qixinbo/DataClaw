@@ -49,4 +49,4 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-nanobot-ai = { path = "../nanobot" }
+nanobot-ai = { path = "../nanobot", editable = true }
