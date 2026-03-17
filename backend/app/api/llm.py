@@ -24,9 +24,6 @@ class LLMConfig(BaseModel):
     name: Optional[str] = Field(None, description="Display name")
     provider: str = Field(..., description="Provider name (e.g., openai, azure, anthropic)")
     model: str = Field(..., description="Model name (e.g., gpt-4, claude-3-opus)")
-    model_type: Optional[str] = Field(None, description="Model type")
-    base_model: Optional[str] = Field(None, description="Base model")
-    protocol_type: Optional[str] = Field(None, description="Protocol type")
     api_key: Optional[str] = Field(None, description="API Key for the provider")
     api_base: Optional[str] = Field(None, description="Base URL for the API")
     extra_headers: Optional[Dict[str, str]] = Field(None, description="Extra headers for the request")
@@ -37,9 +34,6 @@ class LLMConfigCreate(BaseModel):
     name: Optional[str] = None
     provider: str
     model: str
-    model_type: Optional[str] = None
-    base_model: Optional[str] = None
-    protocol_type: Optional[str] = None
     api_key: Optional[str] = None
     api_base: Optional[str] = None
     extra_headers: Optional[Dict[str, str]] = None
@@ -49,9 +43,6 @@ class LLMConfigUpdate(BaseModel):
     name: Optional[str] = None
     provider: Optional[str] = None
     model: Optional[str] = None
-    model_type: Optional[str] = None
-    base_model: Optional[str] = None
-    protocol_type: Optional[str] = None
     api_key: Optional[str] = None
     api_base: Optional[str] = None
     extra_headers: Optional[Dict[str, str]] = None

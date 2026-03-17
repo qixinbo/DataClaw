@@ -15,9 +15,6 @@ interface ModelConfig {
   name?: string;
   provider: string;
   model: string;
-  model_type?: string;
-  base_model?: string;
-  protocol_type?: string;
   api_key?: string;
   api_base?: string;
   extra_headers?: Record<string, string>;
@@ -28,9 +25,6 @@ const defaultForm: Omit<ModelConfig, "id"> = {
   name: "",
   provider: "openai",
   model: "",
-  model_type: "LLM",
-  base_model: "",
-  protocol_type: "OpenAI",
   api_key: "",
   api_base: "",
   extra_headers: {},
@@ -71,7 +65,7 @@ export function ModelConfigs() {
     const value = keyword.trim().toLowerCase();
     if (!value) return configs;
     return configs.filter((item) =>
-      [item.name, item.model, item.provider, item.base_model].filter(Boolean).some((v) => String(v).toLowerCase().includes(value))
+      [item.name, item.model, item.provider].filter(Boolean).some((v) => String(v).toLowerCase().includes(value))
     );
   }, [configs, keyword]);
 
@@ -90,9 +84,6 @@ export function ModelConfigs() {
       name: item.name || "",
       provider: item.provider || "openai",
       model: item.model || "",
-      model_type: item.model_type || "LLM",
-      base_model: item.base_model || "",
-      protocol_type: item.protocol_type || "OpenAI",
       api_key: item.api_key || "",
       api_base: item.api_base || "",
       extra_headers: item.extra_headers || {},
@@ -107,8 +98,8 @@ export function ModelConfigs() {
   const [isTesting, setIsTesting] = useState(false);
 
   const handleTestConnection = async () => {
-    if (!form.model || !form.provider || !form.api_base) {
-      setError("请先填写必要信息（供应商、模型ID、API域名）");
+    if (!form.model || !form.provider) {
+      setError("请先填写必要信息（供应商、模型ID）");
       return;
     }
     setIsTesting(true);
@@ -145,7 +136,7 @@ export function ModelConfigs() {
 
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!form.model || !form.provider || !form.api_base) {
+    if (!form.model || !form.provider) {
       setError("请填写必填项");
       return;
     }
@@ -167,9 +158,6 @@ export function ModelConfigs() {
         ...form,
         extra_headers: extraHeaders,
         name: form.name || form.model,
-        model_type: form.model_type || "大语言模型",
-        base_model: form.base_model || form.model,
-        protocol_type: form.protocol_type || "OpenAI",
       };
       if (editingId) {
         await api.put(`/api/v1/llm/${editingId}`, payload);
@@ -249,7 +237,6 @@ export function ModelConfigs() {
                   <TableHead>模型名称</TableHead>
                   <TableHead>供应商</TableHead>
                   <TableHead>模型标识</TableHead>
-                  <TableHead>模型类型</TableHead>
                   <TableHead>状态</TableHead>
                   <TableHead className="text-right">操作</TableHead>
                 </TableRow>
@@ -257,7 +244,7 @@ export function ModelConfigs() {
               <TableBody>
                 {filteredConfigs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center h-24 text-zinc-500">
+                    <TableCell colSpan={5} className="text-center h-24 text-zinc-500">
                       暂无模型数据
                     </TableCell>
                   </TableRow>
@@ -269,7 +256,6 @@ export function ModelConfigs() {
                       </TableCell>
                       <TableCell className="capitalize">{item.provider}</TableCell>
                       <TableCell className="text-zinc-500 font-mono text-xs">{item.model}</TableCell>
-                      <TableCell className="text-zinc-500">{item.model_type || "大语言模型"}</TableCell>
                       <TableCell>
                         <span 
                           onClick={() => handleSetDefault(item)}
@@ -354,34 +340,9 @@ export function ModelConfigs() {
                   <Input value={form.model || ""} onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))} placeholder="如：gpt-4-turbo" required />
                 </div>
                 <div className="space-y-2">
-                  <Label>模型类型</Label>
-                  <Select value={form.model_type || "LLM"} onValueChange={(v) => setForm((p) => ({ ...p, model_type: v || "LLM" }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="LLM">LLM</SelectItem>
-                      <SelectItem value="Embedding">Embedding</SelectItem>
-                      <SelectItem value="Rerank">Rerank</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label>API 域名</Label>
+                  <Input value={form.api_base || ""} onChange={(e) => setForm((p) => ({ ...p, api_base: e.target.value }))} placeholder="如：https://api.openai.com/v1" />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>协议类型</Label>
-                  <Select value={form.protocol_type || "OpenAI"} onValueChange={(v) => setForm((p) => ({ ...p, protocol_type: v || "OpenAI" }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="OpenAI">OpenAI</SelectItem>
-                      <SelectItem value="Anthropic">Anthropic</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>API 域名 *</Label>
-                <Input value={form.api_base || ""} onChange={(e) => setForm((p) => ({ ...p, api_base: e.target.value }))} placeholder="如：https://api.openai.com/v1" required />
               </div>
 
               <div className="space-y-2">
