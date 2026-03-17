@@ -12,6 +12,10 @@ from nanobot.providers.litellm_provider import LiteLLMProvider
 from app.schemas.chart import ChartGenerationResponse
 from app.services.llm_cache import get_active_llm_config
 
+CHART_MAX_TOKENS = 700
+CHART_TEMPERATURE = 0.2
+CHART_REASONING_EFFORT = "low"
+
 CHART_INSTRUCTIONS = """
 ### INSTRUCTIONS ###
 
@@ -202,8 +206,6 @@ Question: {query}
 Sample Data: {json.dumps(sample_data, ensure_ascii=False, separators=(",", ":"), default=str)}
 Sample Column Values: {columns}
 Language: Chinese (Simplified)
-
-Please think step by step
 """
 
     messages = [
@@ -213,7 +215,12 @@ Please think step by step
 
     # 4. Call LLM
     try:
-        response = await provider.chat(messages=messages)
+        response = await provider.chat(
+            messages=messages,
+            max_tokens=CHART_MAX_TOKENS,
+            temperature=CHART_TEMPERATURE,
+            reasoning_effort=CHART_REASONING_EFFORT,
+        )
         content = response.content
         
         # Clean up code blocks

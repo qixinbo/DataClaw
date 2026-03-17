@@ -21,6 +21,8 @@ interface Message {
   content: string;
   awaitingFirstToken?: boolean;
   viz?: MessageViz;
+  progressLogs?: string[];
+  routeInfo?: string;
 }
 
 interface MessageViz {
@@ -403,8 +405,22 @@ export function ChatInterface() {
           id: assistantId,
           role: "assistant",
           content: "",
-          awaitingFirstToken: true
+          awaitingFirstToken: true,
+          progressLogs: ["请求已提交，准备路由..."],
        }]);
+
+      const pushProgressLog = (text: string) => {
+        if (!text.trim()) return;
+        setMessagesForSession(targetSessionKey, (prev) =>
+          prev.map((msg) => {
+            if (msg.id !== assistantId) return msg;
+            const current = msg.progressLogs || [];
+            if (current[current.length - 1] === text) return msg;
+            const next = [...current, text].slice(-8);
+            return { ...msg, progressLogs: next };
+          })
+        );
+      };
 
        const token = localStorage.getItem("token");
        const effectiveModelId = selectedModelId || currentModel?.id || "";
@@ -497,6 +513,8 @@ export function ChatInterface() {
             sql?: string;
             result?: unknown;
             error?: string;
+            selected?: string;
+            reason?: string;
             chart?: { chart_spec?: ChartSpec | null; reasoning?: string; can_visualize?: boolean; chart_type?: string } | null;
           };
 
@@ -505,13 +523,29 @@ export function ChatInterface() {
             flushAssistant(false);
            }
 
+          if (payload.type === "routing") {
+            const selected = payload.selected === "sql" ? "SQL 分析" : "通用对话";
+            const reason = payload.reason ? `（${payload.reason}）` : "";
+            pushProgressLog(`路由：${selected}${reason}`);
+            setMessagesForSession(targetSessionKey, (prev) =>
+              prev.map((msg) =>
+                msg.id === assistantId ? { ...msg, routeInfo: `${selected}${reason}` } : msg
+              )
+            );
+          }
+
+          if (payload.type === "progress" && payload.content) {
+            pushProgressLog(payload.content);
+          }
+
            if (payload.type === "final" && payload.content) {
             hasFinalPayload = true;
              streamedText = payload.content;
             flushAssistant(true);
+            pushProgressLog("回答生成完成");
              setMessagesForSession(targetSessionKey, (prev) =>
                prev.map((msg) =>
-                 msg.id === assistantId ? { ...msg, content: payload.content || "", awaitingFirstToken: false, viz: streamedViz ?? msg.viz } : msg
+                msg.id === assistantId ? { ...msg, content: payload.content || "", awaitingFirstToken: false, viz: streamedViz ?? msg.viz } : msg
                )
              );
            }
@@ -525,6 +559,7 @@ export function ChatInterface() {
            }
 
           if (payload.type === "viz") {
+            pushProgressLog("可视化结果已生成");
             streamedViz = buildMessageViz(payload);
             setMessagesForSession(targetSessionKey, (prev) =>
               prev.map((msg) =>
@@ -805,25 +840,42 @@ export function ChatInterface() {
                     }`}
                   >
                     {msg.role === "assistant" ? (
-                      msg.awaitingFirstToken && !msg.content ? (
-                        <div className="flex items-center gap-2 text-zinc-500 text-sm py-1">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span>模型思考中，请稍候...</span>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="prose prose-sm prose-zinc max-w-none prose-p:leading-normal prose-p:my-2 prose-headings:my-3 prose-ul:my-2 prose-li:my-0.5 prose-pre:bg-zinc-50 prose-pre:text-zinc-800 prose-pre:border prose-pre:border-zinc-200">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-                              {msg.content}
-                            </ReactMarkdown>
-                          </div>
-                          {msg.viz ? (
-                            <div className="mt-3 pt-3 border-t border-zinc-100">
-                              <InlineVisualizationCard viz={msg.viz} />
+                      <>
+                        {msg.progressLogs && msg.progressLogs.length > 0 ? (
+                          <div className="mb-2 rounded-xl border border-zinc-100 bg-zinc-50/70 px-3 py-2">
+                            <div className="flex items-center gap-2 text-zinc-500 text-xs">
+                              {msg.awaitingFirstToken ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
+                              <span>{msg.awaitingFirstToken ? "正在处理中" : "处理完成"}</span>
                             </div>
-                          ) : null}
-                        </>
-                      )
+                            <div className="mt-1.5 space-y-1">
+                              {msg.progressLogs.map((log, idx) => (
+                                <div key={`${msg.id}-log-${idx}`} className="text-[12px] text-zinc-500 leading-5">
+                                  {idx + 1}. {log}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                        {msg.awaitingFirstToken && !msg.content ? (
+                          <div className="flex items-center gap-2 text-zinc-500 text-sm py-1">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>模型思考中，请稍候...</span>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="prose prose-sm prose-zinc max-w-none prose-p:leading-normal prose-p:my-2 prose-headings:my-3 prose-ul:my-2 prose-li:my-0.5 prose-pre:bg-zinc-50 prose-pre:text-zinc-800 prose-pre:border prose-pre:border-zinc-200">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                                {msg.content}
+                              </ReactMarkdown>
+                            </div>
+                            {msg.viz ? (
+                              <div className="mt-3 pt-3 border-t border-zinc-100">
+                                <InlineVisualizationCard viz={msg.viz} />
+                              </div>
+                            ) : null}
+                          </>
+                        )}
+                      </>
                     ) : (
                       msg.content
                     )}

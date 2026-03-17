@@ -250,14 +250,37 @@ async def nanobot_chat_stream(request: ChatRequest):
             use_nl2sql, route_reason, resolved_source = _should_use_nl2sql(request)
             yield f"data: {json.dumps({'type': 'routing', 'selected': 'sql' if use_nl2sql else 'chat', 'reason': route_reason}, ensure_ascii=False)}\n\n"
             if use_nl2sql:
-                nl2sql_result = await process_nl2sql(
-                    NL2SQLRequest(
-                        query=request.message,
-                        source=resolved_source,
-                        file_url=request.file_url,
-                        generate_chart=request.prefer_sql_chart or _looks_like_visual_intent(request.message),
+                yield f"data: {json.dumps({'type': 'progress', 'content': '已识别为数据分析请求，正在连接数据源'}, ensure_ascii=False)}\n\n"
+                sql_progress_queue: asyncio.Queue[str] = asyncio.Queue()
+
+                async def _on_sql_progress(content: str) -> None:
+                    if content:
+                        await sql_progress_queue.put(content)
+
+                sql_task = asyncio.create_task(
+                    process_nl2sql(
+                        NL2SQLRequest(
+                            query=request.message,
+                            source=resolved_source,
+                            file_url=request.file_url,
+                            generate_chart=request.prefer_sql_chart or _looks_like_visual_intent(request.message),
+                        ),
+                        on_progress=_on_sql_progress,
                     )
                 )
+                while True:
+                    if sql_task.done() and sql_progress_queue.empty():
+                        break
+                    try:
+                        progress = await asyncio.wait_for(sql_progress_queue.get(), timeout=0.2)
+                        yield f"data: {json.dumps({'type': 'progress', 'content': progress}, ensure_ascii=False)}\n\n"
+                    except asyncio.TimeoutError:
+                        continue
+                nl2sql_result = await sql_task
+                if nl2sql_result.error:
+                    yield f"data: {json.dumps({'type': 'progress', 'content': '数据查询阶段返回错误，正在整理结果'}, ensure_ascii=False)}\n\n"
+                else:
+                    yield f"data: {json.dumps({'type': 'progress', 'content': 'SQL 已执行完成，正在整理回答'}, ensure_ascii=False)}\n\n"
                 persisted_viz_payload = _build_sql_chart_viz(nl2sql_result)
                 viz_payload = {
                     "type": "viz",
@@ -284,13 +307,14 @@ async def nanobot_chat_stream(request: ChatRequest):
                     on_progress=_on_progress,
                 )
             )
+            yield f"data: {json.dumps({'type': 'progress', 'content': '已发送给模型，正在分析问题'}, ensure_ascii=False)}\n\n"
             text = ""
             while True:
                 if task.done() and progress_queue.empty():
                     break
                 try:
                     progress = await asyncio.wait_for(progress_queue.get(), timeout=0.2)
-                    yield f"data: {json.dumps({'type': 'delta', 'content': progress}, ensure_ascii=False)}\n\n"
+                    yield f"data: {json.dumps({'type': 'progress', 'content': progress}, ensure_ascii=False)}\n\n"
                 except asyncio.TimeoutError:
                     continue
             response = await task
