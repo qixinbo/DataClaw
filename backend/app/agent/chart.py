@@ -9,8 +9,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
 from nanobot.providers.litellm_provider import LiteLLMProvider
-from app.api.llm import _load_data as load_llm_config
 from app.schemas.chart import ChartGenerationResponse
+from app.services.llm_cache import get_active_llm_config
 
 CHART_INSTRUCTIONS = """
 ### INSTRUCTIONS ###
@@ -133,9 +133,7 @@ CHART_EXAMPLES = """
 """
 
 async def generate_chart(data: List[Dict[str, Any]], query: str) -> ChartGenerationResponse:
-    # 1. Initialize Provider
-    llm_configs = load_llm_config()
-    active_config = next((c for c in llm_configs if c.get("is_active")), None)
+    active_config = get_active_llm_config()
     
     if not active_config:
         return ChartGenerationResponse(
@@ -178,7 +176,7 @@ async def generate_chart(data: List[Dict[str, Any]], query: str) -> ChartGenerat
         columns = list(data[0].keys())
     
     # 3. Construct Prompt
-    schema_json = json.dumps(ChartGenerationResponse.model_json_schema(), indent=2)
+    schema_json = json.dumps(ChartGenerationResponse.model_json_schema(), ensure_ascii=False, separators=(",", ":"))
     
     system_prompt = f"""You are a data analyst great at visualizing data using vega-lite! Given the user's question, sample data and sample column values, you need to generate vega-lite schema in JSON and provide suitable chart type.
 Besides, you need to give a concise and easy-to-understand reasoning to describe why you provide such vega-lite schema based on the question, sample data and sample column values.
@@ -201,7 +199,7 @@ Please provide your chain of thought reasoning, chart type and the vega-lite sch
     user_prompt = f"""
 ### INPUT ###
 Question: {query}
-Sample Data: {json.dumps(sample_data, indent=2, default=str)}
+Sample Data: {json.dumps(sample_data, ensure_ascii=False, separators=(",", ":"), default=str)}
 Sample Column Values: {columns}
 Language: Chinese (Simplified)
 

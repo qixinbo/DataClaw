@@ -447,6 +447,35 @@ export function ChatInterface() {
        let buffer = "";
        let streamedText = "";
        let streamedViz: MessageViz | null = null;
+      let hasFinalPayload = false;
+      let hasDonePayload = false;
+      let rafPending = false;
+      let renderedText = "";
+
+      const flushAssistant = (force = false) => {
+        if (streamedText === renderedText) return;
+        if (force) {
+          renderedText = streamedText;
+          setMessagesForSession(targetSessionKey, (prev) =>
+            prev.map((msg) =>
+              msg.id === assistantId ? { ...msg, content: streamedText, awaitingFirstToken: false } : msg
+            )
+          );
+          return;
+        }
+        if (rafPending) return;
+        rafPending = true;
+        requestAnimationFrame(() => {
+          rafPending = false;
+          if (streamedText === renderedText) return;
+          renderedText = streamedText;
+          setMessagesForSession(targetSessionKey, (prev) =>
+            prev.map((msg) =>
+              msg.id === assistantId ? { ...msg, content: streamedText, awaitingFirstToken: false } : msg
+            )
+          );
+        });
+      };
 
        while (true) {
          const { done, value } = await reader.read();
@@ -473,21 +502,23 @@ export function ChatInterface() {
 
            if (payload.type === "delta" && payload.content) {
              streamedText = `${streamedText}${payload.content}`;
-             setMessagesForSession(targetSessionKey, (prev) =>
-               prev.map((msg) =>
-                  msg.id === assistantId ? { ...msg, content: streamedText, awaitingFirstToken: false } : msg
-               )
-             );
+            flushAssistant(false);
            }
 
            if (payload.type === "final" && payload.content) {
+            hasFinalPayload = true;
              streamedText = payload.content;
+            flushAssistant(true);
              setMessagesForSession(targetSessionKey, (prev) =>
                prev.map((msg) =>
                  msg.id === assistantId ? { ...msg, content: payload.content || "", awaitingFirstToken: false, viz: streamedViz ?? msg.viz } : msg
                )
              );
            }
+
+          if (payload.type === "done") {
+            hasDonePayload = true;
+          }
 
            if (payload.type === "error") {
              throw new Error(payload.content || "流式响应错误");
@@ -504,31 +535,13 @@ export function ChatInterface() {
          }
        }
 
-       if (!streamedText) {
-        const fallback = await api.post<{
-          response: string;
-          viz?: {
-            sql?: string;
-            result?: unknown;
-            error?: string | null;
-            chart?: { chart_spec?: ChartSpec | null; reasoning?: string; can_visualize?: boolean; chart_type?: string } | null;
-          };
-        }>("/nanobot/chat", {
-           message: messagePayload,
-           session_id: targetSessionKey,
-           model_id: effectiveModelId,
-           skill_ids: selectedSkillIds,
-          source,
-          prefer_sql_chart: preferSqlChart,
-          file_url: fileUrl,
-          route_mode: "auto",
-         }, { signal: controller.signal });
-        const fallbackViz = fallback.viz ? buildMessageViz(fallback.viz) : undefined;
-         setMessagesForSession(targetSessionKey, (prev) =>
-           prev.map((msg) =>
-           msg.id === assistantId ? { ...msg, content: fallback.response || "暂无回复", awaitingFirstToken: false, viz: fallbackViz } : msg
-           )
-         );
+      flushAssistant(true);
+      if (!streamedText && (hasFinalPayload || hasDonePayload)) {
+        setMessagesForSession(targetSessionKey, (prev) =>
+          prev.map((msg) =>
+            msg.id === assistantId ? { ...msg, content: "暂无回复", awaitingFirstToken: false, viz: streamedViz ?? msg.viz } : msg
+          )
+        );
        }
     } catch (error: any) {
         if (error?.name === "AbortError" || String(error?.message || "").toLowerCase().includes("aborted")) {

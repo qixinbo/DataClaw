@@ -18,13 +18,13 @@ from nanobot.providers.litellm_provider import LiteLLMProvider
 from app.connectors.postgres import postgres_connector
 from app.connectors.clickhouse import clickhouse_connector
 from app.connectors.factory import get_connector
-from app.api.llm import _load_data as load_llm_config
 from app.schemas.chart import ChartGenerationResponse
 from app.agent.chart import generate_chart
 from app.database import SessionLocal
 from app.models.datasource import DataSource
 from app.core.files import resolve_upload_file_path
 from app.services.mdl import MDLService
+from app.services.llm_cache import get_active_llm_config
 
 SCHEMA_CACHE_TTL_SECONDS = 300
 CONNECTION_CACHE_TTL_SECONDS = 30
@@ -41,6 +41,7 @@ class NL2SQLRequest(BaseModel):
     source: str = Field(..., description="Data source to query (postgres, clickhouse, upload, ds:{id})")
     file_url: Optional[str] = Field(None, description="Uploaded file URL when source is upload")
     session_id: Optional[str] = Field(None, description="Conversation session identifier")
+    generate_chart: bool = Field(False, description="Whether to generate chart specification")
 
 class NL2SQLResponse(BaseModel):
     sql: str
@@ -246,7 +247,7 @@ async def process_nl2sql(request: NL2SQLRequest) -> NL2SQLResponse:
          schema = connector.get_schema()
          _set_cached_schema(request.source, connector, schema)
          
-    schema_str = json.dumps(schema, indent=2)
+    schema_str = json.dumps(schema, ensure_ascii=False, separators=(",", ":"))
 
     # Try to load MDL context
     mdl_context = ""
@@ -280,8 +281,7 @@ async def process_nl2sql(request: NL2SQLRequest) -> NL2SQLResponse:
             print(f"Failed to load MDL: {e}")
 
     # 2. Get the active LLM config
-    llm_configs = load_llm_config()
-    active_config = next((c for c in llm_configs if c.get("is_active")), None)
+    active_config = get_active_llm_config()
     
     if not active_config:
         return NL2SQLResponse(sql="", result=[], error="No active LLM configuration found")
@@ -383,10 +383,8 @@ Let's think step by step.
 
         # 7. Generate Chart
         chart_response = None
-        if formatted_results:
-             # Only try to generate chart if we have results
-             # Convert to list of dicts if possible, or pass as is
-             chart_response = await generate_chart(formatted_results, request.query)
+        if request.generate_chart and formatted_results:
+            chart_response = await generate_chart(formatted_results, request.query)
 
         return NL2SQLResponse(sql=sql_query, result=formatted_results, chart=chart_response)
     except Exception as e:

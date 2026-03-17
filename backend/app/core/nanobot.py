@@ -2,7 +2,7 @@ import asyncio
 import sys
 import os
 from pathlib import Path
-from typing import List, Callable, Awaitable, Any
+from typing import List, Callable, Awaitable, Any, Dict
 
 # Add project root to sys.path to allow importing nanobot
 # Assuming backend/app/core/nanobot.py -> backend/app/core -> backend/app -> backend -> root
@@ -31,6 +31,7 @@ from nanobot.config.schema import Config
 # or just import here if we are confident.
 # Given the structure, importing here should be fine as long as skills.py doesn't import nanobot.py.
 from app.api.skills import load_skills
+from app.services.llm_cache import get_llm_configs
 
 class NanobotIntegration:
     def __init__(self):
@@ -38,6 +39,9 @@ class NanobotIntegration:
         self.bus: MessageBus | None = None
         self.cron: CronService | None = None
         self.config: Config | None = None
+        self._started = False
+        self._model_agent_cache: Dict[str, AgentLoop] = {}
+        self._model_agent_lock = asyncio.Lock()
 
     def initialize(self):
         # Set workspace path to backend/data/workspace
@@ -137,18 +141,62 @@ class NanobotIntegration:
         )
 
     async def start(self):
+        if self._started:
+            return
         if not self.agent:
             self.initialize()
-        # Start the agent loop in background
         asyncio.create_task(self.agent.run())
         asyncio.create_task(self.cron.start())
+        self._started = True
 
     async def stop(self):
         if self.agent:
             self.agent.stop()
             await self.agent.close_mcp()
+        for agent in self._model_agent_cache.values():
+            agent.stop()
+            await agent.close_mcp()
+        self._model_agent_cache.clear()
         if self.cron:
             self.cron.stop()
+        self._started = False
+
+    def _build_agent_for_provider(self, provider: Any) -> AgentLoop:
+        return AgentLoop(
+            bus=self.bus,
+            provider=provider,
+            workspace=self.config.workspace_path,
+            model=provider.default_model,
+            temperature=self.config.agents.defaults.temperature,
+            max_tokens=self.config.agents.defaults.max_tokens,
+            max_iterations=self.config.agents.defaults.max_tool_iterations,
+            memory_window=self.config.agents.defaults.memory_window,
+            reasoning_effort=self.config.agents.defaults.reasoning_effort,
+            brave_api_key=self.config.tools.web.search.api_key or None,
+            web_proxy=self.config.tools.web.proxy or None,
+            exec_config=self.config.tools.exec,
+            cron_service=self.cron,
+            restrict_to_workspace=self.config.tools.restrict_to_workspace,
+            session_manager=self.agent.sessions,
+            mcp_servers=self.config.tools.mcp_servers,
+            channels_config=self.config.channels,
+        )
+
+    async def _get_or_create_model_agent(self, model_id: str, target_config: Dict[str, Any]) -> AgentLoop:
+        async with self._model_agent_lock:
+            cached = self._model_agent_cache.get(model_id)
+            if cached:
+                return cached
+            provider = LiteLLMProvider(
+                api_key=target_config.get("api_key"),
+                api_base=target_config.get("api_base"),
+                default_model=target_config.get("model"),
+                extra_headers=target_config.get("extra_headers"),
+                provider_name=target_config.get("provider"),
+            )
+            agent = self._build_agent_for_provider(provider)
+            self._model_agent_cache[model_id] = agent
+            return agent
 
     async def process_message(
         self,
@@ -160,6 +208,7 @@ class NanobotIntegration:
     ):
         if not self.agent:
             self.initialize()
+        if not self._started:
             await self.start()
             
         # Handle dynamic model switching
@@ -181,79 +230,24 @@ class NanobotIntegration:
         #    BUT `process_direct` is relatively isolated.
         #
         # Let's try to fetch the config first.
-        current_provider = self.agent.provider
-        temp_provider = None
-        
-        if model_id:
-            from app.api.llm import _load_data
-            llm_configs = _load_data()
-            target_config = next((item for item in llm_configs if item["id"] == model_id), None)
-            
-            if target_config:
-                # Map our DB config to Nanobot Provider
-                # We reuse LiteLLMProvider for most cases as it is generic
-                
-                # Construct kwargs for LiteLLMProvider
-                provider_name = target_config["provider"]
-                model_name = target_config["model"]
-                
-                # Handle special case where provider might need to be part of model name for LiteLLM if not standard
-                # But LiteLLMProvider handles `provider_name` arg.
-                
-                temp_provider = LiteLLMProvider(
-                    api_key=target_config.get("api_key"),
-                    api_base=target_config.get("api_base"),
-                    default_model=model_name,
-                    extra_headers=target_config.get("extra_headers"),
-                    provider_name=provider_name
-                )
-        
-        # If we created a temp provider, we need to use it.
-        # Since AgentLoop binds the provider, we might need to swap it temporarily or create a new AgentLoop.
-        # Swapping is risky for concurrency.
-        # Creating a new AgentLoop is safer but heavier.
-        #
-        # Optimization: If we are just doing a single turn chat (process_direct), maybe we can just use the provider directly?
-        # But we want the Agent's reasoning loop (ReAct / tools).
-        #
-        # Let's try creating a temporary AgentLoop sharing the same components (bus, tools) but different provider.
-        
         agent_to_use = self.agent
-        if temp_provider:
-            # Shallow copy or new instance
-            # We need to pass all dependencies.
-            agent_to_use = AgentLoop(
-                bus=self.bus,
-                provider=temp_provider,
-                workspace=self.config.workspace_path,
-                model=temp_provider.default_model,
-                temperature=self.config.agents.defaults.temperature,
-                max_tokens=self.config.agents.defaults.max_tokens,
-                max_iterations=self.config.agents.defaults.max_tool_iterations,
-                memory_window=self.config.agents.defaults.memory_window,
-                reasoning_effort=self.config.agents.defaults.reasoning_effort,
-                brave_api_key=self.config.tools.web.search.api_key or None,
-                web_proxy=self.config.tools.web.proxy or None,
-                exec_config=self.config.tools.exec,
-                cron_service=self.cron,
-                restrict_to_workspace=self.config.tools.restrict_to_workspace,
-                session_manager=self.agent.sessions,
-                mcp_servers=self.config.tools.mcp_servers,
-                channels_config=self.config.channels,
-            )
+        if model_id:
+            llm_configs = get_llm_configs()
+            target_config = next((item for item in llm_configs if item.get("id") == model_id), None)
+            if target_config:
+                if target_config.get("model") != self.agent.model:
+                    agent_to_use = await self._get_or_create_model_agent(model_id, target_config)
 
         full_message = message
         if skill_ids:
             skills = load_skills()
             selected_skills = [s for s in skills if s["id"] in skill_ids]
             if selected_skills:
-                # We inject skills as a runtime context block
-                skill_context = "[Runtime Context — metadata only, not instructions]\n# Active Skills\n\n"
+                parts = ["[Runtime Context — metadata only, not instructions]", "# Active Skills", ""]
                 for s in selected_skills:
-                    skill_context += f"## {s['name']}\n{s.get('description', '')}\n{s['content']}\n\n"
-                
-                # Append user message after skills
-                full_message = f"{skill_context}\n\n{message}"
+                    parts.append(f"## {s['name']}\n{s.get('description', '')}\n{s['content']}\n")
+                skill_context = "\n".join(parts)
+                full_message = f"{skill_context}\n{message}"
 
         session = agent_to_use.sessions.get_or_create(session_id)
         normalized_messages = self._normalize_session_messages(session.messages)
