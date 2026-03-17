@@ -1,5 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { ReactFlow, Background, Controls, useNodesState, useEdgesState, MarkerType, type Node, type Edge, ConnectionLineType } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import dagre from "dagre";
 import { api } from "../lib/api";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -7,7 +10,8 @@ import { Label } from "../components/ui/label";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
-import { ArrowLeft, Table as TableIcon, Network } from "lucide-react";
+import { ArrowLeft, Table as TableIcon } from "lucide-react";
+import { TableNode } from "../components/modeling/TableNode";
 
 interface RawSchema {
   [table: string]: { name: string; type: string }[];
@@ -66,6 +70,61 @@ interface ModelDetailResponse {
   preview_rows: Record<string, unknown>[];
 }
 
+const dagreGraph = new dagre.graphlib.Graph();
+dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
+  // If there are few or no edges, use grid layout to spread out nodes
+  if (edges.length === 0 || edges.length < nodes.length * 0.3) {
+    const COLUMNS = 4;
+    const ROW_HEIGHT = 400; // Height per row including spacing
+    const COL_WIDTH = 300;  // Width per column including spacing
+    
+    return {
+      nodes: nodes.map((node, index) => {
+        const col = index % COLUMNS;
+        const row = Math.floor(index / COLUMNS);
+        return {
+          ...node,
+          position: {
+            x: col * COL_WIDTH,
+            y: row * ROW_HEIGHT,
+          },
+        };
+      }),
+      edges,
+    };
+  }
+
+  // Otherwise use Dagre for connected graphs
+  dagreGraph.setGraph({ rankdir: 'TB', nodesep: 100, ranksep: 120 });
+
+  nodes.forEach((node) => {
+    // Estimating height based on column count
+    const height = 50 + (node.data.columns as Column[]).length * 28;
+    dagreGraph.setNode(node.id, { width: 240, height });
+  });
+
+  edges.forEach((edge) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(dagreGraph);
+
+  const layoutedNodes = nodes.map((node) => {
+    const nodeWithPosition = dagreGraph.node(node.id);
+    return {
+      ...node,
+      position: {
+        x: nodeWithPosition.x - 120, // center offset (width/2)
+        y: nodeWithPosition.y - (nodeWithPosition.height / 2),
+      },
+    };
+  });
+
+  return { nodes: layoutedNodes, edges };
+};
+
 export function Modeling() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -80,9 +139,103 @@ export function Modeling() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [modelDetail, setModelDetail] = useState<ModelDetailResponse | null>(null);
 
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+
+  const nodeTypes = useMemo(() => ({ table: TableNode }), []);
+
+  // Save layout to localStorage when nodes change (dragged)
+  const onNodeDragStop = useCallback(() => {
+    if (nodes.length > 0) {
+      const layoutData = nodes.map(n => ({ id: n.id, position: n.position }));
+      localStorage.setItem(`er-layout-${id}`, JSON.stringify(layoutData));
+    }
+  }, [nodes, id]);
+
   useEffect(() => {
     fetchInitialData();
   }, [id]);
+
+  useEffect(() => {
+    if (step === 'view' && mdl) {
+      // Try to load saved layout
+      const savedLayoutStr = localStorage.getItem(`er-layout-${id}`);
+      let savedPositions: Record<string, {x: number, y: number}> = {};
+      
+      if (savedLayoutStr) {
+        try {
+          const parsed = JSON.parse(savedLayoutStr);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((item: any) => {
+              if (item.id && item.position) {
+                savedPositions[item.id] = item.position;
+              }
+            });
+          }
+        } catch (e) {
+          console.error("Failed to parse saved layout", e);
+        }
+      }
+
+      const initialNodes: Node[] = mdl.models.map((model) => ({
+        id: model.name,
+        type: 'table',
+        position: savedPositions[model.name] || { x: 0, y: 0 },
+        data: { 
+          name: model.name, 
+          columns: model.columns,
+          onDetailClick: openModelDetail 
+        },
+      }));
+
+      const initialEdges: Edge[] = mdl.relationships.map((rel, index) => {
+        // Assuming rel.models has at least 2 elements
+        if (rel.models.length < 2) return null;
+        return {
+          id: `e-${index}`,
+          source: rel.models[0],
+          target: rel.models[1],
+          type: ConnectionLineType.SmoothStep,
+          animated: false,
+          label: rel.joinType,
+          style: { stroke: '#94a3b8' },
+          labelStyle: { fill: '#64748b', fontSize: 11 },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: '#94a3b8',
+          },
+        };
+      }).filter(Boolean) as Edge[];
+
+      // Only run auto-layout if we don't have saved positions for most nodes
+      // or if user explicitly requests it (future feature)
+      const hasSavedLayout = Object.keys(savedPositions).length >= initialNodes.length * 0.5;
+      
+      if (hasSavedLayout) {
+        setNodes(initialNodes);
+        setEdges(initialEdges);
+      } else {
+        const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
+          initialNodes,
+          initialEdges
+        );
+        setNodes(layoutedNodes);
+        setEdges(layoutedEdges);
+      }
+    }
+  }, [step, mdl, id]);
+
+  const handleAutoLayout = () => {
+    if (!mdl) return;
+    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
+      nodes,
+      edges
+    );
+    setNodes([...layoutedNodes]);
+    setEdges([...layoutedEdges]);
+    // Clear saved layout to prefer auto layout
+    localStorage.removeItem(`er-layout-${id}`);
+  };
 
   const initSelectionFromSchema = (schemaRes: RawSchema) => {
     const tableNames = Object.keys(schemaRes);
@@ -245,6 +398,9 @@ export function Modeling() {
         </div>
         {step === "view" && (
           <div className="flex gap-2">
+            <Button variant="outline" onClick={handleAutoLayout}>
+              Auto Layout
+            </Button>
             <Button variant="outline" onClick={handleReselectTables}>
               Reselect Tables
             </Button>
@@ -371,56 +527,23 @@ export function Modeling() {
               </ScrollArea>
             </Card>
 
-            {/* Canvas Area (Simulated) */}
-            <div className="flex-1 overflow-auto bg-slate-100 rounded-lg border p-8 relative">
-                <div className="absolute inset-0 pointer-events-none" 
-                     style={{ 
-                       backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', 
-                       backgroundSize: '20px 20px' 
-                     }} 
-                />
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 relative z-10">
-                  {mdl?.models.map((model) => (
-                    <Card key={model.name} className="shadow-md border-t-4 border-t-blue-500 min-w-[240px] cursor-pointer" onClick={() => openModelDetail(model.name)}>
-                      <CardHeader className="py-3 px-4 bg-gray-50 border-b flex flex-row items-center justify-between">
-                        <div className="font-semibold text-sm flex items-center gap-2">
-                            <TableIcon className="w-4 h-4 text-blue-500" />
-                            {model.name}
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        <div className="max-h-[300px] overflow-y-auto text-xs">
-                          {model.columns.map((col) => (
-                            <div key={col.name} className="flex justify-between py-2 px-4 border-b last:border-0 hover:bg-gray-50">
-                              <span className="font-medium">{col.name}</span>
-                              <span className="text-muted-foreground font-mono text-[10px]">{col.type}</span>
-                            </div>
-                          ))}
-                        </div>
-                        {/* Show Relationships if any */}
-                        {mdl.relationships.filter(r => r.models.includes(model.name)).length > 0 && (
-                            <div className="bg-orange-50 p-2 border-t text-xs">
-                                <div className="font-semibold text-orange-700 mb-1 flex items-center gap-1">
-                                    <Network className="w-3 h-3" /> Relationships
-                                </div>
-                                {mdl.relationships
-                                    .filter(r => r.models.includes(model.name))
-                                    .map(r => {
-                                        const other = r.models.find(m => m !== model.name);
-                                        return (
-                                            <div key={r.name} className="text-orange-600 truncate" title={`${r.joinType} with ${other}`}>
-                                                ⟷ {other}
-                                            </div>
-                                        );
-                                    })
-                                }
-                            </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+            {/* Canvas Area (ReactFlow) */}
+            <div className="flex-1 overflow-hidden bg-slate-50 rounded-lg border relative">
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onNodeDragStop={onNodeDragStop}
+                nodeTypes={nodeTypes}
+                fitView
+                minZoom={0.1}
+                maxZoom={1.5}
+                attributionPosition="bottom-right"
+              >
+                <Background color="#cbd5e1" gap={20} size={1} />
+                <Controls />
+              </ReactFlow>
             </div>
           </div>
         )}
