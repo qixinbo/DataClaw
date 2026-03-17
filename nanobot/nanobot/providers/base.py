@@ -95,15 +95,6 @@ class LLMProvider(ABC):
         """Keep only provider-safe message keys and normalize assistant content."""
         sanitized = []
         for msg in messages:
-            if isinstance(msg, list):
-                for nested in msg:
-                    if not isinstance(nested, dict):
-                        continue
-                    clean = {k: v for k, v in nested.items() if k in allowed_keys}
-                    if clean.get("role") == "assistant" and "content" not in clean:
-                        clean["content"] = None
-                    sanitized.append(clean)
-                continue
             if not isinstance(msg, dict):
                 continue
             clean = {k: v for k, v in msg.items() if k in allowed_keys}

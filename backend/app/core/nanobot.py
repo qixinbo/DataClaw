@@ -2,7 +2,7 @@ import asyncio
 import sys
 import os
 from pathlib import Path
-from typing import List, Callable, Awaitable
+from typing import List, Callable, Awaitable, Any
 
 # Add project root to sys.path to allow importing nanobot
 # Assuming backend/app/core/nanobot.py -> backend/app/core -> backend/app -> backend -> root
@@ -255,6 +255,12 @@ class NanobotIntegration:
                 # Append user message after skills
                 full_message = f"{skill_context}\n\n{message}"
 
+        session = agent_to_use.sessions.get_or_create(session_id)
+        normalized_messages = self._normalize_session_messages(session.messages)
+        if len(normalized_messages) != len(session.messages):
+            session.messages = normalized_messages
+            agent_to_use.sessions.save(session)
+
         response = await agent_to_use.process_direct(
             full_message,
             session_key=session_id,
@@ -263,5 +269,17 @@ class NanobotIntegration:
             on_progress=on_progress,
         )
         return response
+
+    def _normalize_session_messages(self, messages: List[Any]) -> List[dict[str, Any]]:
+        normalized: List[dict[str, Any]] = []
+        stack: List[Any] = list(messages)
+        while stack:
+            current = stack.pop(0)
+            if isinstance(current, dict):
+                normalized.append(current)
+                continue
+            if isinstance(current, list):
+                stack = list(current) + stack
+        return normalized
 
 nanobot_service = NanobotIntegration()
