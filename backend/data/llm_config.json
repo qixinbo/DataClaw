@@ -11,14 +11,5 @@
     "model_type": "\u5927\u8bed\u8a00\u6a21\u578b",
     "base_model": "glm-4-7-251222",
     "protocol_type": "OpenAI"
-  },
-  {
-    "id": "deny1",
-    "provider": "openai",
-    "model": "gpt-4o",
-    "api_key": null,
-    "api_base": "https://api.openai.com/v1",
-    "extra_headers": null,
-    "is_active": false
   }
 ]

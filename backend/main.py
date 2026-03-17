@@ -4,7 +4,6 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import asyncio
 import json
 import re
 from datetime import datetime
@@ -41,6 +40,8 @@ app.include_router(users.router, prefix="/api/v1")
 app.include_router(projects.router, prefix="/api/v1")
 app.include_router(datasources.router, prefix="/api/v1")
 app.include_router(semantic.router, prefix="/api/v1")
+
+STREAM_DELTA_CHUNK_SIZE = 48
 
 @app.on_event("startup")
 async def startup_event():
@@ -243,9 +244,9 @@ async def nanobot_chat_stream(request: ChatRequest):
                 model_id=request.model_id,
             )
             text = response or ""
-            for ch in text:
-                yield f"data: {json.dumps({'type': 'delta', 'content': ch}, ensure_ascii=False)}\n\n"
-                await asyncio.sleep(0.008)
+            for idx in range(0, len(text), STREAM_DELTA_CHUNK_SIZE):
+                chunk = text[idx: idx + STREAM_DELTA_CHUNK_SIZE]
+                yield f"data: {json.dumps({'type': 'delta', 'content': chunk}, ensure_ascii=False)}\n\n"
             yield f"data: {json.dumps({'type': 'final', 'content': text}, ensure_ascii=False)}\n\n"
             yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
         except Exception as e:
