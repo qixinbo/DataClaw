@@ -758,8 +758,8 @@ export function ChatInterface() {
                   className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   {msg.role !== "user" && (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shrink-0 mt-1 shadow-sm">
-                      <span className="font-bold text-xs">Ai</span>
+                    <div className="w-8 h-8 flex items-center justify-center shrink-0 mt-1">
+                      <span className="text-2xl">🦞</span>
                     </div>
                   )}
                   <div
