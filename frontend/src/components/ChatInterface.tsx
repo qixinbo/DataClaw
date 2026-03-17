@@ -69,17 +69,37 @@ interface SessionData {
 }
 
 export function ChatInterface() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messagesBySession, setMessagesBySession] = useState<Record<string, Message[]>>({});
   const [input, setInput] = useState("");
   const [selectedDataSource, setSelectedDataSource] = useState<string>("");
   const [availableSkills, setAvailableSkills] = useState<Skill[]>([]);
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const { currentProject } = useProjectStore();
   
+  const setMessagesForSession = (sessionKey: string, updater: React.SetStateAction<Message[]>) => {
+    setMessagesBySession(prev => {
+      const current = prev[sessionKey] || [];
+      const next = typeof updater === 'function' ? (updater as (msgs: Message[]) => Message[])(current) : updater;
+      return { ...prev, [sessionKey]: next };
+    });
+  };
+
+  const setIsLoadingForSession = (sessionKey: string, loading: boolean) => {
+    setLoadingBySession(prev => ({ ...prev, [sessionKey]: loading }));
+  };
+  const queryParams = new URLSearchParams(location.search);
+  const activeSessionKey = queryParams.get("session") || "api:default";
+
+  const messages = messagesBySession[activeSessionKey] || [];
+  const [loadingBySession, setLoadingBySession] = useState<Record<string, boolean>>({});
+  const isLoading = loadingBySession[activeSessionKey] || false;
+  
+  const generatingSessionsRef = useRef<Record<string, boolean>>({});
+  const abortControllersRef = useRef<Record<string, AbortController>>({});
+
   // Model selection state
   const [models, setModels] = useState<ModelConfig[]>([]);
   const [selectedModelId, setSelectedModelId] = useState<string>("");
@@ -88,16 +108,11 @@ export function ChatInterface() {
   // Data Source selection state
   const [availableDataSources, setAvailableDataSources] = useState<{id: string, name: string}[]>([]);
 
-  // Try to parse active session from URL query
-  const queryParams = new URLSearchParams(location.search);
-  const activeSessionKey = queryParams.get("session") || "api:default";
-
   // File upload state
   const [attachedFile, setAttachedFile] = useState<DataFileContext | null>(null);
   const [activeDataFile, setActiveDataFile] = useState<DataFileContext | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     fetchModels();
@@ -147,7 +162,10 @@ export function ChatInterface() {
 
   useEffect(() => {
     const fetchSessionData = async () => {
-      setIsLoading(true);
+      if (generatingSessionsRef.current[activeSessionKey]) {
+        return; // Do not fetch if we are currently generating for this session
+      }
+      setIsLoadingForSession(activeSessionKey, true);
       setSelectedSkillIds([]);
       try {
         const data = await api.get<SessionData>(`/nanobot/sessions/${activeSessionKey}`);
@@ -158,9 +176,9 @@ export function ChatInterface() {
             content: m.content,
             viz: m.viz ? buildMessageViz(m.viz) : undefined,
           }));
-          setMessages(formattedMessages);
+          setMessagesForSession(activeSessionKey, formattedMessages);
         } else {
-          setMessages([]);
+          setMessagesForSession(activeSessionKey, []);
         }
         const restoredFile = data.metadata?.active_data_file || null;
         const restoredSource = data.metadata?.selected_data_source || "";
@@ -169,12 +187,12 @@ export function ChatInterface() {
         setAttachedFile(null);
       } catch (e) {
         console.error("Failed to fetch session messages", e);
-        setMessages([]);
+        setMessagesForSession(activeSessionKey, []);
         setActiveDataFile(null);
         setSelectedDataSource("");
         setAttachedFile(null);
       } finally {
-        setIsLoading(false);
+        setIsLoadingForSession(activeSessionKey, false);
       }
     };
     
@@ -345,11 +363,12 @@ export function ChatInterface() {
   }, [messages]);
 
   const handleForceStop = () => {
-    const controller = abortControllerRef.current;
+    const controller = abortControllersRef.current[activeSessionKey];
     if (!controller) return;
     controller.abort();
-    setIsLoading(false);
-    setMessages((prev) =>
+    setIsLoadingForSession(activeSessionKey, false);
+    generatingSessionsRef.current[activeSessionKey] = false;
+    setMessagesForSession(activeSessionKey, (prev) =>
       prev.map((msg) =>
         msg.awaitingFirstToken
           ? { ...msg, awaitingFirstToken: false, content: msg.content || "已中断输出" }
@@ -361,8 +380,9 @@ export function ChatInterface() {
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
     
+    const targetSessionKey = activeSessionKey;
     const newMessage: Message = { id: Date.now().toString(), role: 'user', content: input };
-    setMessages(prev => [...prev, newMessage]);
+    setMessagesForSession(targetSessionKey, prev => [...prev, newMessage]);
     setInput("");
     
     let messagePayload = newMessage.content;
@@ -373,12 +393,13 @@ export function ChatInterface() {
     }
     
     const controller = new AbortController();
-    abortControllerRef.current = controller;
-    setIsLoading(true);
+    abortControllersRef.current[targetSessionKey] = controller;
+    generatingSessionsRef.current[targetSessionKey] = true;
+    setIsLoadingForSession(targetSessionKey, true);
     
     try {
        const assistantId = (Date.now() + 1).toString();
-       setMessages(prev => [...prev, {
+       setMessagesForSession(targetSessionKey, prev => [...prev, {
           id: assistantId,
           role: "assistant",
           content: "",
@@ -405,7 +426,7 @@ export function ChatInterface() {
          },
          body: JSON.stringify({
              message: messagePayload,
-             session_id: activeSessionKey,
+             session_id: targetSessionKey,
              model_id: effectiveModelId,
              skill_ids: selectedSkillIds,
              source,
@@ -452,7 +473,7 @@ export function ChatInterface() {
 
            if (payload.type === "delta" && payload.content) {
              streamedText = `${streamedText}${payload.content}`;
-             setMessages((prev) =>
+             setMessagesForSession(targetSessionKey, (prev) =>
                prev.map((msg) =>
                   msg.id === assistantId ? { ...msg, content: streamedText, awaitingFirstToken: false } : msg
                )
@@ -461,7 +482,7 @@ export function ChatInterface() {
 
            if (payload.type === "final" && payload.content) {
              streamedText = payload.content;
-             setMessages((prev) =>
+             setMessagesForSession(targetSessionKey, (prev) =>
                prev.map((msg) =>
                  msg.id === assistantId ? { ...msg, content: payload.content || "", awaitingFirstToken: false, viz: streamedViz ?? msg.viz } : msg
                )
@@ -474,7 +495,7 @@ export function ChatInterface() {
 
           if (payload.type === "viz") {
             streamedViz = buildMessageViz(payload);
-            setMessages((prev) =>
+            setMessagesForSession(targetSessionKey, (prev) =>
               prev.map((msg) =>
                  msg.id === assistantId ? { ...msg, viz: streamedViz || undefined } : msg
               )
@@ -494,7 +515,7 @@ export function ChatInterface() {
           };
         }>("/nanobot/chat", {
            message: messagePayload,
-           session_id: activeSessionKey,
+           session_id: targetSessionKey,
            model_id: effectiveModelId,
            skill_ids: selectedSkillIds,
           source,
@@ -503,7 +524,7 @@ export function ChatInterface() {
           route_mode: "auto",
          }, { signal: controller.signal });
         const fallbackViz = fallback.viz ? buildMessageViz(fallback.viz) : undefined;
-         setMessages((prev) =>
+         setMessagesForSession(targetSessionKey, (prev) =>
            prev.map((msg) =>
            msg.id === assistantId ? { ...msg, content: fallback.response || "暂无回复", awaitingFirstToken: false, viz: fallbackViz } : msg
            )
@@ -511,7 +532,7 @@ export function ChatInterface() {
        }
     } catch (error: any) {
         if (error?.name === "AbortError" || String(error?.message || "").toLowerCase().includes("aborted")) {
-          setMessages((prev) =>
+          setMessagesForSession(targetSessionKey, (prev) =>
             prev.map((msg) =>
               msg.awaitingFirstToken
                 ? { ...msg, awaitingFirstToken: false, content: msg.content || "已中断输出" }
@@ -520,16 +541,17 @@ export function ChatInterface() {
           );
           return;
         }
-        setMessages(prev => [...prev, { 
+        setMessagesForSession(targetSessionKey, prev => [...prev, { 
             id: (Date.now() + 1).toString(), 
             role: 'assistant', 
             content: `Sorry, something went wrong: ${error.message}` 
         }]);
     } finally {
-        if (abortControllerRef.current === controller) {
-          abortControllerRef.current = null;
+        if (abortControllersRef.current[targetSessionKey] === controller) {
+            delete abortControllersRef.current[targetSessionKey];
         }
-        setIsLoading(false);
+        generatingSessionsRef.current[targetSessionKey] = false;
+        setIsLoadingForSession(targetSessionKey, false);
         window.dispatchEvent(new Event("nanobot:sessions-changed"));
     }
   };
