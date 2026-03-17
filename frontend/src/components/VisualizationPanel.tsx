@@ -20,6 +20,16 @@ export function VisualizationPanel() {
 
   const buildPendingChart = (): Omit<ChartConfig, 'layout'> | null => {
     if (!currentData || !currentSQL) return null;
+    if (view === "table") {
+      return {
+        id: Date.now().toString(),
+        title: currentChartSpec?.title || 'Generated Analysis',
+        type: "table",
+        data: currentData,
+        sql: currentSQL,
+        chartSpec: null,
+      };
+    }
     const mark = currentChartSpec?.mark;
     const markType = typeof mark === "string" ? mark : mark?.type;
     const dashboardType = markType === "line" ? "line" : "bar";

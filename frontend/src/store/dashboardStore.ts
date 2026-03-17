@@ -7,7 +7,7 @@ type GridLayout = { i: string; x: number; y: number; w: number; h: number };
 export interface ChartConfig {
   id: string;
   title: string;
-  type: 'bar' | 'line';
+  type: 'bar' | 'line' | 'table';
   data: ChartRow[];
   sql: string;
   chartSpec?: ChartSpec | null;

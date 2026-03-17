@@ -4,6 +4,8 @@ import { useDashboardStore } from '../store/dashboardStore';
 import { useProjectStore } from '../store/projectStore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { X } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { VegaChart } from "@/components/VegaChart";
@@ -11,6 +13,7 @@ import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+const TABLE_PREVIEW_LIMIT = 20;
 
 function isNumericValue(value: unknown) {
   if (typeof value === 'number') return Number.isFinite(value);
@@ -103,13 +106,22 @@ export function Dashboard() {
         isDraggable
         isResizable
       >
-        {charts.map((chart) => (
+        {charts.map((chart) => {
+          const rows = chart.data as Record<string, unknown>[];
+          const columns = Object.keys(rows[0] || {});
+          const previewRows = chart.type === "table" ? rows.slice(0, TABLE_PREVIEW_LIMIT) : rows;
+          const isTableTruncated = chart.type === "table" && rows.length > TABLE_PREVIEW_LIMIT;
+          return (
           <div key={chart.id} className="relative group">
             <Card className="h-full flex flex-col shadow-sm border-muted">
               <CardHeader className="pb-2 shrink-0 flex flex-row items-center justify-between space-y-0">
                 <div>
                   <CardTitle className="text-base">{chart.title}</CardTitle>
-                  <CardDescription className="text-xs">{chart.type.toUpperCase()} Chart</CardDescription>
+                  <CardDescription className="text-xs">
+                    {chart.type === "table"
+                      ? `TABLE · ${rows.length} 行 · ${columns.length} 列`
+                      : `${chart.type.toUpperCase()} Chart`}
+                  </CardDescription>
                 </div>
                 <Button 
                   variant="ghost" 
@@ -122,7 +134,47 @@ export function Dashboard() {
               </CardHeader>
               <CardContent className="flex-1 min-h-0 p-2">
                 {(() => {
-                  const rows = chart.data as Record<string, unknown>[];
+                  if (chart.type === "table") {
+                    if (rows.length === 0) {
+                      return (
+                        <div className="h-full w-full flex items-center justify-center text-xs text-zinc-500">
+                          当前表格没有可展示数据
+                        </div>
+                      );
+                    }
+                    if (columns.length === 0) {
+                      return (
+                        <div className="h-full w-full flex items-center justify-center text-xs text-zinc-500">
+                          当前表格数据缺少可展示字段
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="h-full w-full flex flex-col gap-2">
+                        <div className="text-[11px] text-zinc-500 px-1">
+                          {isTableTruncated ? `预览前 ${TABLE_PREVIEW_LIMIT} 行 / 共 ${rows.length} 行，${columns.length} 列` : `共 ${rows.length} 行，${columns.length} 列`}
+                        </div>
+                        <ScrollArea className="flex-1 w-full border rounded-md">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                {columns.map((col) => <TableHead key={col}>{col}</TableHead>)}
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {previewRows.map((row, i) => (
+                                <TableRow key={i}>
+                                  {columns.map((col) => (
+                                    <TableCell key={`${i}-${col}`}>{String(row[col] ?? "")}</TableCell>
+                                  ))}
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </ScrollArea>
+                      </div>
+                    );
+                  }
                   if (chart.chartSpec && rows.length > 0) {
                     return (
                       <div className="h-full w-full rounded-xl border border-zinc-100 p-2">
@@ -172,7 +224,7 @@ export function Dashboard() {
               </CardContent>
             </Card>
           </div>
-        ))}
+        )})}
       </ResponsiveGridLayout>
     </div>
   );

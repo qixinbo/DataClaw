@@ -31,6 +31,16 @@ export function InlineVisualizationCard({ viz }: InlineVisualizationCardProps) {
   const columns = objectRows.length > 0 ? Object.keys(objectRows[0]) : [];
 
   const buildPendingChart = (): Omit<ChartConfig, 'layout'> => {
+    if (view === "table") {
+      return {
+        id: Date.now().toString(),
+        title: viz.chartSpec?.title || "Generated Analysis",
+        type: "table",
+        data: objectRows,
+        sql: viz.sql,
+        chartSpec: null,
+      };
+    }
     const mark = viz.chartSpec?.mark;
     const markType = typeof mark === "string" ? mark : mark?.type;
     const dashboardType = markType === "line" ? "line" : "bar";
