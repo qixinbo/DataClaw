@@ -13,7 +13,7 @@ router = APIRouter()
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 DATA_FILE = os.path.join(BASE_DIR, "data", "skills.json")
-SKILL_HUB_DIR = os.path.join(BASE_DIR, "data", "skill-hub")
+SKILL_HUB_DIR = os.path.join(BASE_DIR, "data", "workspace", "skills")
 
 # Ensure skill-hub directory exists
 os.makedirs(SKILL_HUB_DIR, exist_ok=True)

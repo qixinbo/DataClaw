@@ -11,5 +11,15 @@
     "model_type": "\u5927\u8bed\u8a00\u6a21\u578b",
     "base_model": "glm-4-7-251222",
     "protocol_type": "OpenAI"
+  },
+  {
+    "id": "1773821572966",
+    "name": "gpt-5.4-nano",
+    "provider": "openai",
+    "model": "gpt-5.4-nano",
+    "api_key": "sk-zk2ca620045b2dd262d45594db34aa9fc7f688602b1f01ba",
+    "api_base": "https://api.zhizengzeng.com/v1",
+    "extra_headers": {},
+    "is_active": false
   }
 ]
