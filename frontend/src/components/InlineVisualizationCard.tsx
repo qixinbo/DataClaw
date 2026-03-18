@@ -3,12 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Code, Table as TableIcon, BarChart as ChartIcon, LayoutDashboard } from "lucide-react";
+import { Code, Table as TableIcon, BarChart as ChartIcon, LayoutDashboard, Copy, Check } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useDashboardStore, type ChartConfig } from "@/store/dashboardStore";
 import { useProjectStore } from "@/store/projectStore";
 import type { ChartSpec } from "@/store/visualizationStore";
 import { VegaChart } from "./VegaChart";
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { format } from 'sql-formatter';
 
 interface InlineVisualizationCardProps {
   viz: {
@@ -24,6 +27,7 @@ interface InlineVisualizationCardProps {
 export function InlineVisualizationCard({ viz }: InlineVisualizationCardProps) {
   const [view, setView] = useState<'table' | 'chart'>('chart');
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [pendingChart, setPendingChart] = useState<Omit<ChartConfig, 'layout'> | null>(null);
   const { addChart } = useDashboardStore();
   const { currentProject } = useProjectStore();
@@ -68,6 +72,14 @@ export function InlineVisualizationCard({ viz }: InlineVisualizationCardProps) {
     setPendingChart(null);
   };
 
+  const handleCopySql = () => {
+    navigator.clipboard.writeText(viz.sql || "");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const formattedSql = viz.sql ? format(viz.sql, { language: 'postgresql' }) : "--";
+
   if (viz.error) {
     return <div className="text-sm text-red-500">{viz.error}</div>;
   }
@@ -76,7 +88,6 @@ export function InlineVisualizationCard({ viz }: InlineVisualizationCardProps) {
     <Card className="w-full border border-zinc-100 shadow-none">
       <CardHeader className="pb-2">
         <CardTitle className="text-base">{viz.chartSpec?.title || "可视化结果"}</CardTitle>
-        <CardDescription>{viz.reasoning || "根据当前回答生成的可视化"}</CardDescription>
       </CardHeader>
       <CardContent className="pt-0">
         <div className="flex items-center justify-between mb-3">
@@ -106,13 +117,47 @@ export function InlineVisualizationCard({ viz }: InlineVisualizationCardProps) {
                   SQL
                 </Button>
               } />
-              <DialogContent className="sm:max-w-[625px]">
-                <DialogHeader>
-                  <DialogTitle>Generated SQL Query</DialogTitle>
-                  <DialogDescription>用于生成当前图表的数据查询语句。</DialogDescription>
+              <DialogContent className="sm:max-w-[700px]">
+                 <DialogHeader className="flex flex-row items-start justify-between pr-8">
+                   <div>
+                     <DialogTitle>Generated SQL Query</DialogTitle>
+                     <DialogDescription className="mt-1">用于生成当前图表的数据查询语句。</DialogDescription>
+                   </div>
+                   <Button
+                     variant="outline"
+                     size="sm"
+                     className="h-8 gap-1.5 shrink-0"
+                     onClick={handleCopySql}
+                   >
+                    {copied ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-emerald-500" />
+                        <span>已复制</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>复制</span>
+                      </>
+                    )}
+                  </Button>
                 </DialogHeader>
-                <div className="bg-slate-950 text-slate-50 p-4 rounded-md overflow-x-auto">
-                  <pre className="text-sm font-mono">{viz.sql || "--"}</pre>
+                <div className="relative rounded-md overflow-hidden bg-[#1e1e1e] border border-zinc-200 shadow-inner mt-2">
+                  <ScrollArea className="max-h-[500px]">
+                    <SyntaxHighlighter
+                      language="sql"
+                      style={vscDarkPlus}
+                      customStyle={{
+                        margin: 0,
+                        padding: '1.25rem',
+                        fontSize: '0.875rem',
+                        lineHeight: '1.5',
+                        background: 'transparent',
+                      }}
+                    >
+                      {formattedSql}
+                    </SyntaxHighlighter>
+                  </ScrollArea>
                 </div>
               </DialogContent>
             </Dialog>

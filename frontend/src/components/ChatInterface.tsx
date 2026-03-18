@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { User, Loader2, Sparkles, ArrowUp, ChevronDown, Paperclip, Check, X, Square, Plus, Database, Wand2, Search, Zap, LayoutGrid, CheckCircle2, Table, XCircle } from "lucide-react";
+import { User, Loader2, Sparkles, ArrowUp, ChevronDown, Paperclip, Check, X, Square, Plus, Database, Wand2, Search, Zap, LayoutGrid, CheckCircle2, Table, XCircle, Settings } from "lucide-react";
 import { api } from "@/lib/api";
 import { type ChartSpec } from "@/store/visualizationStore";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -848,11 +848,20 @@ export function ChatInterface() {
                               <span>{msg.awaitingFirstToken ? "正在处理中" : "处理完成"}</span>
                             </div>
                             <div className="mt-1.5 space-y-1">
-                              {msg.progressLogs.map((log, idx) => (
-                                <div key={`${msg.id}-log-${idx}`} className="text-[12px] text-zinc-500 leading-5">
-                                  {idx + 1}. {log}
-                                </div>
-                              ))}
+                              {msg.progressLogs.map((log, idx, arr) => {
+                                const isLast = idx === arr.length - 1;
+                                const isLoading = isLast && msg.awaitingFirstToken;
+                                return (
+                                  <div key={`${msg.id}-log-${idx}`} className="flex items-start gap-2 text-[12px] text-zinc-500 leading-5">
+                                    {isLoading ? (
+                                      <Settings className="mt-0.5 h-3.5 w-3.5 text-amber-500 animate-spin" />
+                                    ) : (
+                                      <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 text-emerald-500" />
+                                    )}
+                                    <span>{log}</span>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         ) : null}
