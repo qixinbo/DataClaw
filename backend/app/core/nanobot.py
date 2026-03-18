@@ -85,6 +85,14 @@ class NanobotIntegration:
             channels_config=self.config.channels,
         )
 
+        self._register_custom_tools(self.agent)
+
+    def _register_custom_tools(self, agent: AgentLoop):
+        from app.tools.nl2sql import NL2SQLTool
+        from app.tools.visualization import VisualizationTool
+        agent.tools.register(NL2SQLTool())
+        agent.tools.register(VisualizationTool())
+
     def _make_provider(self, config: Config):
         # Logic adapted from nanobot/cli/commands.py
         model = config.agents.defaults.model
@@ -195,6 +203,7 @@ class NanobotIntegration:
                 provider_name=target_config.get("provider"),
             )
             agent = self._build_agent_for_provider(provider)
+            self._register_custom_tools(agent)
             self._model_agent_cache[model_id] = agent
             return agent
 
