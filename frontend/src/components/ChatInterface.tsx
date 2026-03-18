@@ -35,6 +35,21 @@ interface MessageViz {
   error?: string | null;
 }
 
+const REPORT_HTML_BLOCK_REGEX = /<!--\s*REPORT_HTML_START\s*-->([\s\S]*?)<!--\s*REPORT_HTML_END\s*-->/i;
+
+const splitReportHtml = (content: string): { markdown: string; reportHtml: string | null } => {
+  if (!content) {
+    return { markdown: "", reportHtml: null };
+  }
+  const match = content.match(REPORT_HTML_BLOCK_REGEX);
+  if (!match) {
+    return { markdown: content, reportHtml: null };
+  }
+  const reportHtml = (match[1] || "").trim();
+  const markdown = content.replace(REPORT_HTML_BLOCK_REGEX, "").trim();
+  return { markdown, reportHtml: reportHtml || null };
+};
+
 interface ModelConfig {
   id: string;
   name?: string;
@@ -898,7 +913,9 @@ export function ChatInterface() {
             </div>
           ) : (
             <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
-              {messages.map((msg) => (
+              {messages.map((msg) => {
+                const { markdown, reportHtml } = splitReportHtml(msg.content);
+                return (
                 <div
                   key={msg.id}
                   className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
@@ -948,11 +965,23 @@ export function ChatInterface() {
                           </div>
                         ) : (
                           <>
-                            <div className="prose prose-sm prose-zinc max-w-none prose-p:leading-normal prose-p:my-2 prose-headings:my-3 prose-ul:my-2 prose-li:my-0.5 prose-pre:bg-zinc-50 prose-pre:text-zinc-800 prose-pre:border prose-pre:border-zinc-200">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-                                {msg.content}
-                              </ReactMarkdown>
-                            </div>
+                            {markdown ? (
+                              <div className="prose prose-sm prose-zinc max-w-none prose-p:leading-normal prose-p:my-2 prose-headings:my-3 prose-ul:my-2 prose-li:my-0.5 prose-pre:bg-zinc-50 prose-pre:text-zinc-800 prose-pre:border prose-pre:border-zinc-200">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                                  {markdown}
+                                </ReactMarkdown>
+                              </div>
+                            ) : null}
+                            {reportHtml ? (
+                              <div className="mt-3 rounded-xl border border-zinc-200 overflow-hidden bg-white">
+                                <iframe
+                                  title={`report-${msg.id}`}
+                                  srcDoc={reportHtml}
+                                  sandbox="allow-same-origin"
+                                  className="w-full h-[620px] bg-white"
+                                />
+                              </div>
+                            ) : null}
                             {msg.viz ? (
                               <div className="mt-3 pt-3 border-t border-zinc-100">
                                 <InlineVisualizationCard viz={msg.viz} />
@@ -971,7 +1000,7 @@ export function ChatInterface() {
                     </div>
                   )}
                 </div>
-              ))}
+              )})}
               <div ref={scrollRef} />
             </div>
           )}
