@@ -14,6 +14,7 @@ import rehypeRaw from 'rehype-raw';
 import { useLocation } from "react-router-dom";
 import { InlineVisualizationCard } from "./InlineVisualizationCard";
 import { useProjectStore } from "@/store/projectStore";
+import { SlashCommandMenu } from "./SlashCommandMenu";
 
 interface Message {
   id: string;
@@ -81,6 +82,74 @@ export function ChatInterface() {
   const location = useLocation();
   const { currentProject } = useProjectStore();
   
+  // Slash Command State
+  const [slashQuery, setSlashQuery] = useState<string | null>(null);
+  const [slashIndex, setSlashIndex] = useState(0);
+
+  const filteredSlashSkills = slashQuery !== null 
+    ? availableSkills.filter(s => s.name.toLowerCase().includes(slashQuery.toLowerCase()))
+    : [];
+  
+  const handleSelectSlashSkill = (skill: Skill) => {
+    if (!selectedSkillIds.includes(skill.id)) {
+      setSelectedSkillIds(prev => [...prev, skill.id]);
+    }
+    
+    // Remove the slash command from input
+    // Match the last occurrence of /query
+    const match = input.match(/(?:^|\s)\/([a-zA-Z0-9_\-]*)$/);
+    if (match && match.index !== undefined) {
+       // match[0] includes the leading space if present
+       const prefix = input.slice(0, match.index);
+       const suffix = input.slice(match.index + match[0].length);
+       setInput((prefix + suffix).trim());
+    }
+    setSlashQuery(null);
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent) => {
+    if (slashQuery !== null && filteredSlashSkills.length > 0) {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSlashIndex(prev => Math.max(0, prev - 1));
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSlashIndex(prev => Math.min(filteredSlashSkills.length - 1, prev + 1));
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSelectSlashSkill(filteredSlashSkills[slashIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setSlashQuery(null);
+        return;
+      }
+    }
+    
+    if (e.key === 'Enter' && !isLoading) {
+      handleSend();
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInput(val);
+    
+    // Simple slash detection: if the last word starts with /
+    const match = val.match(/(?:^|\s)\/([a-zA-Z0-9_\-]*)$/);
+    if (match) {
+      setSlashQuery(match[1]);
+      setSlashIndex(0);
+    } else {
+      setSlashQuery(null);
+    }
+  };
+
   const setMessagesForSession = (sessionKey: string, updater: React.SetStateAction<Message[]>) => {
     setMessagesBySession(prev => {
       const current = prev[sessionKey] || [];
@@ -787,11 +856,18 @@ export function ChatInterface() {
                       <input
                         type="text"
                         value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleSend()}
+                        onChange={handleInputChange}
+                        onKeyDown={handleInputKeyDown}
                         placeholder="有问题，尽管问"
                         className="flex-1 bg-transparent border-none focus:ring-0 text-lg px-3 py-2 text-zinc-900 placeholder:text-zinc-300 outline-none"
                         disabled={isLoading}
+                      />
+                      <SlashCommandMenu
+                        isOpen={slashQuery !== null}
+                        skills={filteredSlashSkills}
+                        selectedIndex={slashIndex}
+                        onSelect={handleSelectSlashSkill}
+                        onClose={() => setSlashQuery(null)}
                       />
 
                       <div className="flex items-center gap-1">
@@ -1019,11 +1095,18 @@ export function ChatInterface() {
                 <input
                   type="text"
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleSend()}
+                  onChange={handleInputChange}
+                  onKeyDown={handleInputKeyDown}
                   placeholder="有问题，尽管问"
                   className="flex-1 bg-transparent border-none focus:ring-0 text-lg px-3 py-2 text-zinc-900 placeholder:text-zinc-300 outline-none"
                   disabled={isLoading}
+                />
+                <SlashCommandMenu
+                  isOpen={slashQuery !== null}
+                  skills={filteredSlashSkills}
+                  selectedIndex={slashIndex}
+                  onSelect={handleSelectSlashSkill}
+                  onClose={() => setSlashQuery(null)}
                 />
 
                 <div className="flex items-center gap-1">
