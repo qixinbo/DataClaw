@@ -261,12 +261,18 @@ export function ChatInterface() {
       try {
         const data = await api.get<SessionData>(`/nanobot/sessions/${activeSessionKey}`);
         if (data.messages && data.messages.length > 0) {
-          const formattedMessages = data.messages.map((m, idx) => ({
-            id: `${Date.now()}-${idx}`,
-            role: m.role as 'user' | 'assistant',
-            content: m.content,
-            viz: m.viz ? buildMessageViz(m.viz) : undefined,
-          }));
+          const formattedMessages = data.messages
+            .filter((m) => {
+              if (m.role === 'system' || m.role === 'tool' || m.role === 'function') return false;
+              if (m.role === 'assistant' && m.tool_calls && m.tool_calls.length > 0 && !m.viz) return false;
+              return true;
+            })
+            .map((m, idx) => ({
+              id: `${Date.now()}-${idx}`,
+              role: m.role as 'user' | 'assistant',
+              content: m.content || "",
+              viz: m.viz ? buildMessageViz(m.viz) : undefined,
+            }));
           setMessagesForSession(activeSessionKey, formattedMessages);
         } else {
           setMessagesForSession(activeSessionKey, []);
