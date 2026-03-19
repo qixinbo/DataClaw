@@ -24,6 +24,7 @@ interface Skill {
   installation_time: string;
   status: string;
   file_path?: string;
+  is_builtin?: boolean;
 }
 
 export function Skills() {
@@ -230,19 +231,23 @@ export function Skills() {
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-8 w-8 text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-all"
+                            className="h-8 w-8 text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-all shrink-0"
                             onClick={() => handleEditSkill(skill)}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-all"
-                            onClick={() => handleDeleteSkill(skill.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {!skill.is_builtin ? (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-all shrink-0"
+                              onClick={() => handleDeleteSkill(skill.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          ) : (
+                            <div className="h-8 w-8 shrink-0" />
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -275,7 +280,7 @@ export function Skills() {
       }}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col rounded-2xl p-0 overflow-hidden">
           <DialogHeader className="p-6 pb-2">
-            <DialogTitle className="text-xl font-bold text-zinc-900">{editingSkill ? '编辑技能' : '添加新技能'}</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-zinc-900">{editingSkill ? '查看/编辑技能' : '添加新技能'}</DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto px-6 py-2">
             <div className="grid gap-5">
@@ -287,6 +292,7 @@ export function Skills() {
                   value={newSkill.name || ''} 
                   onChange={(e) => setNewSkill({...newSkill, name: e.target.value})}
                   className="rounded-lg border-zinc-200 h-10" 
+                  disabled={editingSkill?.is_builtin}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -295,6 +301,7 @@ export function Skills() {
                   <Select 
                       value={newSkill.type} 
                       onValueChange={(val: any) => setNewSkill({...newSkill, type: val})}
+                      disabled={editingSkill?.is_builtin}
                   >
                       <SelectTrigger className="rounded-lg border-zinc-200 h-10">
                           <SelectValue placeholder="选择类型" />
@@ -311,6 +318,7 @@ export function Skills() {
                   <Select 
                       value={newSkill.status} 
                       onValueChange={(val: any) => setNewSkill({...newSkill, status: val})}
+                      disabled={editingSkill?.is_builtin}
                   >
                       <SelectTrigger className="rounded-lg border-zinc-200 h-10">
                           <SelectValue placeholder="选择状态" />
@@ -330,6 +338,7 @@ export function Skills() {
                   value={newSkill.description || ''} 
                   onChange={(e) => setNewSkill({...newSkill, description: e.target.value})}
                   className="rounded-lg border-zinc-200 min-h-[80px] py-2 text-sm" 
+                  disabled={editingSkill?.is_builtin}
                 />
               </div>
               <div className="grid gap-1.5">
@@ -340,14 +349,17 @@ export function Skills() {
                   onChange={(e) => setNewSkill({...newSkill, content: e.target.value})}
                   className="rounded-lg border-zinc-200 font-mono text-xs min-h-[160px] py-3 bg-zinc-50" 
                   placeholder="Python 代码、SQL 查询模板或 API 规范..."
+                  disabled={editingSkill?.is_builtin}
                 />
               </div>
             </div>
           </div>
           <DialogFooter className="p-6 pt-2">
-            <Button onClick={handleAddSkill} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-6 h-10 w-full">
-              保存技能
-            </Button>
+            {!editingSkill?.is_builtin && (
+              <Button onClick={handleAddSkill} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-6 h-10 w-full">
+                保存技能
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

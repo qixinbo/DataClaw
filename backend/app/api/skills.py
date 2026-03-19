@@ -30,6 +30,7 @@ class Skill(BaseModel):
     installation_time: str = Field(default_factory=lambda: datetime.now().strftime("%Y年%m月%d日"), description="Time when the skill was installed")
     status: str = Field("安全", description="Security status of the skill (e.g., 安全, 低风险)")
     file_path: Optional[str] = Field(None, description="Path to the skill folder in skill-hub")
+    is_builtin: bool = Field(False, description="Whether this is a system builtin skill")
 
 class SkillCreate(BaseModel):
     id: str
@@ -134,8 +135,54 @@ def _write_skill_markdown(skill_dir: str, skill_name: str, description: Optional
 
 def load_skills(project_id: Optional[int] = None) -> List[Dict[str, Any]]:
     data = _load_data()
+    
+    registered_paths = set()
+    
+    # Sync registered skills with their SKILL.md if available
+    for item in data:
+        item.setdefault("is_builtin", False)
+        if item.get("file_path"):
+            abs_path = os.path.abspath(item["file_path"])
+            registered_paths.add(abs_path)
+            skill_md_path = os.path.join(abs_path, "SKILL.md")
+            if os.path.exists(skill_md_path):
+                metadata_res = _parse_skill_md(skill_md_path)
+                if metadata_res.get("name"):
+                    item["name"] = metadata_res["name"]
+                if metadata_res.get("description"):
+                    item["description"] = metadata_res["description"]
+                if metadata_res.get("content"):
+                    item["content"] = metadata_res["content"]
+    
+    # Scan for unregistered skills in SKILL_HUB_DIR
+    if os.path.exists(SKILL_HUB_DIR):
+        for item in os.listdir(SKILL_HUB_DIR):
+            skill_dir = os.path.abspath(os.path.join(SKILL_HUB_DIR, item))
+            if os.path.isdir(skill_dir):
+                skill_md_path = os.path.join(skill_dir, "SKILL.md")
+                if os.path.exists(skill_md_path) and skill_dir not in registered_paths:
+                    metadata_res = _parse_skill_md(skill_md_path)
+                    skill_name = metadata_res.get("name") or item
+                    
+                    # Create a new entry for this discovered skill
+                    new_skill = {
+                        "id": item,
+                        "name": skill_name,
+                        "description": metadata_res.get("description") or "No description provided",
+                        "content": metadata_res.get("content") or "",
+                        "type": "agentskill",
+                        "project_id": None,
+                        "source": "后台生成",
+                        "installation_time": datetime.now().strftime("%Y年%m月%d日"),
+                        "status": "安全",
+                        "file_path": skill_dir,
+                        "is_builtin": item in ("nl2sql", "visualization")
+                    }
+                    data.append(new_skill)
+                    registered_paths.add(skill_dir)
+
     if project_id is not None:
-        return [item for item in data if item.get("project_id") == project_id]
+        return [item for item in data if item.get("project_id") == project_id or item.get("project_id") is None]
     return data
 
 @router.get("/skills", response_model=List[Skill])
@@ -145,7 +192,7 @@ def list_skills(project_id: Optional[int] = None):
 
 @router.get("/skills/{skill_id}", response_model=Skill)
 def get_skill(skill_id: str, project_id: Optional[int] = None):
-    data = _load_data()
+    data = load_skills()
     for item in data:
         if item["id"] == skill_id:
             if project_id is not None and item.get("project_id") != project_id:
@@ -243,7 +290,7 @@ async def upload_skill(
                 shutil.copy2(s, d)
 
         # Register in skills.json
-        data = _load_data()
+        data = load_skills()
         new_skill = {
             "id": final_skill_id,
             "name": skill_name,
@@ -276,7 +323,7 @@ async def upload_skill(
 
 @router.post("/skills", response_model=Skill)
 def create_skill(skill: SkillCreate):
-    data = _load_data()
+    data = load_skills()
     if any(item["id"] == skill.id for item in data):
         raise HTTPException(status_code=400, detail="Skill with this ID already exists")
     
@@ -299,7 +346,7 @@ def create_skill(skill: SkillCreate):
 
 @router.put("/skills/{skill_id}", response_model=Skill)
 def update_skill(skill_id: str, skill: SkillUpdate, project_id: Optional[int] = None):
-    data = _load_data()
+    data = load_skills()
     for i, item in enumerate(data):
         if item["id"] == skill_id:
             if project_id is not None and item.get("project_id") != project_id:
@@ -321,7 +368,7 @@ def update_skill(skill_id: str, skill: SkillUpdate, project_id: Optional[int] = 
 
 @router.delete("/skills/{skill_id}")
 def delete_skill(skill_id: str, project_id: Optional[int] = None):
-    data = _load_data()
+    data = load_skills()
     initial_len = len(data)
     
     # If project_id is provided, we only delete if it matches
@@ -331,6 +378,8 @@ def delete_skill(skill_id: str, project_id: Optional[int] = None):
     
     for item in data:
         if item["id"] == skill_id:
+            if item.get("is_builtin"):
+                raise HTTPException(status_code=400, detail="Builtin skills cannot be deleted")
             if project_id is not None and item.get("project_id") != project_id:
                 new_data.append(item)
                 continue
