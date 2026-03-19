@@ -313,8 +313,8 @@ export function ChatInterface() {
   }): MessageViz => {
     const rows = Array.isArray(payload.result) ? payload.result : [];
     const chart = payload.chart ?? undefined;
-    const canVisualize = Boolean(chart?.can_visualize);
-    const chartSpec = canVisualize ? (chart?.chart_spec ?? null) : null;
+    const canVisualize = chart?.can_visualize ?? Boolean(chart?.chart_spec);
+    const chartSpec = chart?.chart_spec ?? null;
     return {
       sql: typeof payload.sql === "string" ? payload.sql : "",
       rows,
@@ -553,12 +553,12 @@ export function ChatInterface() {
       let renderedText = "";
 
       const flushAssistant = (force = false) => {
-        if (streamedText === renderedText) return;
+        if (streamedText === renderedText && !force) return;
         if (force) {
           renderedText = streamedText;
           setMessagesForSession(targetSessionKey, (prev) =>
             prev.map((msg) =>
-              msg.id === assistantId ? { ...msg, content: streamedText, awaitingFirstToken: false } : msg
+              msg.id === assistantId ? { ...msg, content: streamedText, awaitingFirstToken: false, viz: streamedViz ?? msg.viz } : msg
             )
           );
           return;
@@ -571,7 +571,7 @@ export function ChatInterface() {
           renderedText = streamedText;
           setMessagesForSession(targetSessionKey, (prev) =>
             prev.map((msg) =>
-              msg.id === assistantId ? { ...msg, content: streamedText, awaitingFirstToken: false } : msg
+              msg.id === assistantId ? { ...msg, content: streamedText, awaitingFirstToken: false, viz: streamedViz ?? msg.viz } : msg
             )
           );
         });
@@ -645,11 +645,7 @@ export function ChatInterface() {
           if (payload.type === "viz") {
             pushProgressLog("可视化结果已生成");
             streamedViz = buildMessageViz(payload);
-            setMessagesForSession(targetSessionKey, (prev) =>
-              prev.map((msg) =>
-                 msg.id === assistantId ? { ...msg, viz: streamedViz || undefined } : msg
-              )
-            );
+            flushAssistant(true); // 立即把 viz 状态刷入 messages
           }
          }
        }

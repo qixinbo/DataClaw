@@ -30,23 +30,27 @@ export const VegaChart: React.FC<VegaChartProps> = ({ data, spec }) => {
   }, []);
 
   const vegaSpec: any = useMemo(() => {
-    // Clone spec and ensure tooltip is enabled in mark if not already specified
-    const baseSpec = { ...spec };
+    // Deep clone spec to avoid mutating React state/props
+    const baseSpec = JSON.parse(JSON.stringify(spec));
+    
+    // Ensure tooltip is enabled in mark if not already specified
     if (typeof baseSpec.mark === 'string') {
       baseSpec.mark = { type: baseSpec.mark, tooltip: true };
     } else if (typeof baseSpec.mark === 'object' && baseSpec.mark !== null) {
-      baseSpec.mark = { ...baseSpec.mark, tooltip: true };
+      baseSpec.mark.tooltip = true;
     }
 
     // Add highlight effect: hover over an element makes others transparent
     // 1. Define hover param
     if (!baseSpec.params) {
-      baseSpec.params = [
-        {
-          name: "highlight",
-          select: { type: "point", on: "mouseover", clear: "mouseout" }
-        }
-      ];
+      baseSpec.params = [];
+    }
+    const hasHighlight = baseSpec.params.some((p: any) => p.name === "highlight");
+    if (!hasHighlight) {
+      baseSpec.params.push({
+        name: "highlight",
+        select: { type: "point", on: "mouseover", clear: "mouseout" }
+      });
     }
 
     // 2. Add conditional opacity to encoding
@@ -64,7 +68,7 @@ export const VegaChart: React.FC<VegaChartProps> = ({ data, spec }) => {
 
     // Also add cursor: pointer for marks
     if (typeof baseSpec.mark === 'object' && baseSpec.mark !== null) {
-      (baseSpec.mark as any).cursor = "pointer";
+      baseSpec.mark.cursor = "pointer";
     }
 
     return {
@@ -77,12 +81,17 @@ export const VegaChart: React.FC<VegaChartProps> = ({ data, spec }) => {
     };
   }, [data, size.height, size.width, spec]);
 
+  const handleError = (error: any) => {
+    console.error("VegaEmbed rendering error:", error, "Spec:", vegaSpec);
+  };
+
   return (
-    <div className="w-full h-full" ref={containerRef}>
+    <div className="w-full h-full min-h-[300px]" ref={containerRef}>
       <VegaEmbed 
         spec={vegaSpec} 
         options={{ actions: false }} 
         style={{width: '100%', height: '100%'}} 
+        onError={handleError}
       />
     </div>
   );

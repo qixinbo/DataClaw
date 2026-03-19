@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from nanobot.agent.tools.base import Tool
 from app.agent.nl2sql import process_nl2sql, NL2SQLRequest, NL2SQLResponse
@@ -14,7 +14,7 @@ def _build_sql_chart_viz(nl2sql_result: NL2SQLResponse) -> dict:
     payload = {
         "sql": nl2sql_result.sql,
         "result": nl2sql_result.result,
-        "chart": chart.model_dump() if chart else None,
+        "chart": chart.model_dump(by_alias=True, exclude_none=True) if chart else None,
         "error": nl2sql_result.error,
     }
     return jsonable_encoder(payload)

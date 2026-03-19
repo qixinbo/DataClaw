@@ -60,7 +60,7 @@ class VisualizationTool(Tool):
                 viz_payload = {
                     "sql": existing_viz.get("sql", ""),
                     "result": data,
-                    "chart": chart_response.model_dump(),
+                    "chart": chart_response.model_dump(by_alias=True, exclude_none=True),
                     "error": None,
                 }
                 encoded_viz = jsonable_encoder(viz_payload)

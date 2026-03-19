@@ -3,6 +3,7 @@ import os
 import shutil
 import zipfile
 import tarfile
+import re
 import yaml
 from typing import List, Optional, Dict, Any
 from datetime import datetime
@@ -111,6 +112,26 @@ def _save_data(data: List[Dict[str, Any]]):
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
+def _safe_skill_dir_name(value: str) -> str:
+    safe = re.sub(r'[^a-zA-Z0-9_\-]', '_', value or "").lower()
+    return safe or "skill"
+
+def _write_skill_markdown(skill_dir: str, skill_name: str, description: Optional[str], content: str) -> str:
+    os.makedirs(skill_dir, exist_ok=True)
+    skill_md_path = os.path.join(skill_dir, "SKILL.md")
+    final_description = description or "No description provided"
+    body = content or ""
+    markdown = (
+        f"---\n"
+        f"name: {skill_name}\n"
+        f"description: {final_description}\n"
+        f"---\n\n"
+        f"{body}\n"
+    )
+    with open(skill_md_path, "w", encoding="utf-8") as f:
+        f.write(markdown)
+    return skill_md_path
+
 def load_skills(project_id: Optional[int] = None) -> List[Dict[str, Any]]:
     data = _load_data()
     if project_id is not None:
@@ -205,9 +226,7 @@ async def upload_skill(
                 skill_name = os.path.splitext(filename)[0]
         
         # Create a safe directory name for the skill
-        import re
-        safe_name = re.sub(r'[^a-zA-Z0-9_\-]', '_', skill_name).lower()
-        if not safe_name: safe_name = "skill"
+        safe_name = _safe_skill_dir_name(skill_name)
         final_skill_id = f"{safe_name}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         final_skill_dir = os.path.join(SKILL_HUB_DIR, final_skill_id)
         
@@ -264,6 +283,15 @@ def create_skill(skill: SkillCreate):
     new_skill_dict = skill.dict()
     if not new_skill_dict.get("installation_time"):
         new_skill_dict["installation_time"] = datetime.now().strftime("%Y年%m月%d日")
+    if not new_skill_dict.get("file_path"):
+        skill_dir = os.path.join(SKILL_HUB_DIR, _safe_skill_dir_name(new_skill_dict["id"]))
+        _write_skill_markdown(
+            skill_dir=skill_dir,
+            skill_name=new_skill_dict["name"],
+            description=new_skill_dict.get("description"),
+            content=new_skill_dict.get("content", ""),
+        )
+        new_skill_dict["file_path"] = skill_dir
     
     data.append(new_skill_dict)
     _save_data(data)
@@ -279,6 +307,13 @@ def update_skill(skill_id: str, skill: SkillUpdate, project_id: Optional[int] = 
             updated_item = item.copy()
             update_data = skill.dict(exclude_unset=True)
             updated_item.update(update_data)
+            if updated_item.get("file_path"):
+                _write_skill_markdown(
+                    skill_dir=updated_item["file_path"],
+                    skill_name=updated_item.get("name") or item.get("name") or "skill",
+                    description=updated_item.get("description"),
+                    content=updated_item.get("content", ""),
+                )
             data[i] = updated_item
             _save_data(data)
             return Skill(**updated_item)

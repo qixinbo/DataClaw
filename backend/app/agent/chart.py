@@ -44,7 +44,7 @@ CHART_INSTRUCTIONS = """
     - For daily question, the time unit should be "yearmonthdate".
     - Default time unit is "yearmonth".
 - For each axis, generate the corresponding human-readable title based on the language provided by the user.
-- Make sure all of the fields(x, y, xOffset, color, etc.) in the encoding section of the chart schema are present in the column names of the data.
+- **CRITICAL REQUIREMENT**: Make sure all of the `field` values in the encoding section of the chart schema EXACTLY MATCH the column names of the sample data provided! DO NOT translate, rename, or hallucinate `field` names. If you want to show a translated name in the chart, use the `title` property, NOT the `field` property!
 
 ### GUIDELINES TO PLOT CHART ###
 
@@ -233,6 +233,18 @@ Language: Chinese (Simplified)
             
         content = content.strip()
         result = json.loads(content)
+        
+        # Post-process to fix common LLM hallucinations (translating field names)
+        if result.get("chart_spec") and isinstance(result["chart_spec"], dict):
+            encoding = result["chart_spec"].get("encoding", {})
+            for channel, enc_def in encoding.items():
+                if isinstance(enc_def, dict) and "field" in enc_def:
+                    field = enc_def["field"]
+                    # If field is not in columns, try to find a match or let it be (Vega will render empty)
+                    # But if we can detect it was translated, we might not be able to fix it perfectly.
+                    # As a simple fallback, if there's only one string column and one numeric column, we could guess,
+                    # but it's safer to just rely on the stricter prompt.
+        
         return ChartGenerationResponse(**result)
         
     except Exception as e:

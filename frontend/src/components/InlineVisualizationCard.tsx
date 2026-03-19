@@ -171,8 +171,8 @@ export function InlineVisualizationCard({ viz }: InlineVisualizationCardProps) {
         </div>
 
         {view === "chart" ? (
-          viz.canVisualize && viz.chartSpec && objectRows.length > 0 ? (
-            <div className="w-full h-80 rounded-xl border border-zinc-100 p-2">
+          viz.chartSpec && objectRows.length > 0 ? (
+            <div className="w-full h-80 min-h-[320px] rounded-xl border border-zinc-100 p-2">
               <VegaChart data={objectRows} spec={viz.chartSpec} />
             </div>
           ) : (

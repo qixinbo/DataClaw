@@ -1,6 +1,7 @@
 import asyncio
 import sys
 import os
+import shutil
 from pathlib import Path
 from typing import List, Callable, Awaitable, Any, Dict
 
@@ -47,6 +48,7 @@ class NanobotIntegration:
         # Set workspace path to backend/data/workspace
         workspace_path = Path(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "workspace"))
         workspace_path.mkdir(parents=True, exist_ok=True)
+        self._sync_builtin_skills_to_workspace(workspace_path)
         
         # Override config workspace path via environment variable (since config is loaded from env)
         os.environ["NANOBOT_AGENTS__DEFAULTS__WORKSPACE"] = str(workspace_path)
@@ -86,6 +88,20 @@ class NanobotIntegration:
         )
 
         self._register_custom_tools(self.agent)
+
+    def _sync_builtin_skills_to_workspace(self, workspace_path: Path) -> None:
+        builtin_root = Path(__file__).resolve().parents[1] / "skills_builtin"
+        workspace_skills_root = workspace_path / "skills"
+        workspace_skills_root.mkdir(parents=True, exist_ok=True)
+
+        for skill_name in ("nl2sql", "visualization"):
+            source_dir = builtin_root / skill_name
+            source_skill_file = source_dir / "SKILL.md"
+            if not source_skill_file.exists():
+                continue
+            target_dir = workspace_skills_root / skill_name
+            target_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_skill_file, target_dir / "SKILL.md")
 
     def _register_custom_tools(self, agent: AgentLoop):
         from app.tools.nl2sql import NL2SQLTool

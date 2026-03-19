@@ -123,13 +123,6 @@ class ChartGenerationResponse(BaseModel):
     chart_type: Literal[
         "line", "multi_line", "bar", "pie", "grouped_bar", "stacked_bar", "area", ""
     ] = Field(..., description="The type of chart generated, or empty string if none")
-    chart_spec: Optional[Union[
-        LineChartSchema,
-        MultiLineChartSchema,
-        BarChartSchema,
-        PieChartSchema,
-        GroupedBarChartSchema,
-        StackedBarChartSchema,
-        AreaChartSchema
-    ]] = Field(None, description="The generated Vega-Lite chart specification")
+    # Using Dict[str, Any] allows LLM to output valid Vega-Lite spec directly, avoiding Pydantic strict model serialization issues with dynamic fields
+    chart_spec: Optional[Dict[str, Any]] = Field(None, description="The generated Vega-Lite chart specification")
     can_visualize: bool = Field(..., description="Whether the data can be visualized")
