@@ -264,7 +264,7 @@ export function ChatInterface() {
           const formattedMessages = data.messages
             .filter((m) => {
               if (m.role === 'system' || m.role === 'tool' || m.role === 'function') return false;
-              if (m.role === 'assistant' && m.tool_calls && m.tool_calls.length > 0 && !m.viz) return false;
+              if (m.role === 'assistant' && m.tool_calls && m.tool_calls.length > 0 && !m.viz && (!m.content || m.content.trim() === '')) return false;
               return true;
             })
             .map((m, idx) => ({

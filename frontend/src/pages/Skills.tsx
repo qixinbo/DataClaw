@@ -227,7 +227,7 @@ export function Skills() {
                         </div>
                       </TableCell>
                       <TableCell className="py-4 px-4 text-right">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex items-center justify-end gap-1">
                           <Button 
                             variant="ghost" 
                             size="icon" 

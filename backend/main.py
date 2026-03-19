@@ -135,6 +135,11 @@ async def nanobot_chat(request: ChatRequest):
         elif request.route_mode == "chat":
             message = f"[System: Normal chat mode. Do NOT use the nl2sql tool]\n{message}"
 
+        # Inject instructions for selected skills
+        if request.skill_ids:
+            skill_list = ", ".join(request.skill_ids)
+            message = f"[System: You must prioritize using the following skills/tools to answer the user's request: {skill_list}]\n{message}"
+
         response = await nanobot_service.process_message(
             message,
             session_id=request.session_id,
@@ -185,6 +190,11 @@ async def nanobot_chat_stream(request: ChatRequest):
                 message = f"[System: Use the nl2sql tool to answer the query]\n{message}"
             elif request.route_mode == "chat":
                 message = f"[System: Normal chat mode. Do NOT use the nl2sql tool]\n{message}"
+
+            # Inject instructions for selected skills
+            if request.skill_ids:
+                skill_list = ", ".join(request.skill_ids)
+                message = f"[System: You must prioritize using the following skills/tools to answer the user's request: {skill_list}]\n{message}"
 
             current_task = asyncio.create_task(
                 nanobot_service.process_message(
