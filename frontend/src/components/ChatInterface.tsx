@@ -122,7 +122,12 @@ export function ChatInterface() {
     setSlashQuery(null);
   };
 
-  const handleInputKeyDown = (e: React.KeyboardEvent) => {
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Avoid triggering Enter when using IME (Input Method Editor) for CJK characters
+    if (e.nativeEvent.isComposing) {
+      return;
+    }
+
     if (slashQuery !== null && filteredSlashSkills.length > 0) {
       if (e.key === 'ArrowUp') {
         e.preventDefault();
