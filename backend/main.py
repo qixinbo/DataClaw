@@ -131,9 +131,9 @@ async def nanobot_chat(request: ChatRequest):
         # Inject instructions if explicitly routed
         message = request.message
         if request.route_mode == "sql" or request.prefer_sql_chart:
-            message = f"[System: User explicitly requested data analysis. Please use the nl2sql tool to answer the following query.]\n{message}"
+            message = f"[System: Use the nl2sql tool to answer the query]\n{message}"
         elif request.route_mode == "chat":
-            message = f"[System: User explicitly requested normal chat. Do NOT use the nl2sql tool.]\n{message}"
+            message = f"[System: Normal chat mode. Do NOT use the nl2sql tool]\n{message}"
 
         response = await nanobot_service.process_message(
             message,
@@ -182,9 +182,9 @@ async def nanobot_chat_stream(request: ChatRequest):
             # Inject instructions if explicitly routed
             message = request.message
             if request.route_mode == "sql" or request.prefer_sql_chart:
-                message = f"[System: User explicitly requested data analysis. Please use the nl2sql tool to answer the following query.]\n{message}"
+                message = f"[System: Use the nl2sql tool to answer the query]\n{message}"
             elif request.route_mode == "chat":
-                message = f"[System: User explicitly requested normal chat. Do NOT use the nl2sql tool.]\n{message}"
+                message = f"[System: Normal chat mode. Do NOT use the nl2sql tool]\n{message}"
 
             current_task = asyncio.create_task(
                 nanobot_service.process_message(
@@ -228,7 +228,7 @@ async def nanobot_chat_stream(request: ChatRequest):
                 if session.messages and session.messages[-1].get("role") == "assistant":
                     session.messages[-1]["viz"] = viz_payload
                     nanobot_service.agent.sessions.save(session)
-
+            
             for idx in range(0, len(text), STREAM_DELTA_CHUNK_SIZE):
                 chunk = text[idx: idx + STREAM_DELTA_CHUNK_SIZE]
                 yield f"data: {json.dumps({'type': 'delta', 'content': chunk}, ensure_ascii=False)}\n\n"
