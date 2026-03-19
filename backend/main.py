@@ -4,9 +4,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import json
 import re
+import os
 from datetime import datetime
 
 from app.api import upload, llm, skills, users, datasources, projects, semantic
@@ -33,6 +35,11 @@ app.add_middleware(
 
 # Initialize database tables
 Base.metadata.create_all(bind=engine)
+
+# Mount static directory for reports
+data_dir = os.path.join(os.path.dirname(__file__), "data", "data")
+os.makedirs(data_dir, exist_ok=True)
+app.mount("/reports", StaticFiles(directory=data_dir), name="reports")
 
 app.include_router(upload.router, prefix="/api/v1")
 app.include_router(llm.router, prefix="/api/v1")

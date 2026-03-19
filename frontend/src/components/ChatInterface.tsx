@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { User, Loader2, Sparkles, ArrowUp, ChevronDown, Paperclip, Check, X, Square, Plus, Database, Wand2, Search, Zap, LayoutGrid, CheckCircle2, Table, XCircle, Settings } from "lucide-react";
+import { User, Loader2, Sparkles, ArrowUp, ChevronDown, Paperclip, Check, X, Square, Plus, Database, Wand2, Search, Zap, LayoutGrid, CheckCircle2, Table, XCircle, Settings, ExternalLink } from "lucide-react";
 import { api } from "@/lib/api";
 import { type ChartSpec } from "@/store/visualizationStore";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -48,6 +48,17 @@ const splitReportHtml = (content: string): { markdown: string; reportHtml: strin
   const reportHtml = (match[1] || "").trim();
   const markdown = content.replace(REPORT_HTML_BLOCK_REGEX, "").trim();
   return { markdown, reportHtml: reportHtml || null };
+};
+
+const HTML_FILE_REGEX = /data[\\\/]data[\\\/]([a-zA-Z0-9_\-]+\.html?)/i;
+
+const extractExternalReport = (content: string): string | null => {
+  if (!content) return null;
+  const match = content.match(HTML_FILE_REGEX);
+  if (match && match[1]) {
+    return `/reports/${match[1]}`;
+  }
+  return null;
 };
 
 interface ModelConfig {
@@ -926,6 +937,7 @@ export function ChatInterface() {
             <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
               {messages.map((msg) => {
                 const { markdown, reportHtml } = splitReportHtml(msg.content);
+                const externalReportUrl = extractExternalReport(msg.content);
                 return (
                 <div
                   key={msg.id}
@@ -991,6 +1003,19 @@ export function ChatInterface() {
                                   sandbox="allow-same-origin"
                                   className="w-full h-[620px] bg-white"
                                 />
+                              </div>
+                            ) : null}
+                            {externalReportUrl ? (
+                              <div className="mt-4 flex">
+                                <a 
+                                  href={externalReportUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 rounded-lg text-sm font-medium transition-colors"
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                  在新标签页中打开分析报告
+                                </a>
                               </div>
                             ) : null}
                             {msg.viz ? (
