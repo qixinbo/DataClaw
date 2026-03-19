@@ -197,14 +197,24 @@ async def nanobot_chat_stream(request: ChatRequest):
             )
             
             text = ""
-            viz_sent = False
+            last_viz_hash = None
 
             while True:
                 # Check for viz payload during processing
                 viz_payload = current_viz_data.get()
-                if viz_payload and not viz_sent:
-                    yield f"data: {json.dumps({'type': 'viz', **viz_payload}, ensure_ascii=False)}\n\n"
-                    viz_sent = True
+                if viz_payload:
+                    try:
+                        # Only hash sql and chart to avoid dumping large result arrays every 0.2s
+                        current_hash = hash((
+                            viz_payload.get("sql"), 
+                            viz_payload.get("error"),
+                            json.dumps(viz_payload.get("chart"), sort_keys=True)
+                        ))
+                        if current_hash != last_viz_hash:
+                            yield f"data: {json.dumps({'type': 'viz', **viz_payload}, ensure_ascii=False)}\n\n"
+                            last_viz_hash = current_hash
+                    except Exception as e:
+                        print(f"Error checking viz_payload: {e}")
 
                 if current_task.done() and progress_queue.empty():
                     break
@@ -219,8 +229,18 @@ async def nanobot_chat_stream(request: ChatRequest):
 
             # Check again for viz payload after task completes if not sent yet
             viz_payload = current_viz_data.get()
-            if viz_payload and not viz_sent:
-                yield f"data: {json.dumps({'type': 'viz', **viz_payload}, ensure_ascii=False)}\n\n"
+            if viz_payload:
+                try:
+                    current_hash = hash((
+                        viz_payload.get("sql"), 
+                        viz_payload.get("error"),
+                        json.dumps(viz_payload.get("chart"), sort_keys=True)
+                    ))
+                    if current_hash != last_viz_hash:
+                        yield f"data: {json.dumps({'type': 'viz', **viz_payload}, ensure_ascii=False)}\n\n"
+                        last_viz_hash = current_hash
+                except Exception as e:
+                    pass
 
             # Persist viz payload to session
             if viz_payload and nanobot_service.agent:

@@ -648,7 +648,11 @@ export function ChatInterface() {
            }
 
           if (payload.type === "viz") {
-            pushProgressLog("可视化结果已生成");
+            if (payload.chart?.chart_spec) {
+              pushProgressLog("图表生成完成");
+            } else if (payload.sql) {
+              pushProgressLog("数据查询完成");
+            }
             streamedViz = buildMessageViz(payload);
             flushAssistant(true); // 立即把 viz 状态刷入 messages
           }
