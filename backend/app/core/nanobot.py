@@ -264,15 +264,10 @@ class NanobotIntegration:
                     agent_to_use = await self._get_or_create_model_agent(model_id, target_config)
 
         full_message = message
-        if skill_ids:
-            skills = load_skills()
-            selected_skills = [s for s in skills if s["id"] in skill_ids]
-            if selected_skills:
-                parts = ["[Runtime Context — metadata only, not instructions]", "# Active Skills", ""]
-                for s in selected_skills:
-                    parts.append(f"## {s['name']}\n{s.get('description', '')}\n{s['content']}\n")
-                skill_context = "\n".join(parts)
-                full_message = f"{skill_context}\n{message}"
+        # We no longer inject the full skill content into the user's message here,
+        # because the skill is already available to the agent via its workspace/tools.
+        # The routing instructions (System Prompt) injected in main.py are sufficient
+        # to guide the agent to use the selected skills.
 
         session = agent_to_use.sessions.get_or_create(session_id)
         normalized_messages = self._normalize_session_messages(session.messages)

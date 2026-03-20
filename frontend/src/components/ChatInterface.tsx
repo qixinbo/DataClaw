@@ -278,12 +278,23 @@ export function ChatInterface() {
               if (m.role === 'assistant' && m.tool_calls && m.tool_calls.length > 0 && !m.viz && (!m.content || m.content.trim() === '')) return false;
               return true;
             })
-            .map((m, idx) => ({
-              id: `${Date.now()}-${idx}`,
-              role: m.role as 'user' | 'assistant',
-              content: m.content || "",
-              viz: m.viz ? buildMessageViz(m.viz) : undefined,
-            }));
+            .map((m, idx) => {
+              let cleanContent = m.content || "";
+              // Remove injected system prompt instructions from user messages if present
+              if (m.role === 'user') {
+                cleanContent = cleanContent.replace(/^\[System:.*?\]\n?/i, '');
+                // Handle cases where there might be a runtime context block for skills
+                cleanContent = cleanContent.replace(/\[Runtime Context[\s\S]*?(?=\[System:|$)/i, '');
+                cleanContent = cleanContent.replace(/\[System:.*?\]\n?/i, ''); // clean again in case it follows context
+                cleanContent = cleanContent.trim();
+              }
+              return {
+                id: `${Date.now()}-${idx}`,
+                role: m.role as 'user' | 'assistant',
+                content: cleanContent,
+                viz: m.viz ? buildMessageViz(m.viz) : undefined,
+              };
+            });
           setMessagesForSession(activeSessionKey, formattedMessages);
         } else {
           setMessagesForSession(activeSessionKey, []);
