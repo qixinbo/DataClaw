@@ -34,6 +34,8 @@ from nanobot.config.schema import Config
 from app.api.skills import load_skills
 from app.services.llm_cache import get_llm_configs
 
+from app.core.streaming_provider import StreamingLiteLLMProvider
+
 class NanobotIntegration:
     def __init__(self):
         self.agent: AgentLoop | None = None
@@ -156,7 +158,7 @@ class NanobotIntegration:
         spec = find_by_name(provider_name)
         # Skip API key check for now to allow initialization without full config
         
-        return LiteLLMProvider(
+        return StreamingLiteLLMProvider(
             api_key=p.api_key if p else None,
             api_base=config.get_api_base(model),
             default_model=model,
@@ -211,7 +213,7 @@ class NanobotIntegration:
             cached = self._model_agent_cache.get(model_id)
             if cached:
                 return cached
-            provider = LiteLLMProvider(
+            provider = StreamingLiteLLMProvider(
                 api_key=target_config.get("api_key"),
                 api_base=target_config.get("api_base"),
                 default_model=target_config.get("model"),

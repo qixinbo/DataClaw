@@ -170,6 +170,8 @@ async def nanobot_chat(request: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+from app.core.streaming_provider import streaming_queue_var
+
 @app.post("/nanobot/chat/stream")
 async def nanobot_chat_stream(request: ChatRequest):
     async def event_generator():
@@ -184,6 +186,8 @@ async def nanobot_chat_stream(request: ChatRequest):
             yield f"data: {json.dumps({'type': 'routing', 'selected': 'agent', 'reason': 'auto_routed_by_agent'}, ensure_ascii=False)}\n\n"
             
             progress_queue: asyncio.Queue[str] = asyncio.Queue()
+            # 设置 streaming_queue_var 为当前请求的 progress_queue
+            streaming_queue_var.set(progress_queue)
 
             async def _on_progress(content: str, **kwargs: Any) -> None:
                 if content:
@@ -237,7 +241,10 @@ async def nanobot_chat_stream(request: ChatRequest):
                     break
                 try:
                     progress = await asyncio.wait_for(progress_queue.get(), timeout=0.2)
-                    yield f"data: {json.dumps({'type': 'progress', 'content': progress}, ensure_ascii=False)}\n\n"
+                    if isinstance(progress, dict):
+                        yield f"data: {json.dumps(progress, ensure_ascii=False)}\n\n"
+                    else:
+                        yield f"data: {json.dumps({'type': 'progress', 'content': progress}, ensure_ascii=False)}\n\n"
                 except asyncio.TimeoutError:
                     continue
 
@@ -266,10 +273,9 @@ async def nanobot_chat_stream(request: ChatRequest):
                     session.messages[-1]["viz"] = viz_payload
                     nanobot_service.agent.sessions.save(session)
             
-            for idx in range(0, len(text), STREAM_DELTA_CHUNK_SIZE):
-                chunk = text[idx: idx + STREAM_DELTA_CHUNK_SIZE]
-                yield f"data: {json.dumps({'type': 'delta', 'content': chunk}, ensure_ascii=False)}\n\n"
-            
+            # Since true streaming is enabled via StreamingLiteLLMProvider, 
+            # we no longer need to chunk and yield `text` here.
+            # Just yield the final text to signal completion and update final state.
             yield f"data: {json.dumps({'type': 'final', 'content': text}, ensure_ascii=False)}\n\n"
             yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
         except asyncio.CancelledError:

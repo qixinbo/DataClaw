@@ -24,6 +24,7 @@ interface Message {
   viz?: MessageViz;
   progressLogs?: string[];
   routeInfo?: string;
+  reasoningContent?: string;
 }
 
 interface MessageViz {
@@ -526,18 +527,26 @@ export function ChatInterface() {
           progressLogs: ["请求已提交，准备路由..."],
        }]);
 
-      const pushProgressLog = (text: string) => {
-        if (!text.trim()) return;
-        setMessagesForSession(targetSessionKey, (prev) =>
-          prev.map((msg) => {
-            if (msg.id !== assistantId) return msg;
+    const pushProgressLog = (text: string, isReasoningToken: boolean = false) => {
+      if (!text.trim() && !isReasoningToken) return;
+      setMessagesForSession(targetSessionKey, (prev) =>
+        prev.map((msg) => {
+          if (msg.id !== assistantId) return msg;
+          
+          if (isReasoningToken) {
+            // 对于流式推理内容，拼接而不是创建新条目
+            const currentReasoning = msg.reasoningContent || "";
+            return { ...msg, reasoningContent: currentReasoning + text };
+          } else {
+            // 对于普通的阶段性日志，保留最近的 8 条
             const current = msg.progressLogs || [];
             if (current[current.length - 1] === text) return msg;
             const next = [...current, text].slice(-8);
             return { ...msg, progressLogs: next };
-          })
-        );
-      };
+          }
+        })
+      );
+    };
 
        const token = localStorage.getItem("token");
        const effectiveModelId = selectedModelId || currentModel?.id || "";
@@ -627,6 +636,7 @@ export function ChatInterface() {
           const payload = JSON.parse(payloadText) as {
             type: string;
             content?: string;
+            is_reasoning?: boolean;
             sql?: string;
             result?: unknown;
             error?: string;
@@ -652,7 +662,9 @@ export function ChatInterface() {
           }
 
           if (payload.type === "progress" && payload.content) {
-            pushProgressLog(payload.content);
+            // 如果 progress 内容带有空格或者换行，并且不是典型的系统提示词，很可能这是 reasoning_content
+            // 为了安全起见，我们在后端应该加上 is_reasoning 标记，这里我们通过启发式或者统一拼接
+            pushProgressLog(payload.content, payload.is_reasoning || false);
           }
 
            if (payload.type === "final" && payload.content) {
@@ -968,6 +980,15 @@ export function ChatInterface() {
                   >
                     {msg.role === "assistant" ? (
                       <>
+                        {msg.reasoningContent && (
+                          <div className="mb-3 rounded-xl border border-zinc-200 bg-zinc-50/50 p-3 text-sm text-zinc-600 font-mono whitespace-pre-wrap leading-relaxed shadow-inner max-h-[300px] overflow-y-auto">
+                            <div className="flex items-center gap-2 mb-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                              <Settings className={`h-3.5 w-3.5 ${msg.awaitingFirstToken ? 'animate-spin' : ''}`} />
+                              思考过程
+                            </div>
+                            {msg.reasoningContent}
+                          </div>
+                        )}
                         {msg.progressLogs && msg.progressLogs.length > 0 ? (
                           <div className="mb-2 rounded-xl border border-zinc-100 bg-zinc-50/70 px-3 py-2">
                             <div className="flex items-center gap-2 text-zinc-500 text-xs">
