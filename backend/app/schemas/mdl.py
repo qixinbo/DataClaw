@@ -34,7 +34,7 @@ class Column(BaseModel):
     expression: Optional[str] = None
     isHidden: bool = False
     columnLevelAccessControl: Optional[ColumnAccessControl] = None
-    properties: Dict[str, str] = Field(default_factory=dict)
+    properties: Dict[str, Any] = Field(default_factory=dict)
 
 # Model Definitions
 class TableReference(BaseModel):

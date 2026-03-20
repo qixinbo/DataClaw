@@ -6,6 +6,10 @@ import { Table as TableIcon } from "lucide-react";
 interface Column {
   name: string;
   type: string;
+  properties?: {
+    is_primary_key?: boolean;
+    is_foreign_key?: boolean;
+  };
 }
 
 interface TableNodeData {
@@ -16,7 +20,7 @@ interface TableNodeData {
 
 export const TableNode = memo(({ data }: { data: TableNodeData }) => {
   return (
-    <Card className="min-w-[180px] max-w-[240px] shadow-md border-t-4 border-t-blue-500 text-xs">
+    <Card className="min-w-[220px] max-w-[280px] shadow-md border-t-4 border-t-blue-500 text-xs bg-white">
       <Handle type="target" position={Position.Top} className="!bg-blue-500" />
       
       <CardHeader 
@@ -30,17 +34,41 @@ export const TableNode = memo(({ data }: { data: TableNodeData }) => {
       </CardHeader>
       
       <CardContent className="p-0">
-        <div className="max-h-[200px] overflow-y-auto">
-          {data.columns.map((col) => (
-            <div 
-              key={col.name} 
-              className="py-1.5 px-3 border-b last:border-0 hover:bg-gray-50 flex items-center"
-              title={`${col.name} (${col.type})`}
-            >
-              <span className="font-medium truncate">{col.name}</span>
-              {/* 类型列已被隐藏 */}
-            </div>
-          ))}
+        <div className="max-h-[250px] overflow-y-auto">
+          <table className="w-full text-left border-collapse">
+            <tbody>
+              {data.columns.map((col) => {
+                const isPk = col.properties?.is_primary_key;
+                const isFk = col.properties?.is_foreign_key;
+                let keyText = "";
+                if (isPk && isFk) keyText = "PK, FK";
+                else if (isPk) keyText = "PK";
+                else if (isFk) keyText = "FK";
+
+                // Simplify type display, e.g., INTEGER -> int, CHARACTER VARYING -> string
+                let displayType = (col.type || "string").toLowerCase();
+                if (displayType.includes("int")) displayType = "int";
+                else if (displayType.includes("char") || displayType.includes("text")) displayType = "string";
+                else if (displayType.includes("time") || displayType.includes("date")) displayType = "date";
+                else if (displayType.includes("bool")) displayType = "boolean";
+                else if (displayType.includes("float") || displayType.includes("double") || displayType.includes("numeric") || displayType.includes("decimal")) displayType = "float";
+
+                return (
+                  <tr 
+                    key={col.name} 
+                    className="border-b last:border-0 hover:bg-gray-50"
+                    title={`${col.name} (${col.type})`}
+                  >
+                    <td className="py-1.5 px-3 w-16 text-gray-500 font-mono truncate border-r border-gray-100">{displayType}</td>
+                    <td className="py-1.5 px-3 font-medium truncate text-gray-800">{col.name}</td>
+                    <td className="py-1.5 px-3 w-10 text-center text-gray-500 font-semibold text-[10px] border-l border-gray-100">
+                      {keyText}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </CardContent>
       

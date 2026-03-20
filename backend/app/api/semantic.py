@@ -41,7 +41,14 @@ def get_semantic_schema(datasource_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="DataSource not found")
     
     try:
-        return MDLService.get_raw_schema(ds)
+        raw_schema = MDLService.get_raw_schema(ds)
+        result = {}
+        for table, data in raw_schema.items():
+            if isinstance(data, dict) and "columns" in data:
+                result[table] = data["columns"]
+            elif isinstance(data, list):
+                result[table] = data
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

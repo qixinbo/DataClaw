@@ -22,41 +22,44 @@ class PostgresConnector:
             return [dict(row._mapping) for row in result]
 
     def get_schema(self):
-        if self.engine.dialect.name == "sqlite":
-            return self._get_sqlite_schema()
-
-        query = """
-        SELECT table_name, column_name, data_type
-        FROM information_schema.columns
-        WHERE table_schema = 'public'
-        ORDER BY table_name, ordinal_position;
-        """
-        try:
-            results = self.execute_query(query)
-            schema = {}
-            for row in results:
-                table = row['table_name']
-                if table not in schema:
-                    schema[table] = []
-                schema[table].append({"name": row['column_name'], "type": row['data_type']})
-            return schema
-        except Exception as e:
-            print(f"Error getting schema: {e}")
-            return {}
-
-    def _get_sqlite_schema(self):
         try:
             from sqlalchemy import inspect
             inspector = inspect(self.engine)
             schema = {}
-            for table_name in inspector.get_table_names():
+            # Default schema for postgres is 'public', sqlite is None
+            schema_name = 'public' if self.engine.dialect.name == 'postgresql' else None
+            
+            for table_name in inspector.get_table_names(schema=schema_name):
                 columns = []
-                for col in inspector.get_columns(table_name):
-                    columns.append({"name": col['name'], "type": str(col['type'])})
-                schema[table_name] = columns
+                # get columns
+                for col in inspector.get_columns(table_name, schema=schema_name):
+                    columns.append({
+                        "name": col['name'], 
+                        "type": str(col['type'])
+                    })
+                
+                # get primary key
+                pk_constraint = inspector.get_pk_constraint(table_name, schema=schema_name)
+                pks = pk_constraint.get('constrained_columns', []) if pk_constraint else []
+                
+                # get foreign keys
+                fks = inspector.get_foreign_keys(table_name, schema=schema_name)
+                foreign_keys = []
+                for fk in fks:
+                    foreign_keys.append({
+                        "constrained_columns": fk['constrained_columns'],
+                        "referred_table": fk['referred_table'],
+                        "referred_columns": fk['referred_columns']
+                    })
+                
+                schema[table_name] = {
+                    "columns": columns,
+                    "primary_keys": pks,
+                    "foreign_keys": foreign_keys
+                }
             return schema
         except Exception as e:
-            print(f"Error getting SQLite schema: {e}")
+            print(f"Error getting schema: {e}")
             return {}
 
     def test_connection(self) -> bool:
