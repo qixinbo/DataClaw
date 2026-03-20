@@ -538,10 +538,10 @@ export function ChatInterface() {
             const currentReasoning = msg.reasoningContent || "";
             return { ...msg, reasoningContent: currentReasoning + text };
           } else {
-            // 对于普通的阶段性日志，保留最近的 8 条
+            // 对于普通的阶段性日志，取消 8 条限制，允许滚动查看所有历史
             const current = msg.progressLogs || [];
             if (current[current.length - 1] === text) return msg;
-            const next = [...current, text].slice(-8);
+            const next = [...current, text];
             return { ...msg, progressLogs: next };
           }
         })
@@ -991,22 +991,23 @@ export function ChatInterface() {
                         )}
                         {msg.progressLogs && msg.progressLogs.length > 0 ? (
                           <div className="mb-2 rounded-xl border border-zinc-100 bg-zinc-50/70 px-3 py-2">
-                            <div className="flex items-center gap-2 text-zinc-500 text-xs">
+                            <div className="flex items-center gap-2 text-zinc-500 text-xs mb-1.5 pb-1.5 border-b border-zinc-100/50">
                               {msg.awaitingFirstToken ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
                               <span>{msg.awaitingFirstToken ? "正在处理中" : "处理完成"}</span>
                             </div>
-                            <div className="mt-1.5 space-y-1">
+                            <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
                               {msg.progressLogs.map((log, idx, arr) => {
                                 const isLast = idx === arr.length - 1;
-                                const isLoading = isLast && msg.awaitingFirstToken;
+                                // 如果是正在处理的会话，且当前日志是最后一条，或者是明确包含“正在”的日志，则显示 loading
+                                const isLoadingLog = (isLast && msg.awaitingFirstToken) || log.includes("正在");
                                 return (
                                   <div key={`${msg.id}-log-${idx}`} className="flex items-start gap-2 text-[12px] text-zinc-500 leading-5">
-                                    {isLoading ? (
-                                      <Settings className="mt-0.5 h-3.5 w-3.5 text-amber-500 animate-spin" />
+                                    {isLoadingLog && msg.awaitingFirstToken ? (
+                                      <Settings className="mt-0.5 h-3.5 w-3.5 text-amber-500 animate-spin shrink-0" />
                                     ) : (
-                                      <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 text-emerald-500" />
+                                      <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 text-emerald-500 shrink-0" />
                                     )}
-                                    <span>{log}</span>
+                                    <span className="break-words">{log}</span>
                                   </div>
                                 );
                               })}
