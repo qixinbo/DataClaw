@@ -92,7 +92,7 @@ npm run dev
 DataClaw 的开发深受以下优秀开源项目的启发，特此致谢：
 
 - [WrenAI](https://github.com/Canner/WrenAI): 强大的 Text-to-SQL 解决方案，其架构和思路给了我们很大的启发。
-- [Aix-DB](https://github.com/aix-db/Aix-DB): 在智能数据分析和交互式体验方面提供了极好的参考。
+- [Aix-DB](https://github.com/apconw/Aix-DB): 在智能数据分析和交互式体验方面提供了极好的参考。
 
 <br />
 
