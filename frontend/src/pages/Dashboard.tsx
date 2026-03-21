@@ -179,7 +179,7 @@ export function Dashboard() {
                   }
                   if (chart.chartSpec && rows.length > 0) {
                     return (
-                      <div className="h-full w-full rounded-xl border border-zinc-100 p-2">
+                      <div className="h-full w-full rounded-xl border border-zinc-100 p-2 overflow-hidden">
                         <VegaChart data={rows} spec={chart.chartSpec} />
                       </div>
                     );

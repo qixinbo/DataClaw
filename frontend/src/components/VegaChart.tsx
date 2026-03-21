@@ -86,7 +86,7 @@ export const VegaChart: React.FC<VegaChartProps> = ({ data, spec }) => {
   };
 
   return (
-    <div className="w-full h-full min-h-[300px]" ref={containerRef}>
+    <div className="w-full h-full overflow-hidden" ref={containerRef}>
       <VegaEmbed 
         spec={vegaSpec} 
         options={{ actions: false }} 
