@@ -84,3 +84,15 @@ Open your browser and navigate to `http://localhost:5173`. Boom! 🎉 You're rea
 ## 🤝 Contributing
 
 Got a cool idea? Found a bug? We'd love your help! Feel free to open an issue or submit a pull request. Let's make data analysis fun again!
+
+***
+
+## 💖 Acknowledgements
+
+The development of DataClaw was deeply inspired by the following excellent open-source projects. Special thanks to:
+
+- [WrenAI](https://github.com/Canner/WrenAI): A powerful Text-to-SQL solution whose architecture and concepts provided great inspiration.
+- [Aix-DB](https://github.com/aix-db/Aix-DB): Provided an excellent reference for intelligent data analysis and interactive user experience.
+
+<br />
+
