@@ -93,9 +93,68 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
 
   const renderConfigFields = () => {
     switch (type) {
+      case "supabase":
+        return (
+          <div className="space-y-4">
+             <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Host</label>
+                <Input 
+                  value={config.host || ""} 
+                  onChange={e => handleConfigChange("host", e.target.value)} 
+                  placeholder="aws-0-[region].pooler.supabase.com" 
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Port</label>
+                <Input 
+                  type="number"
+                  value={config.port || 6543} 
+                  onChange={e => handleConfigChange("port", parseInt(e.target.value))} 
+                  placeholder="6543"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Database</label>
+              <Input 
+                value={config.database || "postgres"} 
+                onChange={e => handleConfigChange("database", e.target.value)} 
+                placeholder="postgres" 
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Username</label>
+              <Input 
+                value={config.user || ""} 
+                onChange={e => handleConfigChange("user", e.target.value)} 
+                placeholder="postgres.[project-ref]" 
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Password</label>
+              <Input 
+                type="password"
+                value={config.password || ""} 
+                onChange={e => handleConfigChange("password", e.target.value)} 
+                placeholder="••••••" 
+              />
+            </div>
+            <div className="text-xs text-zinc-500 pt-2">
+              或者直接使用 Supabase 控制台提供的 Connection String (URI):
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Connection String</label>
+              <Input 
+                value={config.connection_string || ""} 
+                onChange={e => handleConfigChange("connection_string", e.target.value)} 
+                placeholder="postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres?sslmode=require"
+              />
+            </div>
+          </div>
+        );
       case "postgres":
       case "postgresql":
-      case "supabase":
       case "mysql":
       case "sqlserver":
       case "oracle":

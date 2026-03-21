@@ -12,6 +12,7 @@ const SOURCE_TYPES = [
   { id: "csv", name: "CSV Upload", icon: <FileText className="h-6 w-6 text-green-600" /> },
   { id: "bigquery", name: "BigQuery", icon: <Database className="h-6 w-6 text-blue-500" /> },
   { id: "postgres", name: "PostgreSQL", icon: <Database className="h-6 w-6 text-indigo-600" /> },
+  { id: "supabase", name: "Supabase", icon: <Database className="h-6 w-6 text-emerald-500" /> },
   { id: "mysql", name: "MySQL", icon: <Database className="h-6 w-6 text-cyan-600" /> },
   { id: "oracle", name: "Oracle", icon: <Database className="h-6 w-6 text-red-600" /> },
   { id: "sqlserver", name: "SQL Server", icon: <Database className="h-6 w-6 text-red-500" /> },

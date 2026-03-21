@@ -133,4 +133,7 @@ def test_datasource_connection(
         else:
              raise HTTPException(status_code=400, detail="Connection failed")
     except Exception as e:
+        import traceback
+        import sys
+        print(f"Datasource Test Error: {str(e)}\n{traceback.format_exc()}", file=sys.stderr)
         raise HTTPException(status_code=400, detail=f"Connection failed: {str(e)}")

@@ -13,9 +13,17 @@ def _get_cached_connector(ds_type: str, config_json: str):
     config = json.loads(config_json)
     
     if ds_type in ["postgres", "postgresql", "supabase"]:
-        # Supabase is just postgres
-        db_url = config.get("connection_string") or \
-                 f"postgresql://{config.get('user')}:{config.get('password')}@{config.get('host')}:{config.get('port', 5432)}/{config.get('database')}"
+        db_url = config.get("connection_string")
+        if not db_url:
+            default_port = 6543 if ds_type == "supabase" else 5432
+            port = config.get("port") or default_port
+            db_url = f"postgresql://{config.get('user')}:{config.get('password')}@{config.get('host')}:{port}/{config.get('database')}"
+            
+        if ds_type == "supabase" and "?" not in db_url:
+            db_url += "?sslmode=require"
+        elif ds_type == "supabase" and "sslmode=" not in db_url:
+            db_url += "&sslmode=require"
+            
         return PostgresConnector(db_url=db_url)
         
     elif ds_type == "sqlite":

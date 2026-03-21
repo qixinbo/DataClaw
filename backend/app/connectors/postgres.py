@@ -69,6 +69,6 @@ class PostgresConnector:
             return True
         except Exception as e:
             print(f"PostgreSQL Connection Error: {e}")
-            return False
+            raise e
 
 postgres_connector = PostgresConnector()
