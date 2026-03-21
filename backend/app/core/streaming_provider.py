@@ -34,13 +34,15 @@ class StreamingLiteLLMProvider(LiteLLMProvider):
         if self._gateway:
             os.environ[spec.env_key] = api_key
         else:
-            os.environ.setdefault(spec.env_key, api_key)
+            # os.environ.setdefault 会在已存在且为空字符串时保留空字符串，导致 litellm 无法识别
+            # 因此强制更新
+            os.environ[spec.env_key] = api_key
 
         effective_base = api_base or spec.default_api_base
         for env_name, env_val in spec.env_extras:
             resolved = env_val.replace("{api_key}", api_key)
             resolved = resolved.replace("{api_base}", effective_base)
-            os.environ.setdefault(env_name, resolved)
+            os.environ[env_name] = resolved
 
     def _resolve_model(self, model: str) -> str:
         """Resolve model name by applying provider/gateway prefixes, using override if available."""
