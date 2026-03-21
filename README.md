@@ -1,26 +1,26 @@
-[🇨🇳 简体中文](./README_zh.md) | [🇬🇧 English](./README.md)
+[🇨🇳 简体中文](./README.md) | [🇬🇧 English](./README_en.md)
 
-# 🦞 DataClaw
+# 🦞 龙虾问数 (DataClaw)
 
-> **Unleash the claws on your data, making analysis as easy and refreshing as raising lobsters!** 🌊📊
-> DataClaw is your intelligent, AI-powered Data Analysis Platform. Chat with your data, visualize insights instantly, and build dashboards—all through natural language. No SQL degree required!
+> **释放你的数据潜能，让分析像养龙虾一样简单爽快！** 🌊📊
+> 龙虾问数 (DataClaw) 是一个智能的、AI 驱动的数据分析平台。通过自然语言与你的数据对话，瞬间生成可视化图表，轻松搭建仪表盘——从此告别繁琐的 SQL 语句！
 
 ***
 
-## ✨ Why DataClaw?
+## ✨ 为什么选择龙虾问数？
 
-Tired of writing complex SQL queries just to get a simple bar chart? DataClaw acts as your personal data scientist. Powered by advanced LLMs and an intelligent agentic workflow, it translates your questions into database queries, fetches the data, and renders beautiful visualizations on the fly.
+受够了为了画个简单的柱状图而写半天复杂的 SQL 语句吗？龙虾问数就是你的私人数据科学家。借助强大的大语言模型 (LLM) 和智能 Agent 工作流，它能将你的自然语言提问精准转化为数据库查询，提取数据，并即时渲染出美观的可视化图表。
 
-Whether you're querying a massive Supabase/PostgreSQL database or just tossing in a CSV file, DataClaw's got you covered! 🚀
+无论你是要查询庞大的 Supabase/PostgreSQL 数据库，还是随手丢进一个 CSV 文件，龙虾问数都能轻松拿捏！🚀
 
-## 🌟 Key Features
+## 🌟 核心特性
 
-- **🗣️ Chat to SQL**: Ask questions in plain English (or Chinese!). DataClaw understands your schema, generates accurate SQL, and self-corrects if things go sideways.
-- **📈 Instant Visualizations**: Returns not just raw tables, but auto-generated interactive charts tailored to your data's shape.
-- **🗂️ Multi-Source Ready**: Connects seamlessly to PostgreSQL, Supabase, and local CSV/Excel uploads.
-- **🧠 Bring Your Own LLM**: Native integration with LiteLLM. Plug in OpenAI, DeepSeek, Zhipu, DashScope, Volcengine, or any compatible provider.
-- **🛠️ Extensible Agent Skills**: Built on top of the powerful `nanobot` framework (a lightweight version of `OpenClaw`). Add custom tools and slash commands (`/`) to tailor the agent to your specific business logic.
-- **📊 Customizable Dashboards**: Pin your favorite chat-generated charts to a drag-and-drop dashboard for quick access.
+- **🗣️ 自然语言转 SQL**: 用大白话提问！它能理解你的数据表结构，生成准确的 SQL，甚至在报错时进行自我纠正 (Self-correction)。
+- **📈 即时数据可视化**: 拒绝枯燥的生肉表格，根据数据特征自动生成交互式图表。
+- **🗂️ 动态多数据源**: 无缝连接 PostgreSQL、Supabase，以及本地 CSV/Excel 文件上传解析。
+- **🧠 灵活的模型接入**: 原生集成 LiteLLM，支持随插随用 OpenAI、DeepSeek、智谱、通义千问 (DashScope)、火山引擎或任何兼容的 LLM 提供商。
+- **🛠️ 强大的 Agent 技能拓展**: 基于核心 `nanobot`框架（`OpenClaw`的精简版）构建。支持通过斜杠命令 (`/`) 快速调用自定义工具 (Skills)，完美贴合特定业务逻辑。
+- **📊 可定制仪表盘 (Dashboard)**: 一键将对话中生成的图表固定到看板，拖拽布局，随时查看核心指标。
 
 <br />
 
@@ -31,56 +31,56 @@ Whether you're querying a massive Supabase/PostgreSQL database or just tossing i
 
 <br />
 
-## 🏗️ Architecture
+## 🏗️ 项目架构
 
-DataClaw is divided into three main claws (components):
+DataClaw 的架构主要分为三只“大钳子”：
 
-1. **`frontend/`** 🎨: The shiny shell. Built with **React 19**, **Vite**, **TailwindCSS**, and **Zustand**. It features a chat-like interface, streaming AI responses, and interactive Vega charts.
-2. **`backend/`** ⚙️: The muscle. A **FastAPI** application managing projects, data source connections, user sessions, and API gateways.
-3. **`nanobot/`** 🧠: The brain. The core AI agent framework handling NL2SQL, schema caching, prompt injection, and LLM routing.
+1. **`frontend/`** 🎨: 闪亮的外壳。基于 **React 19**、**Vite**、**TailwindCSS** 和 **Zustand** 构建。拥有类似微信/ChatGPT的对话界面、支持流式思考过程渲染以及交互式图表展示。
+2. **`backend/`** ⚙️: 强健的肌肉。一个 **FastAPI** 后端服务，负责管理项目、数据源连接、用户会话持久化以及作为 API 网关。
+3. **`nanobot/`** 🧠: 智慧的大脑。核心的 AI Agent 框架，负责处理意图路由、NL2SQL 转换、Schema 缓存管理以及与 LLM 的底层交互。
 
 ***
 
-## 🚀 Quick Start
+## 🚀 快速开始
 
-Ready to dive in? Let's get DataClaw running on your local machine!
+准备好大显身手了吗？让我们把龙虾问数在你的本地跑起来！
 
-### 1. Backend Setup 🐍
+### 1. 后端服务启动 🐍
 
-Ensure you have Python 3.10+ installed.
+请确保你已安装 Python 3.10 或以上版本。
 
 ```bash
 cd backend
-# Create a virtual environment (optional but recommended)
+# 创建虚拟环境（可选但强烈建议）
 python -m venv .venv
 source .venv/bin/activate
 
-# Install dependencies
+# 安装依赖
 pip install -r requirements.txt
 
-# Start the FastAPI server
+# 启动 FastAPI 服务器
 uvicorn app.main:app --reload --port 8000
 ```
 
-*Note: Ensure your* *`nanobot`* *is properly linked or installed in editable mode as per the project workspace.*
+*提示：请确保* *`nanobot`* *核心库已根据项目工作区的要求正确链接或以可编辑模式 (editable mode) 安装。*
 
-### 2. Frontend Setup ⚛️
+### 2. 前端服务启动 ⚛️
 
-Ensure you have Node.js 18+ installed.
+请确保你已安装 Node.js 18 或以上版本。
 
 ```bash
 cd frontend
-# Install dependencies
+# 安装依赖
 npm install
 
-# Start the Vite development server
+# 启动 Vite 开发服务器
 npm run dev
 ```
 
-Open your browser and navigate to `http://localhost:5173`. Boom! 🎉 You're ready to chat with your data.
+打开浏览器并访问 `http://localhost:5173`。搞定！🎉 你现在可以开始和你的数据愉快的聊天了。
 
 ***
 
-## 🤝 Contributing
+## 🤝 参与贡献
 
-Got a cool idea? Found a bug? We'd love your help! Feel free to open an issue or submit a pull request. Let's make data analysis fun again!
+有个好点子？发现了一个 Bug？非常欢迎你的加入！随时可以提交 Issue 或 Pull Request。让我们一起让数据分析变得更加有趣！
