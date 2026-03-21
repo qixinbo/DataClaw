@@ -1,6 +1,6 @@
 [🇨🇳 简体中文](./README_zh.md) | [🇬🇧 English](./README.md)
 
-# 🦞 DataClaw (LobsterDataQA)
+# 🦞 DataClaw
 
 > **Unleash the claws on your data, making analysis as easy and refreshing as raising lobsters!** 🌊📊
 > DataClaw is your intelligent, AI-powered Data Analysis Platform. Chat with your data, visualize insights instantly, and build dashboards—all through natural language. No SQL degree required!
