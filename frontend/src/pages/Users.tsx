@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from 'react-i18next';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +19,7 @@ interface User {
 }
 
 export function Users() {
+  const { t } = useTranslation();
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -87,7 +89,7 @@ export function Users() {
       } else {
         // Create
         if (!formData.password) {
-          setError("新建用户必须填写密码");
+          setError(t('newUserMustHavePassword'));
           return;
         }
         await api.post("/api/v1/users", formData);
@@ -95,12 +97,12 @@ export function Users() {
       setIsDialogOpen(false);
       fetchUsers();
     } catch (err: any) {
-      setError(err.message || "发生错误");
+      setError(err.message || t('anErrorOccurred'));
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (window.confirm("确认删除该用户吗？")) {
+    if (window.confirm(t('confirmDeleteUser'))) {
       try {
         await api.delete(`/api/v1/users/${id}`);
         fetchUsers();
@@ -125,12 +127,12 @@ export function Users() {
           <DialogContent className="sm:max-w-[425px]">
             <form onSubmit={handleSubmit}>
               <DialogHeader>
-                <DialogTitle>{editingUser ? "编辑用户" : "添加新用户"}</DialogTitle>
+                <DialogTitle>{editingUser ? t('editUser') : t('addNewUser')}</DialogTitle>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 {error && <div className="text-red-500 text-sm">{error}</div>}
                 <div className="grid gap-2">
-                  <Label htmlFor="username">用户名</Label>
+                  <Label htmlFor="username">{t('username')}</Label>
                   <Input
                     id="username"
                     value={formData.username}
@@ -139,7 +141,7 @@ export function Users() {
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="email">邮箱</Label>
+                  <Label htmlFor="email">{t('email')}</Label>
                   <Input
                     id="email"
                     type="email"
@@ -150,7 +152,7 @@ export function Users() {
                 </div>
                 {!editingUser && (
                   <div className="grid gap-2">
-                    <Label htmlFor="password">密码</Label>
+                    <Label htmlFor="password">{t('password')}</Label>
                     <Input
                       id="password"
                       type="password"
@@ -161,7 +163,7 @@ export function Users() {
                   </div>
                 )}
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="is_active">激活状态</Label>
+                  <Label htmlFor="is_active">{t('activeStatus')}</Label>
                   <Switch
                     id="is_active"
                     checked={formData.is_active}
@@ -169,7 +171,7 @@ export function Users() {
                   />
                 </div>
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="is_admin">管理员权限</Label>
+                  <Label htmlFor="is_admin">{t('adminPrivileges')}</Label>
                   <Switch
                     id="is_admin"
                     checked={formData.is_admin}
@@ -179,10 +181,10 @@ export function Users() {
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  取消
+                  {t('cancel')}
                 </Button>
                 <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                  保存
+                  {t('save')}
                 </Button>
               </DialogFooter>
             </form>
@@ -200,13 +202,13 @@ export function Users() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>用户名</TableHead>
-                  <TableHead>邮箱</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead>角色</TableHead>
-                  <TableHead>创建时间</TableHead>
-                  <TableHead className="text-right">操作</TableHead>
+                  <TableHead>{t('id')}</TableHead>
+                  <TableHead>{t('username')}</TableHead>
+                  <TableHead>{t('email')}</TableHead>
+                  <TableHead>{t('status')}</TableHead>
+                  <TableHead>{t('role')}</TableHead>
+                  <TableHead>{t('createdAt')}</TableHead>
+                  <TableHead className="text-right">{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -224,12 +226,12 @@ export function Users() {
                       <TableCell>{user.email}</TableCell>
                       <TableCell>
                         <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${user.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-600'}`}>
-                          {user.is_active ? '正常' : '禁用'}
+                          {user.is_active ? t('normal') : t('disabled')}
                         </span>
                       </TableCell>
                       <TableCell>
                         <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${user.is_admin ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                          {user.is_admin ? '管理员' : '普通用户'}
+                          {user.is_admin ? t('admin') : t('regularUser')}
                         </span>
                       </TableCell>
                       <TableCell className="text-zinc-500">

@@ -1,8 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { User, Loader2, Sparkles, ArrowUp, ChevronDown, Paperclip, Check, X, Square, Plus, Database, Wand2, Search, Zap, LayoutGrid, CheckCircle2, Table, XCircle, Settings, ExternalLink } from "lucide-react";
+import { User, Loader2, ArrowUp, ChevronDown, Check, Square, Plus, Database, Wand2, Zap, CheckCircle2, Table, XCircle, Settings, ExternalLink } from "lucide-react";
 import { api } from "@/lib/api";
 import { type ChartSpec } from "@/store/visualizationStore";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -12,6 +10,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import { useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { InlineVisualizationCard } from "./InlineVisualizationCard";
 import { useProjectStore } from "@/store/projectStore";
 import { SlashCommandMenu } from "./SlashCommandMenu";
@@ -99,6 +98,7 @@ interface SessionData {
 }
 
 export function ChatInterface() {
+  const { t } = useTranslation();
   const [messagesBySession, setMessagesBySession] = useState<Record<string, Message[]>>({});
   const [input, setInput] = useState("");
   const [selectedDataSource, setSelectedDataSource] = useState<string>("");
@@ -214,7 +214,7 @@ export function ChatInterface() {
   // File upload state
   const [attachedFile, setAttachedFile] = useState<DataFileContext | null>(null);
   const [activeDataFile, setActiveDataFile] = useState<DataFileContext | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -337,7 +337,7 @@ export function ChatInterface() {
 
   const currentModel = models.find(m => m.id === selectedModelId);
   
-  const chartIntentPattern = /(图表|可视化|画图|作图|柱状图|折线图|饼图|趋势|分布|chart|plot|visuali[sz]e)/i;
+  const chartIntentPattern = new RegExp(t('chartIntentPattern'), 'i');
 
   const buildMessageViz = (payload: {
     sql?: string;
@@ -419,7 +419,7 @@ export function ChatInterface() {
           {selectedDataSource ? (
             <div className="px-3 py-1.5 rounded-full text-xs border flex items-center gap-1.5 bg-blue-50 text-blue-700 border-blue-200">
               <Database className="h-3.5 w-3.5" />
-              {`数据源：${selectedDataSourceName}`}
+              {`${t('dataSource')}：${selectedDataSourceName}`}
             </div>
           ) : null}
           {selectedSkills.map((skill) => (
@@ -447,7 +447,7 @@ export function ChatInterface() {
           </div>
           <div className="flex-1 min-w-0 pr-6">
             <div className="text-sm font-bold text-zinc-900 truncate">{file.filename}</div>
-            <div className="text-xs text-zinc-500">电子表格</div>
+            <div className="text-xs text-zinc-500">{t('spreadsheet')}</div>
           </div>
           <button 
             onClick={handleRemoveFile}
@@ -491,7 +491,7 @@ export function ChatInterface() {
     setMessagesForSession(activeSessionKey, (prev) =>
       prev.map((msg) =>
         msg.awaitingFirstToken
-          ? { ...msg, awaitingFirstToken: false, content: msg.content || "已中断输出" }
+          ? { ...msg, awaitingFirstToken: false, content: msg.content || t('outputInterrupted') }
           : msg
       )
     );
@@ -508,7 +508,7 @@ export function ChatInterface() {
     let messagePayload = newMessage.content;
     const currentAttachedFile = attachedFile;
     if (currentAttachedFile) {
-      messagePayload = `[用户上传了文件: ${currentAttachedFile.filename}]\n[文件内容摘要: ${currentAttachedFile.summary || "无"}]\n[数据列: ${currentAttachedFile.columns?.join(", ") || "无"}]\n[文件下载链接: ${currentAttachedFile.url}]\n\n${newMessage.content}`;
+      messagePayload = `[${t('userUploadedFile')}: ${currentAttachedFile.filename}]\n[${t('fileContentSummary')}: ${currentAttachedFile.summary || t('none')}]\n[${t('dataColumns')}: ${currentAttachedFile.columns?.join(", ") || t('none')}]\n[${t('fileDownloadLink')}: ${currentAttachedFile.url}]\n\n${newMessage.content}`;
       setAttachedFile(null);
     }
     
@@ -524,7 +524,7 @@ export function ChatInterface() {
           role: "assistant",
           content: "",
           awaitingFirstToken: true,
-          progressLogs: ["请求已提交，准备路由..."],
+          progressLogs: [t('requestSubmittedRouting')],
        }]);
 
     const pushProgressLog = (text: string, isReasoningToken: boolean = false) => {
@@ -581,7 +581,7 @@ export function ChatInterface() {
 
        if (!response.ok || !response.body) {
          const err = await response.json().catch(() => ({}));
-         throw new Error(err.detail || "流式响应失败");
+         throw new Error(err.detail || t('streamResponseFailed'));
        }
 
        const reader = response.body.getReader();
@@ -651,9 +651,9 @@ export function ChatInterface() {
            }
 
           if (payload.type === "routing") {
-            const selected = payload.selected === "sql" ? "SQL 分析" : "通用对话";
+            const selected = payload.selected === "sql" ? t('sqlAnalysis') : t('generalConversation');
             const reason = payload.reason ? `（${payload.reason}）` : "";
-            pushProgressLog(`路由：${selected}${reason}`);
+            pushProgressLog(t('routingInfo', { selected, reason }));
             setMessagesForSession(targetSessionKey, (prev) =>
               prev.map((msg) =>
                 msg.id === assistantId ? { ...msg, routeInfo: `${selected}${reason}` } : msg
@@ -671,7 +671,7 @@ export function ChatInterface() {
             hasFinalPayload = true;
              streamedText = payload.content;
             flushAssistant(true);
-            pushProgressLog("回答生成完成");
+            pushProgressLog(t('answerGenerationCompleted'));
              setMessagesForSession(targetSessionKey, (prev) =>
                prev.map((msg) =>
                 msg.id === assistantId ? { ...msg, content: payload.content || "", awaitingFirstToken: false, viz: streamedViz ?? msg.viz } : msg
@@ -684,14 +684,14 @@ export function ChatInterface() {
           }
 
            if (payload.type === "error") {
-             throw new Error(payload.content || "流式响应错误");
+             throw new Error(payload.content || t('streamResponseError'));
            }
 
           if (payload.type === "viz") {
             if (payload.chart?.chart_spec) {
-              pushProgressLog("图表生成完成");
+              pushProgressLog(t('chartGenerationCompleted'));
             } else if (payload.sql) {
-              pushProgressLog("数据查询完成");
+              pushProgressLog(t('dataQueryCompleted'));
             }
             streamedViz = buildMessageViz(payload);
             flushAssistant(true); // 立即把 viz 状态刷入 messages
@@ -703,7 +703,7 @@ export function ChatInterface() {
       if (!streamedText && (hasFinalPayload || hasDonePayload)) {
         setMessagesForSession(targetSessionKey, (prev) =>
           prev.map((msg) =>
-            msg.id === assistantId ? { ...msg, content: "暂无回复", awaitingFirstToken: false, viz: streamedViz ?? msg.viz } : msg
+            msg.id === assistantId ? { ...msg, content: t('noReply'), awaitingFirstToken: false, viz: streamedViz ?? msg.viz } : msg
           )
         );
        }
@@ -712,7 +712,7 @@ export function ChatInterface() {
           setMessagesForSession(targetSessionKey, (prev) =>
             prev.map((msg) =>
               msg.awaitingFirstToken
-                ? { ...msg, awaitingFirstToken: false, content: msg.content || "已中断输出" }
+                ? { ...msg, awaitingFirstToken: false, content: msg.content || t('outputInterrupted') }
                 : msg
             )
           );
@@ -746,10 +746,10 @@ export function ChatInterface() {
           </PopoverTrigger>
           <PopoverContent className="w-[280px] p-0" align="start">
             <Command>
-              <CommandInput placeholder="搜索模型..." />
+              <CommandInput placeholder={t('searchModel')} />
               <CommandList className="max-h-[300px]">
-                <CommandEmpty>未找到模型</CommandEmpty>
-                <CommandGroup heading="可用模型">
+                <CommandEmpty>{t('modelNotFound')}</CommandEmpty>
+                <CommandGroup heading={t('availableModels')}>
                   {models.map((model) => (
                     <CommandItem
                       key={model.id}
@@ -818,7 +818,7 @@ export function ChatInterface() {
                               <div className="flex-1 p-3 bg-zinc-50/50">
                                 <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
                                   <Database className="h-3 w-3" />
-                                  数据源
+                                  {t('dataSource')}
                                 </div>
                                 <div className="space-y-0.5">
                                   {availableDataSources.map((ds) => (
@@ -849,7 +849,7 @@ export function ChatInterface() {
                                         }}
                                         className="w-full py-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 transition-colors flex items-center justify-center gap-1"
                                       >
-                                        清除已选
+                                        {t('clearSelected')}
                                       </button>
                                     </div>
                                   )}
@@ -893,7 +893,7 @@ export function ChatInterface() {
                                   ) : (
                                     <div className="px-3 py-8 text-center">
                                       <Zap className="h-8 w-8 text-zinc-100 mx-auto mb-2" />
-                                      <p className="text-xs text-zinc-400">暂无可用技能</p>
+                                      <p className="text-xs text-zinc-400">{t('noAvailableSkills')}</p>
                                     </div>
                                   )}
                                 </div>
@@ -903,7 +903,7 @@ export function ChatInterface() {
                                       onClick={() => setSelectedSkillIds([])}
                                       className="w-full py-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 transition-colors flex items-center justify-center gap-1"
                                     >
-                                      清除已选 ({selectedSkillIds.length})
+                                      {t('clearSelectedWithCount', { count: selectedSkillIds.length })}
                                     </button>
                                   </div>
                                 )}
@@ -918,7 +918,7 @@ export function ChatInterface() {
                         value={input}
                         onChange={handleInputChange}
                         onKeyDown={handleInputKeyDown}
-                        placeholder="有问题，尽管问"
+                        placeholder={t('askAnything')}
                         className="flex-1 bg-transparent border-none focus:ring-0 text-lg px-3 py-2 text-zinc-900 placeholder:text-zinc-300 outline-none"
                         disabled={isLoading}
                       />
@@ -984,7 +984,7 @@ export function ChatInterface() {
                           <div className="mb-3 rounded-xl border border-zinc-200 bg-zinc-50/50 p-3 text-sm text-zinc-600 font-mono whitespace-pre-wrap leading-relaxed shadow-inner max-h-[300px] overflow-y-auto">
                             <div className="flex items-center gap-2 mb-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
                               <Settings className={`h-3.5 w-3.5 ${msg.awaitingFirstToken ? 'animate-spin' : ''}`} />
-                              思考过程
+                              {t('thinkingProcess')}
                             </div>
                             {msg.reasoningContent}
                           </div>
@@ -993,13 +993,13 @@ export function ChatInterface() {
                           <div className="mb-2 rounded-xl border border-zinc-100 bg-zinc-50/70 px-3 py-2">
                             <div className="flex items-center gap-2 text-zinc-500 text-xs mb-1.5 pb-1.5 border-b border-zinc-100/50">
                               {msg.awaitingFirstToken ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
-                              <span>{msg.awaitingFirstToken ? "正在处理中" : "处理完成"}</span>
+                              <span>{msg.awaitingFirstToken ? t('processing') : t('processCompleted')}</span>
                             </div>
                             <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
                               {msg.progressLogs.map((log, idx, arr) => {
                                 const isLast = idx === arr.length - 1;
                                 // 如果是正在处理的会话，且当前日志是最后一条，或者是明确包含“正在”的日志，则显示 loading
-                                const isLoadingLog = (isLast && msg.awaitingFirstToken) || log.includes("正在");
+                                const isLoadingLog = (isLast && msg.awaitingFirstToken) || log.includes(t('processingIndicator'));
                                 return (
                                   <div key={`${msg.id}-log-${idx}`} className="flex items-start gap-2 text-[12px] text-zinc-500 leading-5">
                                     {isLoadingLog && msg.awaitingFirstToken ? (
@@ -1017,7 +1017,7 @@ export function ChatInterface() {
                         {msg.awaitingFirstToken && !msg.content ? (
                           <div className="flex items-center gap-2 text-zinc-500 text-sm py-1">
                             <Loader2 className="h-4 w-4 animate-spin" />
-                            <span>模型思考中，请稍候...</span>
+                            <span>{t('modelThinking')}</span>
                           </div>
                         ) : (
                           <>
@@ -1047,7 +1047,7 @@ export function ChatInterface() {
                                   className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 rounded-lg text-sm font-medium transition-colors"
                                 >
                                   <ExternalLink className="h-4 w-4" />
-                                  在新标签页中打开分析报告
+                                  {t('openReportInNewTab')}
                                 </a>
                               </div>
                             ) : null}
@@ -1095,7 +1095,7 @@ export function ChatInterface() {
                         <div className="flex-1 p-3 bg-zinc-50/50">
                           <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
                             <Database className="h-3 w-3" />
-                            数据源
+                            {t('dataSource')}
                           </div>
                           <div className="space-y-0.5">
                             {availableDataSources.map((ds) => (
@@ -1126,7 +1126,7 @@ export function ChatInterface() {
                                   }}
                                   className="w-full py-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 transition-colors flex items-center justify-center gap-1"
                                 >
-                                  清除已选
+                                  {t('clearSelected')}
                                 </button>
                               </div>
                             )}
@@ -1170,7 +1170,7 @@ export function ChatInterface() {
                             ) : (
                               <div className="px-3 py-8 text-center">
                                 <Zap className="h-8 w-8 text-zinc-100 mx-auto mb-2" />
-                                <p className="text-xs text-zinc-400">暂无可用技能</p>
+                                <p className="text-xs text-zinc-400">{t('noAvailableSkills')}</p>
                               </div>
                             )}
                           </div>
@@ -1180,7 +1180,7 @@ export function ChatInterface() {
                                 onClick={() => setSelectedSkillIds([])}
                                 className="w-full py-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 transition-colors flex items-center justify-center gap-1"
                               >
-                                清除已选 ({selectedSkillIds.length})
+                                {t('clearSelectedWithCount', { count: selectedSkillIds.length })}
                               </button>
                             </div>
                           )}
@@ -1195,7 +1195,7 @@ export function ChatInterface() {
                   value={input}
                   onChange={handleInputChange}
                   onKeyDown={handleInputKeyDown}
-                  placeholder="有问题，尽管问"
+                  placeholder={t('askAnything')}
                   className="flex-1 bg-transparent border-none focus:ring-0 text-lg px-3 py-2 text-zinc-900 placeholder:text-zinc-300 outline-none"
                   disabled={isLoading}
                 />
@@ -1229,7 +1229,7 @@ export function ChatInterface() {
             </div>
             <div className="mt-2 flex justify-center">
               <p className="text-[11px] text-zinc-400">
-                DataClaw 可能会出错。请核查重要信息。
+                {t('dataClawDisclaimer')}
               </p>
             </div>
           </div>

@@ -1,4 +1,5 @@
 import { useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy';
 import { useDashboardStore } from '../store/dashboardStore';
 import { useProjectStore } from '../store/projectStore';
@@ -43,6 +44,7 @@ function inferChartKeys(data: Record<string, unknown>[]) {
 }
 
 export function Dashboard() {
+  const { t } = useTranslation();
   const { charts, removeChart, updateLayout, loadCharts } = useDashboardStore();
   const { currentProject } = useProjectStore();
 
@@ -79,7 +81,7 @@ export function Dashboard() {
   if (!currentProject) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-        <p>请选择一个项目以查看仪表板。</p>
+        <p>{t('selectProjectToViewDashboard')}</p>
       </div>
     );
   }
@@ -87,8 +89,8 @@ export function Dashboard() {
   if (charts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-        <p>当前项目暂无图表。</p>
-        <p className="text-sm">前往对话页并添加可视化结果！</p>
+        <p>{t('noChartsInCurrentProject')}</p>
+        <p className="text-sm">{t('goToChatToAddCharts')}</p>
       </div>
     );
   }
@@ -119,7 +121,7 @@ export function Dashboard() {
                   <CardTitle className="text-base">{chart.title}</CardTitle>
                   <CardDescription className="text-xs">
                     {chart.type === "table"
-                      ? `TABLE · ${rows.length} 行 · ${columns.length} 列`
+                      ? t('tableRowColDesc', { rowCount: rows.length, colCount: columns.length })
                       : `${chart.type.toUpperCase()} Chart`}
                   </CardDescription>
                 </div>
@@ -152,7 +154,7 @@ export function Dashboard() {
                     return (
                       <div className="h-full w-full flex flex-col gap-2">
                         <div className="text-[11px] text-zinc-500 px-1">
-                          {isTableTruncated ? `预览前 ${TABLE_PREVIEW_LIMIT} 行 / 共 ${rows.length} 行，${columns.length} 列` : `共 ${rows.length} 行，${columns.length} 列`}
+                          {isTableTruncated ? t('previewTableRows', { previewLimit: TABLE_PREVIEW_LIMIT, rowCount: rows.length, colCount: columns.length }) : t('totalTableRows', { rowCount: rows.length, colCount: columns.length })}
                         </div>
                         <ScrollArea className="flex-1 w-full border rounded-md">
                           <Table>

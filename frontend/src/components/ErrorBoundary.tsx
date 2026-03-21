@@ -1,15 +1,16 @@
 import { Component, type ReactNode } from "react";
+import { withTranslation, type WithTranslation } from "react-i18next";
 
 type ErrorBoundaryProps = {
   children: ReactNode;
-};
+} & WithTranslation;
 
 type ErrorBoundaryState = {
   hasError: boolean;
   message: string;
 };
 
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundaryComponent extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = {
     hasError: false,
     message: "",
@@ -27,11 +28,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   render() {
+    const { t } = this.props;
     if (this.state.hasError) {
       return (
         <div className="h-screen w-screen flex items-center justify-center bg-background text-foreground p-6">
           <div className="max-w-lg text-center">
-            <h1 className="text-xl font-semibold mb-2">页面渲染失败</h1>
+            <h1 className="text-xl font-semibold mb-2">{t('pageRenderFailed')}</h1>
             <p className="text-sm text-muted-foreground break-words">{this.state.message}</p>
           </div>
         </div>
@@ -41,3 +43,5 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return this.props.children;
   }
 }
+
+export const ErrorBoundary = withTranslation()(ErrorBoundaryComponent);

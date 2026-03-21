@@ -1,9 +1,10 @@
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Menu, LayoutDashboard, Plus, MoreVertical, User, Search, Wrench, Settings, Brain, Trash2, Pencil, Pin, Archive, Database, CheckSquare, Square, ListChecks, RotateCcw, Wand2, Folder } from "lucide-react";
+import { Menu, LayoutDashboard, Plus, MoreVertical, User, Search, Settings, Brain, Trash2, Pencil, Pin, Archive, Database, CheckSquare, Square, ListChecks, RotateCcw, Wand2, Folder, Globe } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/store/authStore";
 import { api } from "@/lib/api";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -45,6 +46,7 @@ function Section({
   onBatchDelete: (keys: string[]) => void;
   activeKey: string | null;
 }) {
+  const { t } = useTranslation();
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
 
@@ -96,14 +98,14 @@ function Section({
             <>
               <button
                 onClick={handleSelectAll}
-                title="全选/取消全选"
+                title={t('selectAllOrCancel')}
                 className="p-1 hover:bg-zinc-200 rounded text-zinc-500 transition-colors"
               >
                 <ListChecks className="h-3.5 w-3.5" />
               </button>
               <button
                 onClick={handleInvertSelection}
-                title="反选"
+                title={t('invertSelection')}
                 className="p-1 hover:bg-zinc-200 rounded text-zinc-500 transition-colors"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
@@ -111,7 +113,7 @@ function Section({
               <button
                 onClick={handleBatchDelete}
                 disabled={selectedKeys.length === 0}
-                title="批量删除"
+                title={t('batchDelete')}
                 className={`p-1 rounded transition-colors ${
                   selectedKeys.length > 0 
                     ? "hover:bg-red-100 text-red-500" 
@@ -124,7 +126,7 @@ function Section({
                 onClick={() => setIsSelectionMode(false)}
                 className="text-[10px] font-medium px-1.5 py-0.5 hover:bg-zinc-200 rounded text-zinc-500 transition-colors ml-1"
               >
-                取消
+                {t('cancel')}
               </button>
             </>
           ) : (
@@ -191,7 +193,7 @@ function Section({
                     }}
                   >
                     <Pencil className="mr-2 h-4 w-4" />
-                    <span>重命名</span>
+                    <span>{t('rename')}</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={(e) => {
@@ -206,7 +208,7 @@ function Section({
                     }}
                   >
                     <Pin className="mr-2 h-4 w-4" />
-                    <span>{item.pinned ? "取消置顶" : "置顶"}</span>
+                    <span>{item.pinned ? t('unpin') : t('pin')}</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={(e) => {
@@ -221,7 +223,7 @@ function Section({
                     }}
                   >
                     <Archive className="mr-2 h-4 w-4" />
-                    <span>{item.archived ? "取消归档" : "归档"}</span>
+                    <span>{item.archived ? t('unarchive') : t('archive')}</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={(e) => {
@@ -237,7 +239,7 @@ function Section({
                     className="text-red-600 focus:text-red-600 focus:bg-red-50"
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    <span>删除会话</span>
+                    <span>{t('deleteSession')}</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -254,6 +256,7 @@ function SidebarBody() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
+  const { t, i18n } = useTranslation();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   
@@ -324,7 +327,7 @@ function SidebarBody() {
   };
 
   const handleDeleteSession = async (key: string) => {
-    if (!window.confirm("确定要删除这个会话吗？")) return;
+    if (!window.confirm(t('confirmDeleteSession'))) return;
     try {
       await api.delete(`/nanobot/sessions/${encodeURIComponent(key)}`);
       if (activeSessionKey === key) {
@@ -338,7 +341,7 @@ function SidebarBody() {
   };
 
   const handleBatchDelete = async (keys: string[]) => {
-    if (!window.confirm(`确定要删除选中的 ${keys.length} 个会话吗？`)) return;
+    if (!window.confirm(t('confirmBatchDeleteSessions', { count: keys.length }))) return;
     try {
       await api.post("/nanobot/sessions/batch-delete", { session_ids: keys });
       if (keys.includes(activeSessionKey)) {
@@ -444,7 +447,7 @@ function SidebarBody() {
         <Link to="/" className="flex items-center gap-1.5 text-zinc-700 font-bold text-lg hover:opacity-80 transition-opacity">
           <span className="text-xl leading-none mr-0.5">🦞</span>
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-zinc-800 to-zinc-600">
-            龙虾问数
+            {t('lobsterDataQA')}
           </span>
         </Link>
         <div className="w-8" />
@@ -457,7 +460,7 @@ function SidebarBody() {
           onClick={() => navigate("/dashboard")}
         >
           <LayoutDashboard className="h-4.5 w-4.5 mr-2 text-zinc-600" />
-          Dashboard
+          {t('dashboardMenu')}
         </Button>
         
         <Button 
@@ -466,7 +469,7 @@ function SidebarBody() {
           onClick={handleNewThread}
         >
           <Plus className="h-4 w-4 mr-2" />
-          New Thread
+          {t('newThread')}
         </Button>
       </div>
 
@@ -477,13 +480,13 @@ function SidebarBody() {
             <Input
               value={sessionFilter}
               onChange={(e) => setSessionFilter(e.target.value)}
-              placeholder="过滤会话名称"
+              placeholder={t('filterSessionName')}
               className="pl-9 h-9 border-zinc-200 bg-white"
             />
           </div>
         </div>
         <Section 
-          title="THREADS" 
+          title={t('threads')} 
           count={activeSessions.length} 
           items={activeSessions} 
           onSelect={handleSelectSession}
@@ -495,7 +498,7 @@ function SidebarBody() {
           activeKey={activeSessionKey}
         />
         <Section 
-          title="ARCHIVED_THREADS" 
+          title={t('archivedThreads')} 
           count={archivedSessions.length} 
           items={archivedSessions} 
           onSelect={handleSelectSession}
@@ -511,13 +514,13 @@ function SidebarBody() {
       <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>重命名会话</DialogTitle>
+            <DialogTitle>{t('renameSession')}</DialogTitle>
           </DialogHeader>
           <div className="py-4">
             <Input 
               value={newTitle} 
               onChange={(e) => setNewTitle(e.target.value)} 
-              placeholder="输入新的会话标题" 
+              placeholder={t('enterNewSessionTitle')} 
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -527,8 +530,8 @@ function SidebarBody() {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>取消</Button>
-            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleRename}>保存</Button>
+            <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>{t('cancel')}</Button>
+            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleRename}>{t('save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -543,7 +546,7 @@ function SidebarBody() {
               <User className="h-4.5 w-4.5" />
             </div>
             <div className="text-sm font-medium truncate max-w-[100px] text-left">
-              {user?.username || 'User'}
+              {user?.username || t('defaultUser')}
             </div>
           </button>
           
@@ -552,7 +555,7 @@ function SidebarBody() {
             onClick={() => navigate("/skills")}
           >
             <Wand2 className="h-4 w-4" />
-            技能中心
+            {t('skillCenter')}
           </button>
         </div>
 
@@ -572,7 +575,7 @@ function SidebarBody() {
               }}
             >
               <Folder className="h-4 w-4 text-zinc-500" />
-              项目管理
+              {t('projectManagement')}
             </button>
 
             <button 
@@ -583,7 +586,7 @@ function SidebarBody() {
               }}
             >
               <Database className="h-4 w-4 text-zinc-500" />
-              数据源管理
+              {t('dataSourceManagement')}
             </button>
 
             <button 
@@ -594,7 +597,7 @@ function SidebarBody() {
               }}
             >
               <Settings className="h-4 w-4 text-zinc-500" />
-              个人设置
+              {t('personalSettings')}
             </button>
 
             {user?.is_admin && (
@@ -607,18 +610,18 @@ function SidebarBody() {
                   }}
                 >
                   <Brain className="h-4 w-4 text-zinc-500" />
-                  模型配置
+                  {t('modelConfig')}
                 </button>
                 
                 <button 
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50 transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 transition-colors"
                   onClick={() => {
                     navigate("/users");
                     setShowUserMenu(false);
                   }}
                 >
                   <User className="h-4 w-4" />
-                  用户管理
+                  {t('userManagement')}
                 </button>
               </>
             )}
@@ -626,10 +629,21 @@ function SidebarBody() {
             <div className="h-px bg-zinc-100 my-1 mx-2" />
             
             <button 
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 transition-colors"
+              onClick={() => {
+                i18n.changeLanguage(i18n.language === 'zh' ? 'en' : 'zh');
+                setShowUserMenu(false);
+              }}
+            >
+              <Globe className="h-4 w-4 text-zinc-500" />
+              {i18n.language === 'zh' ? 'English' : '中文'}
+            </button>
+            
+            <button 
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
               onClick={handleLogout}
             >
-              退出登录
+              {t('logout')}
             </button>
           </div>
         )}

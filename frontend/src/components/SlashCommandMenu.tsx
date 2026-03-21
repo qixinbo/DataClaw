@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from "@/lib/utils";
 
 interface Skill {
@@ -17,6 +18,7 @@ interface SlashCommandMenuProps {
 }
 
 export function SlashCommandMenu({ isOpen, skills, selectedIndex, onSelect, onClose }: SlashCommandMenuProps) {
+  const { t } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
 
@@ -60,7 +62,7 @@ export function SlashCommandMenu({ isOpen, skills, selectedIndex, onSelect, onCl
             )}
           >
             <span className="font-bold text-blue-400 shrink-0 font-mono">/{skill.name}</span>
-            <span className="text-zinc-400 truncate text-xs">{skill.description || "无描述"}</span>
+            <span className="text-zinc-400 truncate text-xs">{skill.description || t('noDescription')}</span>
           </button>
         ))}
       </div>

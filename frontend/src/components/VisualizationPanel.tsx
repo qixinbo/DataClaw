@@ -8,9 +8,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useDashboardStore, type ChartConfig } from "@/store/dashboardStore";
 import { useVisualizationStore } from "@/store/visualizationStore";
 import { useProjectStore } from "@/store/projectStore";
+import { useTranslation } from "react-i18next";
 import { VegaChart } from "./VegaChart";
 
 export function VisualizationPanel() {
+  const { t } = useTranslation();
   const [view, setView] = useState<'table' | 'chart'>('chart');
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingChart, setPendingChart] = useState<Omit<ChartConfig, 'layout'> | null>(null);
@@ -206,9 +208,9 @@ export function VisualizationPanel() {
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>确认加入 Dashboard</DialogTitle>
+            <DialogTitle>{t('confirmAddToDashboard')}</DialogTitle>
             <DialogDescription>
-              将当前图表添加到 Dashboard，是否继续？
+              {t('confirmAddChartToDashboardDesc')}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -219,9 +221,9 @@ export function VisualizationPanel() {
                 setPendingChart(null);
               }}
             >
-              取消
+              {t('cancel')}
             </Button>
-            <Button onClick={handleConfirmAdd}>确认添加</Button>
+            <Button onClick={handleConfirmAdd}>{t('confirmAdd')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

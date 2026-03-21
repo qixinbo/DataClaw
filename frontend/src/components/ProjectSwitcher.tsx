@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ChevronDown, Plus, Folder } from 'lucide-react';
-import { useProjectStore, type Project } from '@/store/projectStore';
+import { useProjectStore } from '@/store/projectStore';
 import {
   DropdownMenu,
   DropdownMenuContent,

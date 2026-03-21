@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +9,7 @@ import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 
 export function Settings() {
+  const { t } = useTranslation();
   const { user, updateUser } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,7 +30,7 @@ export function Settings() {
     setSuccess('');
     
     if (isPasswordMismatch) {
-      setError("两次输入的密码不一致");
+      setError(t('passwordsDoNotMatch'));
       return;
     }
 
@@ -44,9 +46,9 @@ export function Settings() {
 
         if (user && user.id) {
             const response = await api.put<any>(`/api/v1/users/${user.id}`, updateData);
-            let successMsg = "个人设置保存成功！";
+            let successMsg = t('personalSettingsSaved');
             if (password) {
-              successMsg = "个人设置及密码修改成功！";
+              successMsg = t('personalSettingsAndPasswordSaved');
             }
             setSuccess(successMsg);
             setPassword('');
@@ -57,7 +59,7 @@ export function Settings() {
         }
     } catch (error: any) {
         console.error("Failed to save settings", error);
-        setError(error.message || "保存设置失败");
+        setError(error.message || t('failedToSaveSettings'));
     } finally {
         setIsSaving(false);
     }
@@ -79,23 +81,23 @@ export function Settings() {
           
           <Card className="border-zinc-200 shadow-sm">
             <CardHeader>
-              <CardTitle className="text-xl">账号信息</CardTitle>
-              <CardDescription>修改您的登录邮箱和密码</CardDescription>
+              <CardTitle className="text-xl">{t('accountInfo')}</CardTitle>
+              <CardDescription>{t('modifyLoginEmailAndPassword')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username">用户名</Label>
+                <Label htmlFor="username">{t('username')}</Label>
                 <Input 
                   id="username" 
                   value={user?.username || ''}
                   disabled
                   className="bg-zinc-50 text-zinc-500"
                 />
-                <p className="text-xs text-zinc-400">用户名不可修改</p>
+                <p className="text-xs text-zinc-400">{t('usernameCannotBeModified')}</p>
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="email">邮箱地址</Label>
+                <Label htmlFor="email">{t('emailAddress')}</Label>
                 <Input 
                   id="email" 
                   type="email"
@@ -105,11 +107,11 @@ export function Settings() {
               </div>
 
               <div className="space-y-2 pt-4 border-t border-zinc-100">
-                <Label htmlFor="new-password">新密码</Label>
+                <Label htmlFor="new-password">{t('newPassword')}</Label>
                 <Input 
                   id="new-password" 
                   type="password" 
-                  placeholder="如不修改请留空" 
+                  placeholder={t('leaveBlankIfNotModifying')} 
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);
@@ -119,18 +121,18 @@ export function Settings() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirm-password">确认新密码</Label>
+                <Label htmlFor="confirm-password">{t('confirmNewPassword')}</Label>
                 <Input 
                   id="confirm-password" 
                   type="password" 
-                  placeholder="如不修改请留空" 
+                  placeholder={t('leaveBlankIfNotModifying')} 
                   value={confirmPassword}
                   onChange={(e) => {
                     setConfirmPassword(e.target.value);
                     setError('');
                   }}
                 />
-                {isPasswordMismatch && <p className="text-sm text-red-600">两次输入的密码不一致</p>}
+                {isPasswordMismatch && <p className="text-sm text-red-600">{t('passwordsDoNotMatch')}</p>}
               </div>
             </CardContent>
             <CardFooter className="bg-zinc-50/50 border-t border-zinc-100 pt-6">

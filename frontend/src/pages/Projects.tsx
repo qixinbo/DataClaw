@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Folder, Pencil, Trash2, Loader2, Database } from 'lucide-react';
 import { useProjectStore, type Project } from '@/store/projectStore';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useNavigate } from 'react-router-dom';
 
 export function Projects() {
+  const { t } = useTranslation();
   const { projects, loading, fetchProjects, addProject, updateProject, deleteProject, setCurrentProject } = useProjectStore();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -53,7 +55,7 @@ export function Projects() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm('Are you sure you want to delete this project? All associated data sources will be deleted.')) return;
+    if (!window.confirm(t('confirmDeleteProject'))) return;
     try {
       await deleteProject(id);
     } catch (error) {
@@ -76,44 +78,40 @@ export function Projects() {
     <div className="flex-1 flex flex-col h-full bg-zinc-50/30 overflow-hidden">
       <div className="h-14 px-6 flex items-center justify-between border-b border-zinc-100 bg-white">
         <div className="flex items-center gap-2 text-zinc-700 font-medium">
-          <Folder className="h-5 w-5 text-blue-500" />
-          项目管理
-        </div>
+          <Folder className="h-5 w-5 text-blue-500" />{t('projectManagement')}</div>
         <Button onClick={() => {
           setFormData({ name: '', description: '' });
           setIsCreateDialogOpen(true);
         }} size="sm" className="gap-2">
-          <Plus className="h-4 w-4" />
-          新建项目
-        </Button>
+          <Plus className="h-4 w-4" />{t('newProject')}</Button>
       </div>
 
       <div className="flex-1 p-6 overflow-auto">
         <div className="max-w-5xl mx-auto space-y-6">
           <Card className="border-zinc-200 shadow-sm">
             <CardHeader>
-              <CardTitle>项目列表</CardTitle>
-              <CardDescription>管理您的项目，不同项目拥有独立的数据源</CardDescription>
+              <CardTitle>{t('projectList')}</CardTitle>
+              <CardDescription>{t('manageProjectsDesc')}</CardDescription>
             </CardHeader>
             <CardContent>
               {loading && projects.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-zinc-400">
                   <Loader2 className="h-8 w-8 animate-spin mb-4" />
-                  <p>加载中...</p>
+                  <p>{t('loading')}</p>
                 </div>
               ) : projects.length === 0 ? (
                 <div className="text-center py-12 border-2 border-dashed rounded-lg border-zinc-100">
                   <Folder className="h-12 w-12 text-zinc-200 mx-auto mb-4" />
-                  <p className="text-zinc-500">暂无项目，请先创建一个</p>
+                  <p className="text-zinc-500">{t('noProjectsCreateOne')}</p>
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>名称</TableHead>
-                      <TableHead>描述</TableHead>
-                      <TableHead>创建时间</TableHead>
-                      <TableHead className="text-right">操作</TableHead>
+                      <TableHead>{t('name')}</TableHead>
+                      <TableHead>{t('description')}</TableHead>
+                      <TableHead>{t('createdAt')}</TableHead>
+                      <TableHead className="text-right">{t('actions')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -132,7 +130,7 @@ export function Projects() {
                               variant="ghost" 
                               size="sm" 
                               onClick={() => goToDataSources(project)}
-                              title="管理数据源"
+                              title={t('manageDataSources')}
                             >
                               <Database className="h-4 w-4 text-emerald-500" />
                             </Button>
@@ -140,7 +138,7 @@ export function Projects() {
                               variant="ghost" 
                               size="sm" 
                               onClick={() => openEditDialog(project)}
-                              title="编辑项目"
+                              title={t('editProject')}
                             >
                               <Pencil className="h-4 w-4 text-blue-500" />
                             </Button>
@@ -148,7 +146,7 @@ export function Projects() {
                               variant="ghost" 
                               size="sm" 
                               onClick={() => handleDelete(project.id)}
-                              title="删除项目"
+                              title={t('deleteProject')}
                             >
                               <Trash2 className="h-4 w-4 text-red-500" />
                             </Button>
@@ -168,32 +166,32 @@ export function Projects() {
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>新建项目</DialogTitle>
+            <DialogTitle>{t('newProject')}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">项目名称</Label>
+              <Label htmlFor="name">{t('projectName')}</Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="输入项目名称"
+                placeholder={t('enterProjectName')}
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="description">描述 (可选)</Label>
+              <Label htmlFor="description">{t('descriptionOptional')}</Label>
               <Textarea
                 id="description"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="输入项目描述"
+                placeholder={t('enterProjectDescription')}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>取消</Button>
+            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>{t('cancel')}</Button>
             <Button onClick={handleCreate} disabled={isSubmitting || !formData.name.trim()}>
-              {isSubmitting ? '创建中...' : '创建'}
+              {isSubmitting ? t('creating') : t('create')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -203,32 +201,32 @@ export function Projects() {
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>编辑项目</DialogTitle>
+            <DialogTitle>{t('editProject')}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="edit-name">项目名称</Label>
+              <Label htmlFor="edit-name">{t('projectName')}</Label>
               <Input
                 id="edit-name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="输入项目名称"
+                placeholder={t('enterProjectName')}
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-description">描述 (可选)</Label>
+              <Label htmlFor="edit-description">{t('descriptionOptional')}</Label>
               <Textarea
                 id="edit-description"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="输入项目描述"
+                placeholder={t('enterProjectDescription')}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>取消</Button>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>{t('cancel')}</Button>
             <Button onClick={handleUpdate} disabled={isSubmitting || !formData.name.trim()}>
-              {isSubmitting ? '保存中...' : '保存'}
+              {isSubmitting ? t('saving') : t('save')}
             </Button>
           </DialogFooter>
         </DialogContent>

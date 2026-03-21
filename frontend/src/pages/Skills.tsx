@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Trash2, Edit2, Plus, Terminal, Loader2, FolderOpen, Share2, Download, Eye, ShieldCheck, AlertCircle, Wand2, Upload } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Trash2, Terminal, Loader2, FolderOpen, Eye, ShieldCheck, AlertCircle, Wand2, Upload } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -28,11 +27,12 @@ interface Skill {
 }
 
 export function Skills() {
+  const { t } = useTranslation();
   const [skills, setSkills] = useState<Skill[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSkill, setEditingSkill] = useState<Skill | null>(null);
-  const [newSkill, setNewSkill] = useState<Partial<Skill>>({ type: 'python', content: '', source: '本地导入', status: '安全' });
+  const [newSkill, setNewSkill] = useState<Partial<Skill>>({ type: 'python', content: '', source: t('localImport'), status: t('safe') });
   const { currentProject } = useProjectStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -69,8 +69,8 @@ export function Skills() {
       await fetchSkills();
     } catch (error: any) {
       console.error("Failed to upload skill", error);
-      const errorMessage = error.response?.data?.detail || error.message || "未知错误";
-      alert("上传失败: " + errorMessage);
+      const errorMessage = error.response?.data?.detail || error.message || t('unknownError');
+      alert(t('uploadFailed') + ': ' + errorMessage);
     } finally {
       setIsLoading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -95,7 +95,7 @@ export function Skills() {
               await api.post<Skill>('/api/v1/skills', skillToCreate);
           }
           await fetchSkills();
-          setNewSkill({ type: 'python', content: '', source: '本地导入', status: '安全' });
+          setNewSkill({ type: 'python', content: '', source: t('localImport'), status: t('safe') });
           setEditingSkill(null);
           setIsDialogOpen(false);
       } catch (error) {
@@ -112,7 +112,7 @@ export function Skills() {
 
   const handleDeleteSkill = async (id: string) => {
     if (!currentProject) return;
-    if (!window.confirm("确定要删除这个技能吗？")) return;
+    if (!window.confirm(t('confirmDeleteSkill'))) return;
     try {
         await api.delete(`/api/v1/skills/${id}?project_id=${currentProject.id}`);
         setSkills(skills.filter(s => s.id !== id));
@@ -125,7 +125,7 @@ export function Skills() {
     return (
       <div className="h-full flex flex-col items-center justify-center text-zinc-500 gap-4">
         <FolderOpen className="h-12 w-12 text-zinc-200" />
-        <p>请先在顶部选择一个项目以管理其技能</p>
+        <p>{t('selectProjectToManageSkills')}</p>
       </div>
     );
   }
@@ -135,10 +135,8 @@ export function Skills() {
       <div className="border-b border-zinc-100 px-8 py-5 flex items-center justify-between bg-white shrink-0">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900 flex items-center gap-2">
-            < Wand2 className="h-6 w-6 text-indigo-500" />
-            Skills 仓库 - {currentProject.name}
-          </h1>
-          <p className="text-sm text-zinc-500 mt-1">管理该项目的 AI 技能和工具，支持符合 agentskills.io 标准的文件上传</p>
+            < Wand2 className="h-6 w-6 text-indigo-500" />{t('skillsRepository', { project: currentProject.name })}</h1>
+          <p className="text-sm text-zinc-500 mt-1">{t('manageAiSkillsDesc')}</p>
         </div>
         <div className="flex gap-3">
           <input
@@ -152,9 +150,7 @@ export function Skills() {
             className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
             onClick={() => fileInputRef.current?.click()}
           >
-            <Upload className="h-4 w-4" />
-            上传 Skill
-          </Button>
+            <Upload className="h-4 w-4" />{t('uploadSkill')}</Button>
         </div>
       </div>
 
@@ -163,11 +159,11 @@ export function Skills() {
           <Table className="table-fixed w-full">
             <TableHeader className="bg-zinc-50/50">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="w-[40%] font-semibold text-zinc-700 py-3 px-4 text-sm">名称</TableHead>
-                <TableHead className="w-[15%] font-semibold text-zinc-700 py-3 px-4 text-sm">来源</TableHead>
-                <TableHead className="w-[15%] font-semibold text-zinc-700 py-3 px-4 text-sm text-center">安装时间</TableHead>
-                <TableHead className="w-[15%] font-semibold text-zinc-700 py-3 px-4 text-sm text-center">状态</TableHead>
-                <TableHead className="w-[15%] font-semibold text-zinc-700 py-3 px-4 text-sm text-right">操作</TableHead>
+                <TableHead className="w-[40%] font-semibold text-zinc-700 py-3 px-4 text-sm">{t('name')}</TableHead>
+                <TableHead className="w-[15%] font-semibold text-zinc-700 py-3 px-4 text-sm">{t('source')}</TableHead>
+                <TableHead className="w-[15%] font-semibold text-zinc-700 py-3 px-4 text-sm text-center">{t('installationTime')}</TableHead>
+                <TableHead className="w-[15%] font-semibold text-zinc-700 py-3 px-4 text-sm text-center">{t('status')}</TableHead>
+                <TableHead className="w-[15%] font-semibold text-zinc-700 py-3 px-4 text-sm text-right">{t('actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -214,11 +210,11 @@ export function Skills() {
                       </TableCell>
                       <TableCell className="py-4 px-4 text-center">
                         <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] md:text-xs font-medium whitespace-nowrap ${
-                          skill.status === '安全' 
+                          skill.status === t('safe') 
                           ? 'bg-green-50 text-green-700 border border-green-100' 
                           : 'bg-amber-50 text-amber-700 border border-amber-100'
                         }`}>
-                          {skill.status === '安全' ? (
+                          {skill.status === t('safe') ? (
                             <ShieldCheck className="h-3 w-3" />
                           ) : (
                             <AlertCircle className="h-3 w-3" />
@@ -259,7 +255,7 @@ export function Skills() {
                           <div className="p-4 bg-zinc-50 rounded-2xl">
                             <Terminal className="h-10 w-10 opacity-20" />
                           </div>
-                          <p className="text-sm">该项目尚无技能，点击“导入 Skill”开始</p>
+                          <p className="text-sm">{t('noSkillsInProjectClickImport')}</p>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -275,20 +271,20 @@ export function Skills() {
           setIsDialogOpen(open);
           if (!open) {
               setEditingSkill(null);
-              setNewSkill({ type: 'python', content: '', source: '本地导入', status: '安全' });
+              setNewSkill({ type: 'python', content: '', source: t('localImport'), status: t('safe') });
           }
       }}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col rounded-2xl p-0 overflow-hidden">
           <DialogHeader className="p-6 pb-2">
-            <DialogTitle className="text-xl font-bold text-zinc-900">{editingSkill ? '查看/编辑技能' : '添加新技能'}</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-zinc-900">{editingSkill ? t('viewOrEditSkill') : t('addNewSkill')}</DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto px-6 py-2">
             <div className="grid gap-5">
               <div className="grid gap-1.5">
-                <Label htmlFor="name" className="text-zinc-600 font-medium text-sm">名称</Label>
+                <Label htmlFor="name" className="text-zinc-600 font-medium text-sm">{t('name')}</Label>
                 <Input 
                   id="name" 
-                  placeholder="技能名称"
+                  placeholder={t('skillName')}
                   value={newSkill.name || ''} 
                   onChange={(e) => setNewSkill({...newSkill, name: e.target.value})}
                   className="rounded-lg border-zinc-200 h-10" 
@@ -297,14 +293,14 @@ export function Skills() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="type" className="text-zinc-600 font-medium text-sm">类型</Label>
+                  <Label htmlFor="type" className="text-zinc-600 font-medium text-sm">{t('type')}</Label>
                   <Select 
                       value={newSkill.type} 
                       onValueChange={(val: any) => setNewSkill({...newSkill, type: val})}
                       disabled={editingSkill?.is_builtin}
                   >
                       <SelectTrigger className="rounded-lg border-zinc-200 h-10">
-                          <SelectValue placeholder="选择类型" />
+                          <SelectValue placeholder={t('selectType')} />
                       </SelectTrigger>
                       <SelectContent className="rounded-lg">
                           <SelectItem value="python">Python</SelectItem>
@@ -314,27 +310,27 @@ export function Skills() {
                   </Select>
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="status" className="text-zinc-600 font-medium text-sm">状态</Label>
+                  <Label htmlFor="status" className="text-zinc-600 font-medium text-sm">{t('status')}</Label>
                   <Select 
                       value={newSkill.status} 
                       onValueChange={(val: any) => setNewSkill({...newSkill, status: val})}
                       disabled={editingSkill?.is_builtin}
                   >
                       <SelectTrigger className="rounded-lg border-zinc-200 h-10">
-                          <SelectValue placeholder="选择状态" />
+                          <SelectValue placeholder={t('selectStatus')} />
                       </SelectTrigger>
                       <SelectContent className="rounded-lg">
-                          <SelectItem value="安全">安全</SelectItem>
-                          <SelectItem value="低风险">低风险</SelectItem>
+                          <SelectItem value={t('safe')}>{t('safe')}</SelectItem>
+                          <SelectItem value={t('lowRisk')}>{t('lowRisk')}</SelectItem>
                       </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="description" className="text-zinc-600 font-medium text-sm">描述</Label>
+                <Label htmlFor="description" className="text-zinc-600 font-medium text-sm">{t('description')}</Label>
                 <Textarea 
                   id="description" 
-                  placeholder="简要描述技能的功能..."
+                  placeholder={t('brieflyDescribeSkillFunction')}
                   value={newSkill.description || ''} 
                   onChange={(e) => setNewSkill({...newSkill, description: e.target.value})}
                   className="rounded-lg border-zinc-200 min-h-[80px] py-2 text-sm" 
@@ -342,13 +338,13 @@ export function Skills() {
                 />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="content" className="text-zinc-600 font-medium text-sm">内容</Label>
+                <Label htmlFor="content" className="text-zinc-600 font-medium text-sm">{t('content')}</Label>
                 <Textarea 
                   id="content" 
                   value={newSkill.content || ''} 
                   onChange={(e) => setNewSkill({...newSkill, content: e.target.value})}
                   className="rounded-lg border-zinc-200 font-mono text-xs min-h-[160px] py-3 bg-zinc-50" 
-                  placeholder="Python 代码、SQL 查询模板或 API 规范..."
+                  placeholder={t('pythonSqlApiContentPlaceholder')}
                   disabled={editingSkill?.is_builtin}
                 />
               </div>
@@ -356,9 +352,7 @@ export function Skills() {
           </div>
           <DialogFooter className="p-6 pt-2">
             {!editingSkill?.is_builtin && (
-              <Button onClick={handleAddSkill} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-6 h-10 w-full">
-                保存技能
-              </Button>
+              <Button onClick={handleAddSkill} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-6 h-10 w-full">{t('saveSkill')}</Button>
             )}
           </DialogFooter>
         </DialogContent>

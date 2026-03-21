@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Check, AlertTriangle, Upload } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
 
 export interface DataSourceConfig {
@@ -19,6 +20,7 @@ interface DataSourceFormProps {
 }
 
 export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: DataSourceFormProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState(initialData?.name || "");
   const [type, setType] = useState(initialData?.type || "postgres");
   const [config, setConfig] = useState<Record<string, any>>(initialData?.config || {});
@@ -52,7 +54,7 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
       }
     } catch (error) {
       console.error("Upload failed", error);
-      alert("上传失败");
+      alert(t('uploadFailed'));
     } finally {
       setIsUploading(false);
       // Clear input value so same file can be selected again
@@ -69,12 +71,12 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
       const success = await onTest(type, config);
       setTestResult({
         success,
-        message: success ? "连接成功" : "连接失败",
+        message: success ? t('connectionSuccess') : t('connectionFailed'),
       });
     } catch (e: any) {
       setTestResult({
         success: false,
-        message: e.message || "连接失败",
+        message: e.message || t('connectionFailed'),
       });
     } finally {
       setIsTesting(false);
@@ -141,7 +143,7 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
               />
             </div>
             <div className="text-xs text-zinc-500 pt-2">
-              或者直接使用 Supabase 控制台提供的 Connection String (URI):
+              {t('orUseSupabaseConnectionString')}
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Connection String</label>
@@ -206,7 +208,7 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
               />
             </div>
             <div className="text-xs text-zinc-500 pt-2">
-              或者使用连接字符串 (覆盖上述设置):
+              {t('orUseConnectionString')}
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Connection String</label>
@@ -273,7 +275,7 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
         return (
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">文件上传</label>
+              <label className="text-sm font-medium">{t('fileUpload')}</label>
               <div className="flex gap-2">
                 <Input 
                   value={config.file_path || ""} 
@@ -292,7 +294,7 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
                   onChange={handleFileUpload}
                 />
               </div>
-              <p className="text-xs text-zinc-500">上传文件或输入服务器路径</p>
+              <p className="text-xs text-zinc-500">{t('uploadFileOrEnterPath')}</p>
             </div>
           </div>
         );
@@ -300,9 +302,9 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
         return (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <AlertTriangle className="h-10 w-10 text-amber-500 mb-3" />
-            <h3 className="font-medium text-zinc-900">暂不支持该数据源类型</h3>
+            <h3 className="font-medium text-zinc-900">{t('unsupportedDataSourceType')}</h3>
             <p className="text-sm text-zinc-500 mt-1 max-w-[300px]">
-              该数据源连接器正在开发中。请尝试使用 PostgreSQL, ClickHouse 或文件上传。
+              {t('dataSourceConnectorInDevelopment')}
             </p>
           </div>
         );
@@ -312,18 +314,18 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-2">
-        <label className="text-sm font-medium">名称</label>
+        <label className="text-sm font-medium">{t('name')}</label>
         <Input 
           value={name} 
           onChange={e => setName(e.target.value)} 
-          placeholder="我的数据源" 
+          placeholder={t('myDataSource')} 
           required 
         />
       </div>
 
       {!initialData?.type && (
         <div className="space-y-2">
-          <label className="text-sm font-medium">类型</label>
+          <label className="text-sm font-medium">{t('type')}</label>
           <select
             className="w-full h-10 px-3 rounded-md border border-zinc-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-zinc-950 focus:border-transparent"
             value={type}
@@ -353,7 +355,7 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
 
       <div className="flex justify-end gap-3 pt-4">
         <Button type="button" variant="outline" onClick={onCancel}>
-          取消
+          {t('cancel')}
         </Button>
         <Button 
           type="button" 
@@ -362,11 +364,11 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
           disabled={isTesting}
         >
           {isTesting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          测试连接
+          {t('testConnection')}
         </Button>
         <Button type="submit" disabled={isSaving}>
           {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          保存
+          {t('save')}
         </Button>
       </div>
     </form>

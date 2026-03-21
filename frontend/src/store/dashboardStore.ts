@@ -57,7 +57,7 @@ function saveChartsToStorage(charts: ChartConfig[], projectId: number) {
   window.localStorage.setItem(getStorageKey(projectId), JSON.stringify(charts));
 }
 
-export const useDashboardStore = create<DashboardState>((set, get) => ({
+export const useDashboardStore = create<DashboardState>((set) => ({
   charts: [],
   loadCharts: (projectId) => {
     set({ charts: loadChartsFromStorage(projectId) });

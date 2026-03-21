@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from 'react-i18next';
 import { api } from "@/lib/api";
 import { DataSourceForm, type DataSourceConfig } from "@/components/DataSourceForm";
 import { Button } from "@/components/ui/button";
-import { Plus, Database, Pencil, Trash2, Loader2, FolderOpen, Info, ChevronLeft, FileText, Search, Network } from "lucide-react";
+import { Plus, Database, Pencil, Trash2, Loader2, Info, ChevronLeft, FileText, Search, Network } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useAuthStore } from "@/store/authStore";
 import { useProjectStore } from "@/store/projectStore";
 import { useNavigate } from "react-router-dom";
 
@@ -30,13 +30,13 @@ const SOURCE_TYPES = [
 ];
 
 export function DataSources() {
+  const { t } = useTranslation();
   const [datasources, setDatasources] = useState<DataSourceConfig[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [view, setView] = useState<"list" | "select-type">("list");
   const [isOpen, setIsOpen] = useState(false);
   const [editingDs, setEditingDs] = useState<DataSourceConfig | null>(null);
   const [selectedType, setSelectedType] = useState<string | null>(null);
-  const { user } = useAuthStore();
   const { currentProject } = useProjectStore();
   const navigate = useNavigate();
 
@@ -77,7 +77,7 @@ export function DataSources() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm("确定要删除这个数据源吗？")) return;
+    if (!window.confirm(t('confirmDeleteDataSource'))) return;
     try {
       await api.delete(`/api/v1/datasources/${id}`);
       fetchDataSources();
@@ -98,7 +98,7 @@ export function DataSources() {
       fetchDataSources();
     } catch (e) {
       console.error("Failed to save data source", e);
-      alert("保存失败: " + (e as any).message);
+      alert(t('saveFailed') + (e as any).message);
     }
   };
 
@@ -121,7 +121,7 @@ export function DataSources() {
             className="flex items-center text-zinc-500 hover:text-zinc-800 transition-colors mb-6 group"
           >
             <ChevronLeft className="h-4 w-4 mr-1 group-hover:-translate-x-0.5 transition-transform" />
-            返回列表
+            {t('backToList')}
           </button>
           
           <h1 className="text-2xl font-semibold text-zinc-800 mb-6">Connect an external data source</h1>
@@ -158,7 +158,7 @@ export function DataSources() {
           <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
-                {editingDs ? "编辑数据源" : `新建 ${SOURCE_TYPES.find(t => t.id === selectedType)?.name || ""} 数据源`}
+                {editingDs ? t('editDataSource') : t('createNewDataSourceWithType', { type: SOURCE_TYPES.find(t => t.id === selectedType)?.name || "" })}
               </DialogTitle>
             </DialogHeader>
             <div className="py-4">
@@ -179,12 +179,12 @@ export function DataSources() {
     <div className="h-full flex flex-col bg-white">
       <div className="border-b border-zinc-100 px-8 py-5 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900">数据源配置</h1>
-          <p className="text-sm text-zinc-500 mt-1">管理可用于问答的数据源连接</p>
+          <h1 className="text-2xl font-bold text-zinc-900">{t('dataSourceConfig')}</h1>
+          <p className="text-sm text-zinc-500 mt-1">{t('manageDataSourceConnections')}</p>
         </div>
         <Button onClick={handleCreate} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
           <Plus className="h-4 w-4" />
-          新建数据源
+          {t('newDataSource')}
         </Button>
       </div>
 
@@ -196,8 +196,8 @@ export function DataSources() {
         ) : datasources.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-zinc-200 rounded-xl bg-zinc-50/50">
             <Database className="h-10 w-10 text-zinc-300 mb-3" />
-            <p className="text-zinc-500 font-medium">暂无数据源</p>
-            <p className="text-zinc-400 text-sm mt-1">点击右上角按钮添加第一个数据源</p>
+            <p className="text-zinc-500 font-medium">{t('noDataSources')}</p>
+            <p className="text-zinc-400 text-sm mt-1">{t('clickTopRightToAddFirstDataSource')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -256,7 +256,7 @@ export function DataSources() {
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingDs ? `编辑 ${SOURCE_TYPES.find(t => t.id === editingDs.type)?.name || editingDs.type} 数据源` : `新建 ${SOURCE_TYPES.find(t => t.id === selectedType)?.name || ""} 数据源`}
+              {editingDs ? t('editDataSourceWithType', { type: SOURCE_TYPES.find(t => t.id === editingDs.type)?.name || editingDs.type }) : t('createNewDataSourceWithType', { type: SOURCE_TYPES.find(t => t.id === selectedType)?.name || "" })}
             </DialogTitle>
           </DialogHeader>
           <div className="py-4">

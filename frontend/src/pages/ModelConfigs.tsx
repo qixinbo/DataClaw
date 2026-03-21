@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from 'react-i18next';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ const defaultForm: Omit<ModelConfig, "id"> = {
 };
 
 export function ModelConfigs() {
+  const { t } = useTranslation();
   const { user } = useAuthStore();
   const isAdmin = !!user?.is_admin;
   const [configs, setConfigs] = useState<ModelConfig[]>([]);
@@ -99,7 +101,7 @@ export function ModelConfigs() {
 
   const handleTestConnection = async () => {
     if (!form.model || !form.provider) {
-      setError("请先填写必要信息（供应商、模型ID）");
+      setError(t('fillRequiredInfoFirst'));
       return;
     }
     setIsTesting(true);
@@ -111,7 +113,7 @@ export function ModelConfigs() {
           const parsed = JSON.parse(extraConfigText);
           if (parsed && typeof parsed === "object") extraHeaders = parsed;
         } catch (err) {
-          setError("额外配置必须是有效的JSON");
+          setError(t('extraConfigMustBeValidJson'));
           setIsTesting(false);
           return;
         }
@@ -126,9 +128,9 @@ export function ModelConfigs() {
       };
 
       await api.post("/api/v1/llm/test", payload);
-      alert("连接测试成功！");
+      alert(t('connectionTestSuccessful'));
     } catch (e: any) {
-      setError(e.message || "连接测试失败");
+      setError(e.message || t('connectionTestFailed'));
     } finally {
       setIsTesting(false);
     }
@@ -137,7 +139,7 @@ export function ModelConfigs() {
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!form.model || !form.provider) {
-      setError("请填写必填项");
+      setError(t('fillRequiredFields'));
       return;
     }
     setIsSaving(true);
@@ -149,7 +151,7 @@ export function ModelConfigs() {
           const parsed = JSON.parse(extraConfigText);
           if (parsed && typeof parsed === "object") extraHeaders = parsed;
         } catch (err) {
-          setError("额外配置必须是有效的JSON");
+          setError(t('extraConfigMustBeValidJson'));
           setIsSaving(false);
           return;
         }
@@ -168,14 +170,14 @@ export function ModelConfigs() {
       setDialogOpen(false);
       await fetchConfigs();
     } catch (e: any) {
-      setError(e.message || "保存配置失败");
+      setError(e.message || t('failedToSaveConfig'));
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm("确认删除该模型吗？")) return;
+    if (!window.confirm(t('confirmDeleteModel'))) return;
     try {
       await api.delete(`/api/v1/llm/${id}`);
       await fetchConfigs();
@@ -197,7 +199,7 @@ export function ModelConfigs() {
   if (!isAdmin) {
     return (
       <div className="flex-1 flex flex-col h-full bg-zinc-50/30 overflow-hidden items-center justify-center">
-        <div className="text-zinc-500 text-lg">无权限访问此页面，请使用管理员账号登录。</div>
+        <div className="text-zinc-500 text-lg">{t('noPermissionAdminOnly')}</div>
       </div>
     );
   }
@@ -206,21 +208,17 @@ export function ModelConfigs() {
     <div className="flex-1 flex flex-col h-full bg-zinc-50/30 overflow-hidden">
       <div className="h-14 px-6 flex items-center justify-between border-b border-zinc-100 bg-white">
         <div className="flex items-center gap-2 text-zinc-700 font-medium">
-          <Brain className="h-5 w-5 text-indigo-500" />
-          模型配置
-        </div>
+          <Brain className="h-5 w-5 text-indigo-500" />{t('modelConfig')}</div>
         <div className="flex items-center gap-3">
           <div className="relative">
             <Search className="h-4 w-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <Input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="搜索模型..." className="w-[200px] pl-9 h-8 text-sm" />
+            <Input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder={t('searchModel')} className="w-[200px] pl-9 h-8 text-sm" />
           </div>
           <Button variant="outline" size="icon" className="h-8 w-8 text-zinc-500" onClick={fetchConfigs}>
             <RefreshCw className="h-4 w-4" />
           </Button>
           <Button className="h-8 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm" onClick={openCreate}>
-            <Plus className="h-4 w-4 mr-1" />
-            添加模型
-          </Button>
+            <Plus className="h-4 w-4 mr-1" />{t('addModel')}</Button>
         </div>
       </div>
 
@@ -234,19 +232,17 @@ export function ModelConfigs() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>模型名称</TableHead>
-                  <TableHead>供应商</TableHead>
-                  <TableHead>模型标识</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead className="text-right">操作</TableHead>
+                  <TableHead>{t('modelName')}</TableHead>
+                  <TableHead>{t('provider')}</TableHead>
+                  <TableHead>{t('modelIdentifier')}</TableHead>
+                  <TableHead>{t('status')}</TableHead>
+                  <TableHead className="text-right">{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredConfigs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center h-24 text-zinc-500">
-                      暂无模型数据
-                    </TableCell>
+                    <TableCell colSpan={5} className="text-center h-24 text-zinc-500">{t('noModelData')}</TableCell>
                   </TableRow>
                 ) : (
                   filteredConfigs.map((item) => (
@@ -260,9 +256,9 @@ export function ModelConfigs() {
                         <span 
                           onClick={() => handleSetDefault(item)}
                           className={`inline-flex px-2 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${item.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
-                          title={item.is_active ? "当前默认模型" : "点击设为默认"}
+                          title={item.is_active ? t('currentDefaultModel') : t('clickToSetDefault')}
                         >
-                          {item.is_active ? '默认' : '设为默认'}
+                          {item.is_active ? t('default') : t('setDefault')}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
@@ -296,18 +292,18 @@ export function ModelConfigs() {
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <form onSubmit={handleSave}>
             <DialogHeader>
-              <DialogTitle>{editingId ? "编辑模型" : "添加模型"}</DialogTitle>
+              <DialogTitle>{editingId ? t('editModel') : t('addModel')}</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               {error && <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-md p-2">{error}</div>}
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>模型名称</Label>
-                  <Input value={form.name || ""} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder="如：GPT-4" />
+                  <Label>{t('modelName')}</Label>
+                  <Input value={form.name || ""} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder={t('egGpt4')} />
                 </div>
                 <div className="space-y-2">
-                  <Label>供应商 *</Label>
+                  <Label>{t('providerRequired')}</Label>
                   <Select value={form.provider} onValueChange={(v) => setForm((p) => ({ ...p, provider: v || "openai" }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent className="max-h-[300px]">
@@ -318,10 +314,10 @@ export function ModelConfigs() {
                       <SelectItem value="gemini">Google AI Studio (Gemini)</SelectItem>
                       <SelectItem value="bedrock">AWS Bedrock</SelectItem>
                       <SelectItem value="deepseek">DeepSeek</SelectItem>
-                      <SelectItem value="zhipuai">ZhipuAI (智谱)</SelectItem>
+                      <SelectItem value="zhipuai">{t('zhipuAi')}</SelectItem>
                       <SelectItem value="moonshot">Moonshot (Kimi)</SelectItem>
-                      <SelectItem value="dashscope">DashScope (通义千问)</SelectItem>
-                      <SelectItem value="volcengine">Volcengine (火山引擎)</SelectItem>
+                      <SelectItem value="dashscope">{t('dashScope')}</SelectItem>
+                      <SelectItem value="volcengine">{t('volcengine')}</SelectItem>
                       <SelectItem value="groq">Groq</SelectItem>
                       <SelectItem value="cohere">Cohere</SelectItem>
                       <SelectItem value="mistral">Mistral</SelectItem>
@@ -336,12 +332,12 @@ export function ModelConfigs() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>模型ID *</Label>
-                  <Input value={form.model || ""} onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))} placeholder="如：gpt-4-turbo" required />
+                  <Label>{t('modelIdRequired')}</Label>
+                  <Input value={form.model || ""} onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))} placeholder={t('egGpt4Turbo')} required />
                 </div>
                 <div className="space-y-2">
-                  <Label>API 域名</Label>
-                  <Input value={form.api_base || ""} onChange={(e) => setForm((p) => ({ ...p, api_base: e.target.value }))} placeholder="如：https://api.openai.com/v1" />
+                  <Label>{t('apiDomain')}</Label>
+                  <Input value={form.api_base || ""} onChange={(e) => setForm((p) => ({ ...p, api_base: e.target.value }))} placeholder={t('egApiDomain')} />
                 </div>
               </div>
 
@@ -353,7 +349,7 @@ export function ModelConfigs() {
                     value={form.api_key || ""}
                     onChange={(e) => setForm((p) => ({ ...p, api_key: e.target.value }))}
                     className="pr-10"
-                    placeholder="不修改请留空"
+                    placeholder={t('leaveBlankIfNotModifying')}
                   />
                   <button
                     type="button"
@@ -366,7 +362,7 @@ export function ModelConfigs() {
               </div>
 
               <div className="space-y-2">
-                <Label>额外配置 (JSON)</Label>
+                <Label>{t('extraConfigJson')}</Label>
                 <Textarea value={extraConfigText} onChange={(e) => setExtraConfigText(e.target.value)} className="min-h-[80px] font-mono text-xs" placeholder='{"timeout": "60"}' />
               </div>
             </div>
@@ -376,7 +372,7 @@ export function ModelConfigs() {
                 测试连接
               </Button>
               <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>{t('cancel')}</Button>
                 <Button type="submit" disabled={isSaving} className="bg-indigo-600 hover:bg-indigo-700 text-white">
                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   保存
