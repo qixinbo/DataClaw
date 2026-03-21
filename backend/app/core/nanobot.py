@@ -108,8 +108,10 @@ class NanobotIntegration:
     def _register_custom_tools(self, agent: AgentLoop):
         from app.tools.nl2sql import NL2SQLTool
         from app.tools.visualization import VisualizationTool
+        from app.tools.get_schema import GetDatabaseSchemaTool
         agent.tools.register(NL2SQLTool())
         agent.tools.register(VisualizationTool())
+        agent.tools.register(GetDatabaseSchemaTool())
 
     def _make_provider(self, config: Config):
         # Logic adapted from nanobot/cli/commands.py

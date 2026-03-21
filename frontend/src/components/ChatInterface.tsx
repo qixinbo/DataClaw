@@ -958,7 +958,8 @@ export function ChatInterface() {
             </div>
           ) : (
             <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
-              {messages.map((msg) => {
+              {messages.map((msg, msgIdx) => {
+                const isMessageGenerating = isLoading && msgIdx === messages.length - 1;
                 const { markdown, reportHtml } = splitReportHtml(msg.content);
                 const externalReportUrl = extractExternalReport(msg.content);
                 return (
@@ -992,17 +993,24 @@ export function ChatInterface() {
                         {msg.progressLogs && msg.progressLogs.length > 0 ? (
                           <div className="mb-2 rounded-xl border border-zinc-100 bg-zinc-50/70 px-3 py-2">
                             <div className="flex items-center gap-2 text-zinc-500 text-xs mb-1.5 pb-1.5 border-b border-zinc-100/50">
-                              {msg.awaitingFirstToken ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
-                              <span>{msg.awaitingFirstToken ? t('processing') : t('processCompleted')}</span>
+                              {isMessageGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
+                              <span>{isMessageGenerating ? t('processing') : t('processCompleted')}</span>
                             </div>
-                            <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
+                            <div 
+                              className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1"
+                              ref={(el) => {
+                                if (el && isMessageGenerating) {
+                                  el.scrollTop = el.scrollHeight;
+                                }
+                              }}
+                            >
                               {msg.progressLogs.map((log, idx, arr) => {
                                 const isLast = idx === arr.length - 1;
-                                // 如果是正在处理的会话，且当前日志是最后一条，或者是明确包含“正在”的日志，则显示 loading
-                                const isLoadingLog = (isLast && msg.awaitingFirstToken) || log.includes(t('processingIndicator'));
+                                // 只有当是整个会话的最后一条消息，且当前日志是最后一条时，才显示 loading 动画
+                                const isLoadingLog = isLast && isMessageGenerating;
                                 return (
                                   <div key={`${msg.id}-log-${idx}`} className="flex items-start gap-2 text-[12px] text-zinc-500 leading-5">
-                                    {isLoadingLog && msg.awaitingFirstToken ? (
+                                    {isLoadingLog ? (
                                       <Settings className="mt-0.5 h-3.5 w-3.5 text-amber-500 animate-spin shrink-0" />
                                     ) : (
                                       <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 text-emerald-500 shrink-0" />

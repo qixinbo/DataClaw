@@ -246,6 +246,7 @@ async def nanobot_chat_stream(request: ChatRequest):
                     else:
                         yield f"data: {json.dumps({'type': 'progress', 'content': progress}, ensure_ascii=False)}\n\n"
                 except asyncio.TimeoutError:
+                    yield ": keep-alive\n\n"
                     continue
 
             response = await current_task

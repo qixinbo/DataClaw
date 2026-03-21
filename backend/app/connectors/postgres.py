@@ -29,7 +29,44 @@ class PostgresConnector:
             # Default schema for postgres is 'public', sqlite is None
             schema_name = 'public' if self.engine.dialect.name == 'postgresql' else None
             
-            for table_name in inspector.get_table_names(schema=schema_name):
+            table_names = inspector.get_table_names(schema=schema_name)
+            
+            # Use SQLAlchemy 2.0+ multi-fetch to avoid N+1 queries issue, especially over remote networks
+            if hasattr(inspector, 'get_multi_columns'):
+                multi_columns = inspector.get_multi_columns(schema=schema_name)
+                multi_pk = inspector.get_multi_pk_constraint(schema=schema_name)
+                multi_fk = inspector.get_multi_foreign_keys(schema=schema_name)
+                
+                for table_name in table_names:
+                    key = (schema_name, table_name)
+                    
+                    columns = []
+                    for col in multi_columns.get(key, []):
+                        columns.append({
+                            "name": col['name'], 
+                            "type": str(col['type'])
+                        })
+                        
+                    pk_constraint = multi_pk.get(key)
+                    pks = pk_constraint.get('constrained_columns', []) if pk_constraint else []
+                    
+                    foreign_keys = []
+                    for fk in multi_fk.get(key, []):
+                        foreign_keys.append({
+                            "constrained_columns": fk['constrained_columns'],
+                            "referred_table": fk['referred_table'],
+                            "referred_columns": fk['referred_columns']
+                        })
+                        
+                    schema[table_name] = {
+                        "columns": columns,
+                        "primary_keys": pks,
+                        "foreign_keys": foreign_keys
+                    }
+                return schema
+
+            # Fallback for older SQLAlchemy versions
+            for table_name in table_names:
                 columns = []
                 # get columns
                 for col in inspector.get_columns(table_name, schema=schema_name):
@@ -59,8 +96,10 @@ class PostgresConnector:
                 }
             return schema
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             print(f"Error getting schema: {e}")
-            return {}
+            raise e
 
     def test_connection(self) -> bool:
         try:

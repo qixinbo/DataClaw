@@ -74,14 +74,8 @@ class NL2SQLTool(Tool):
             # Call the core logic
             result = await process_nl2sql(request, on_progress=on_progress)
             
-            if result.error:
-                return f"Error executing query: {result.error}"
-
-            # Save the result data to context for potential later use by VisualizationTool
-            if result.result:
-                current_data.set(result.result)
-
-            # Save visualization payload to context so the chat stream can pick it up
+            # Always save visualization payload to context so the chat stream can pick it up
+            # Even if there's an error, we want the frontend to see the generated SQL
             viz_payload = _build_sql_chart_viz(result)
             existing_viz = current_viz_data.get()
             if isinstance(existing_viz, dict):
@@ -90,6 +84,13 @@ class NL2SQLTool(Tool):
                 current_viz_data.set(existing_viz)
             else:
                 current_viz_data.set(viz_payload)
+
+            if result.error:
+                return f"Error executing query: {result.error}\nGenerated SQL: {result.sql}"
+
+            # Save the result data to context for potential later use by VisualizationTool
+            if result.result:
+                current_data.set(result.result)
 
             # Build a summary string for the Agent to read
             row_count = len(result.result) if result.result else 0
