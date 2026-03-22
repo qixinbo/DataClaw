@@ -81,6 +81,53 @@ npm run dev
 
 ***
 
+## 🔌 数据源配置说明
+
+DataClaw 支持连接多种类型的数据源，以满足不同场景的分析需求。你可以在界面的 **Data Sources** 菜单中点击 **+** 新建并配置它们。以下是常见数据源的详细接入指南：
+
+<details>
+<summary><b>▶ PostgreSQL (pgsql)</b></summary>
+
+连接标准的关系型数据库。你既可以通过表单填充分散的参数，也可以直接粘贴完整的 Connection String。
+
+- **Host**: 数据库的主机地址。如果你是在本地电脑运行了数据库（如使用 pgAdmin），请填入 `127.0.0.1`（不要填 `localhost`，以避免 Unix Socket 解析错误）。
+- **Port**: 默认一般为 `5432`。
+- **Database**: 你要连接的具体数据库名称。
+- **Username / Password**: 数据库的认证凭据（默认用户通常是 `postgres`）。
+- **Connection String (可选)**: 也可以直接输入类似 `postgresql://postgres:你的密码@127.0.0.1:5432/你的数据库名` 的字符串，它将覆盖上述单独的输入框配置。
+</details>
+
+<details>
+<summary><b>▶ Supabase</b></summary>
+
+专门针对 Supabase 云端 PostgreSQL 数据库优化的连接方式，强制开启 SSL 且默认使用连接池以提高稳定性。
+
+- 推荐直接使用 **Connection String** 配置：
+  进入你的 Supabase 项目控制台 -> `Project Settings` -> `Database` -> `Connection string` -> 选择 `URI` 选项卡。
+  复制那串类似 `postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres?sslmode=require` 的链接并填入。
+- *注意*: Supabase 默认开启了 Transaction Pooler（端口 6543）。如果想要直连（Direct connection），请将端口改为 `5432`，并确保 URL 中包含 `sslmode=require`。
+</details>
+
+<details>
+<summary><b>▶ SQLite</b></summary>
+
+轻量级的本地文件型数据库，非常适合快速测试或分析单机应用数据。
+
+- **File Upload**: 你可以直接点击按钮，从本地上传 `.db`、`.sqlite` 或 `.sqlite3` 后缀的数据库文件。文件会被安全地保存在服务端的上传目录中供分析使用。
+- **File Path (进阶)**: 如果服务部署在服务器上，且 SQLite 文件已存在于服务器的某个绝对路径中，你也可以直接在输入框中填入该文件的绝对路径（如 `/data/my_app.db`）。
+</details>
+
+<details>
+<summary><b>▶ CSV</b></summary>
+
+最常见的数据交换格式，即插即用，无需复杂的数据库配置。
+
+- **File Upload**: 与 SQLite 类似，点击按钮选择本地的 `.csv` 文件上传即可。系统会在后台利用 DuckDB 或 Pandas 等引擎将其虚拟化为一个可供 SQL 查询的表。
+- 上传成功后，在对话界面中，你可以直接把这个 CSV 文件当作一张数据库表来“提问”！
+</details>
+
+***
+
 ## 🤝 参与贡献
 
 有个好点子？发现了一个 Bug？非常欢迎你的加入！随时可以提交 Issue 或 Pull Request。让我们一起让数据分析变得更加有趣！

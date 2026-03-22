@@ -81,6 +81,53 @@ Open your browser and navigate to `http://localhost:5173`. Boom! 🎉 You're rea
 
 ***
 
+## 🔌 Data Source Configuration Guide
+
+DataClaw supports connecting to various types of data sources to meet different analysis needs. You can click **+** in the **Data Sources** menu to create and configure them. Here are detailed connection guides for common data sources:
+
+<details>
+<summary><b>▶ PostgreSQL (pgsql)</b></summary>
+
+Connects to standard relational databases. You can either fill in the individual parameters through the form or paste a complete Connection String directly.
+
+- **Host**: The host address of the database. If you are running the database on your local machine (e.g., using pgAdmin), please enter `127.0.0.1` (do not enter `localhost` to avoid Unix Socket resolution errors).
+- **Port**: Typically defaults to `5432`.
+- **Database**: The specific name of the database you want to connect to.
+- **Username / Password**: Database authentication credentials (the default user is usually `postgres`).
+- **Connection String (Optional)**: You can also directly input a string like `postgresql://postgres:your_password@127.0.0.1:5432/your_database_name`, which will override the individual input fields above.
+</details>
+
+<details>
+<summary><b>▶ Supabase</b></summary>
+
+A connection method specifically optimized for Supabase cloud PostgreSQL databases, enforcing SSL and using connection pools by default to improve stability.
+
+- We recommend using the **Connection String** configuration directly:
+  Go to your Supabase project console -> `Project Settings` -> `Database` -> `Connection string` -> Select the `URI` tab.
+  Copy the link that looks like `postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres?sslmode=require` and paste it in.
+- *Note*: Supabase enables Transaction Pooler by default (Port 6543). If you want a Direct connection, change the port to `5432` and ensure the URL includes `sslmode=require`.
+</details>
+
+<details>
+<summary><b>▶ SQLite</b></summary>
+
+A lightweight local file-based database, perfect for quick testing or analyzing single-machine application data.
+
+- **File Upload**: You can directly click the button to upload a `.db`, `.sqlite`, or `.sqlite3` database file from your local machine. The file will be securely saved in the server's upload directory for analysis.
+- **File Path (Advanced)**: If the service is deployed on a server and the SQLite file already exists at an absolute path on the server, you can also enter the absolute path directly in the input box (e.g., `/data/my_app.db`).
+</details>
+
+<details>
+<summary><b>▶ CSV</b></summary>
+
+The most common data exchange format, plug-and-play, no complex database configuration required.
+
+- **File Upload**: Similar to SQLite, click the button to select and upload a local `.csv` file. The system will use engines like DuckDB or Pandas in the background to virtualize it into an SQL-queryable table.
+- Once uploaded successfully, you can query this CSV file directly as if it were a database table in the chat interface!
+</details>
+
+***
+
 ## 🤝 Contributing
 
 Got a cool idea? Found a bug? We'd love your help! Feel free to open an issue or submit a pull request. Let's make data analysis fun again!
