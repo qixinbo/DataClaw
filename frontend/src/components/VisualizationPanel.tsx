@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Code, Table as TableIcon, BarChart as ChartIcon, Download, LayoutDashboard, Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -16,9 +17,22 @@ export function VisualizationPanel() {
   const [view, setView] = useState<'table' | 'chart'>('chart');
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingChart, setPendingChart] = useState<Omit<ChartConfig, 'layout'> | null>(null);
-  const { addChart } = useDashboardStore();
+  const [selectedDashboardId, setSelectedDashboardId] = useState<string>('');
+  const { dashboards, addChart, loadDashboards } = useDashboardStore();
   const { currentProject } = useProjectStore();
   const { currentData, currentSQL, currentChartSpec, currentChartInfo, isLoading, error } = useVisualizationStore();
+
+  useEffect(() => {
+    if (currentProject) {
+      loadDashboards(currentProject.id);
+    }
+  }, [currentProject, loadDashboards]);
+
+  useEffect(() => {
+    if (dashboards.length > 0 && !selectedDashboardId) {
+      setSelectedDashboardId(dashboards[0].id);
+    }
+  }, [dashboards, selectedDashboardId]);
 
   const buildPendingChart = (): Omit<ChartConfig, 'layout'> | null => {
     if (!currentData || !currentSQL) return null;
@@ -54,8 +68,8 @@ export function VisualizationPanel() {
   };
 
   const handleConfirmAdd = () => {
-    if (!pendingChart || !currentProject) return;
-    addChart(pendingChart, currentProject.id);
+    if (!pendingChart || !currentProject || !selectedDashboardId) return;
+    addChart(pendingChart, selectedDashboardId, currentProject.id);
     setConfirmOpen(false);
     setPendingChart(null);
   };
@@ -127,7 +141,7 @@ export function VisualizationPanel() {
             </Button>
            </div>
            
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleAddToDashboard}>
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleAddToDashboard} disabled={dashboards.length === 0}>
             <LayoutDashboard className="h-3.5 w-3.5 mr-1.5" />
             Add to Dashboard
           </Button>
@@ -208,11 +222,26 @@ export function VisualizationPanel() {
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{t('confirmAddToDashboard')}</DialogTitle>
+            <DialogTitle>{t('pinChartToDashboard')}</DialogTitle>
             <DialogDescription>
-              {t('confirmAddChartToDashboardDesc')}
+              {t('selectDashboardToPin')}
             </DialogDescription>
           </DialogHeader>
+          <div className="py-4">
+            <label className="text-sm font-medium mb-2 block">{t('dashboardMenu')}</label>
+            <Select value={selectedDashboardId} onValueChange={(val) => { if (val) setSelectedDashboardId(val); }}>
+              <SelectTrigger>
+                <SelectValue placeholder={t('selectDashboard')}>
+                  {dashboards.find(d => d.id === selectedDashboardId)?.name || t('selectDashboard')}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {dashboards.map(d => (
+                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <DialogFooter>
             <Button
               variant="outline"
@@ -223,7 +252,7 @@ export function VisualizationPanel() {
             >
               {t('cancel')}
             </Button>
-            <Button onClick={handleConfirmAdd}>{t('confirmAdd')}</Button>
+            <Button onClick={handleConfirmAdd} disabled={!selectedDashboardId}>{t('submit')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

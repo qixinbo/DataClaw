@@ -45,14 +45,20 @@ function inferChartKeys(data: Record<string, unknown>[]) {
 
 export function Dashboard() {
   const { t } = useTranslation();
-  const { charts, removeChart, updateLayout, loadCharts } = useDashboardStore();
+  const { dashboards, activeDashboardId, removeChart, updateLayout, loadDashboards } = useDashboardStore();
   const { currentProject } = useProjectStore();
 
   useEffect(() => {
     if (currentProject) {
-      loadCharts(currentProject.id);
+      loadDashboards(currentProject.id);
     }
-  }, [currentProject, loadCharts]);
+  }, [currentProject, loadDashboards]);
+
+  const activeDashboard = useMemo(() => {
+    return dashboards.find((d) => d.id === activeDashboardId) || dashboards[0] || null;
+  }, [dashboards, activeDashboardId]);
+
+  const charts = activeDashboard?.charts || [];
 
   const ResponsiveGridLayout = useMemo(
     () => WidthProvider(Responsive as any) as any,
@@ -64,7 +70,7 @@ export function Dashboard() {
   }), [charts]);
 
   const onLayoutChange = (currentLayout: any[]) => {
-    if (currentProject) {
+    if (currentProject && activeDashboard) {
       updateLayout(
         currentLayout.map((item) => ({
           i: item.i,
@@ -73,6 +79,7 @@ export function Dashboard() {
           w: item.w,
           h: item.h,
         })),
+        activeDashboard.id,
         currentProject.id
       );
     }
@@ -86,7 +93,16 @@ export function Dashboard() {
     );
   }
 
-  if (charts.length === 0) {
+  if (dashboards.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+        <p>{t('noDashboardsInCurrentProject')}</p>
+        <p className="text-sm">{t('createDashboardToGetStarted')}</p>
+      </div>
+    );
+  }
+
+  if (!activeDashboard || charts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
         <p>{t('noChartsInCurrentProject')}</p>
@@ -97,7 +113,7 @@ export function Dashboard() {
 
   return (
     <div className="p-4 h-full overflow-y-auto">
-      <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
+      <h1 className="text-2xl font-bold mb-4">{activeDashboard.name || t('dashboardMenu')}</h1>
       <ResponsiveGridLayout
         className="layout"
         layouts={layouts}
@@ -129,7 +145,7 @@ export function Dashboard() {
                   variant="ghost" 
                   size="icon" 
                   className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={() => removeChart(chart.id, currentProject.id)}
+                  onClick={() => removeChart(chart.id, activeDashboard.id, currentProject.id)}
                 >
                   <X className="h-4 w-4" />
                 </Button>

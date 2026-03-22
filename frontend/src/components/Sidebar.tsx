@@ -6,6 +6,8 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/store/authStore";
+import { useProjectStore } from "@/store/projectStore";
+import { useDashboardStore } from "@/store/dashboardStore";
 import { api } from "@/lib/api";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -23,39 +25,26 @@ interface SessionInfo {
   };
 }
 
-function Section({
+function SectionHeader({
   title,
   count,
+  isSelectionMode,
+  setIsSelectionMode,
+  selectedKeys,
+  setSelectedKeys,
   items,
-  onSelect,
-  onDelete,
-  onRename,
-  onTogglePinned,
-  onToggleArchived,
-  onBatchDelete,
-  activeKey
+  onBatchDelete
 }: {
   title: string;
   count: number;
+  isSelectionMode: boolean;
+  setIsSelectionMode: (val: boolean) => void;
+  selectedKeys: string[];
+  setSelectedKeys: (val: string[] | ((prev: string[]) => string[])) => void;
   items: SessionInfo[];
-  onSelect: (key: string) => void;
-  onDelete: (key: string) => void;
-  onRename: (key: string, currentTitle: string) => void;
-  onTogglePinned: (key: string, pinned: boolean) => void;
-  onToggleArchived: (key: string, archived: boolean) => void;
   onBatchDelete: (keys: string[]) => void;
-  activeKey: string | null;
 }) {
   const { t } = useTranslation();
-  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
-
-  const toggleSelect = (key: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSelectedKeys(prev => 
-      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
-    );
-  };
 
   const handleSelectAll = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -84,12 +73,12 @@ function Section({
     if (!isSelectionMode) {
       setSelectedKeys([]);
     }
-  }, [isSelectionMode]);
+  }, [isSelectionMode, setSelectedKeys]);
 
   return (
-    <div className="px-3 pt-6">
-      <div className="flex items-center justify-between mb-2 px-1 group">
-        <div className="text-xs font-semibold text-zinc-500 flex items-center gap-1 uppercase tracking-wider">
+    <div className="px-3 pt-4 pb-1">
+      <div className="flex items-center justify-between px-1 group">
+        <div className="text-[14px] font-semibold text-zinc-500 flex items-center gap-1">
           {title}
           <span>({count})</span>
         </div>
@@ -140,7 +129,49 @@ function Section({
           )}
         </div>
       </div>
-      <div className="space-y-0.5 mt-2">
+    </div>
+  );
+}
+
+function Section({
+  items,
+  onSelect,
+  onDelete,
+  onRename,
+  onTogglePinned,
+  onToggleArchived,
+  onBatchDelete,
+  activeKey,
+  isSelectionMode,
+  setIsSelectionMode,
+  selectedKeys,
+  setSelectedKeys
+}: {
+  items: SessionInfo[];
+  onSelect: (key: string) => void;
+  onDelete: (key: string) => void;
+  onRename: (key: string, currentTitle: string) => void;
+  onTogglePinned: (key: string, pinned: boolean) => void;
+  onToggleArchived: (key: string, archived: boolean) => void;
+  onBatchDelete: (keys: string[]) => void;
+  activeKey: string | null;
+  isSelectionMode: boolean;
+  setIsSelectionMode: (val: boolean) => void;
+  selectedKeys: string[];
+  setSelectedKeys: (val: string[] | ((prev: string[]) => string[])) => void;
+}) {
+  const { t } = useTranslation();
+
+  const toggleSelect = (key: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedKeys(prev => 
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+  };
+
+  return (
+    <div className="px-3 pb-2">
+      <div className="space-y-0 mt-1">
         {items.map((item) => {
           const displayTitle = item.metadata?.title || item.key.replace("api:", "");
           const isActive = activeKey === item.key;
@@ -149,11 +180,11 @@ function Section({
           return (
             <div
               key={item.key}
-              className={`w-full h-9 px-2 text-left rounded-md text-[14px] flex items-center justify-between group transition-colors cursor-pointer ${
+              className={`w-full h-8 px-2 text-left rounded-md text-[14px] flex items-center justify-between group transition-colors cursor-pointer ${
                 isActive && !isSelectionMode ? 'bg-zinc-100 text-zinc-900 font-medium' : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'
               } ${isSelected ? 'bg-indigo-50/50 text-indigo-700' : ''}`}
-              onClick={(e) => isSelectionMode ? toggleSelect(item.key, e) : onSelect(item.key)}
-            >
+                onClick={(e) => isSelectionMode ? toggleSelect(item.key, e) : onSelect(item.key)}
+              >
               <div className="truncate pr-2 flex-1 flex items-center gap-1.5 min-w-0">
                 {isSelectionMode ? (
                   <span 
@@ -242,7 +273,7 @@ function Section({
                     <span>{t('deleteSession')}</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
-              </DropdownMenu>
+                </DropdownMenu>
               )}
             </div>
           );
@@ -252,10 +283,100 @@ function Section({
   );
 }
 
+function DashboardSection({
+  title,
+  count,
+  items,
+  onSelect,
+  onDelete,
+  onRename,
+  onCreate,
+  activeId
+}: {
+  title: string;
+  count: number;
+  items: {id: string, name: string}[];
+  onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
+  onRename: (id: string, currentName: string) => void;
+  onCreate: () => void;
+  activeId: string | null;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="px-3 pt-4">
+      <div className="flex items-center justify-between mb-1.5 px-1 group">
+        <div className="text-[14px] font-semibold text-zinc-500 flex items-center gap-1">
+          {title}
+          <span>({count})</span>
+        </div>
+        <button
+          onClick={onCreate}
+          className="text-[10px] font-medium px-1.5 py-0.5 hover:bg-zinc-200 rounded text-zinc-500 transition-colors opacity-0 group-hover:opacity-100 flex items-center gap-0.5"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          {t('new')}
+        </button>
+      </div>
+      <div className="space-y-0 mt-1">
+        {items.map((item) => {
+          const isActive = activeId === item.id;
+          return (
+            <div
+              key={item.id}
+              className={`w-full h-8 px-2 text-left rounded-md text-[14px] flex items-center justify-between group transition-colors cursor-pointer ${
+                isActive ? 'bg-zinc-100 text-zinc-900 font-medium' : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'
+              }`}
+                onClick={() => onSelect(item.id)}
+              >
+              <div className="truncate pr-2 flex-1 flex items-center gap-1.5 min-w-0">
+                <span className="w-4 shrink-0 flex items-center justify-center">
+                  <LayoutDashboard className="h-3.5 w-3.5 text-zinc-400" />
+                </span>
+                <span className="truncate">{item.name}</span>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger onClick={(e) => e.stopPropagation()} className="h-6 w-6 flex items-center justify-center rounded hover:bg-zinc-200 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity outline-none">
+                  <MoreVertical className="h-4 w-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-32">
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onRename(item.id, item.name);
+                    }}
+                  >
+                    <Pencil className="mr-2 h-4 w-4" />
+                    <span>{t('rename')}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onDelete(item.id);
+                    }}
+                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    <span>{t('deleteSession')}</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            );
+          })}
+        </div>
+    </div>
+  );
+}
+
 function SidebarBody() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
+  const { currentProject } = useProjectStore();
+  const { dashboards, activeDashboardId, loadDashboards, createDashboard, deleteDashboard, renameDashboard, setActiveDashboard } = useDashboardStore();
   const { t, i18n } = useTranslation();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -266,10 +387,25 @@ function SidebarBody() {
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [sessionToRename, setSessionToRename] = useState<{key: string, title: string} | null>(null);
   const [newTitle, setNewTitle] = useState("");
-  
+
+  const [activeSelectionMode, setActiveSelectionMode] = useState(false);
+  const [activeSelectedKeys, setActiveSelectedKeys] = useState<string[]>([]);
+  const [archivedSelectionMode, setArchivedSelectionMode] = useState(false);
+  const [archivedSelectedKeys, setArchivedSelectedKeys] = useState<string[]>([]);
+
+  const [dashboardRenameDialogOpen, setDashboardRenameDialogOpen] = useState(false);
+  const [dashboardToRename, setDashboardToRename] = useState<{id: string, name: string} | null>(null);
+  const [newDashboardName, setNewDashboardName] = useState("");
+
   // Try to parse active session from URL query
   const queryParams = new URLSearchParams(location.search);
   const activeSessionKey = queryParams.get("session") || "api:default";
+
+  useEffect(() => {
+    if (currentProject) {
+      loadDashboards(currentProject.id);
+    }
+  }, [currentProject, loadDashboards]);
 
   const fetchSessions = async () => {
     try {
@@ -440,6 +576,44 @@ function SidebarBody() {
     return title.includes(normalizedFilter);
   });
 
+  const handleCreateDashboard = () => {
+    if (!currentProject) return;
+    if (dashboards.length >= 3) {
+      alert(t('dashboardLimitReached') || "You can only create up to 3 dashboards.");
+      return;
+    }
+    createDashboard(t('newDashboardNameDefault'), currentProject.id);
+    navigate(`/dashboard`);
+  };
+
+  const handleSelectDashboard = (id: string) => {
+    setActiveDashboard(id);
+    navigate(`/dashboard`);
+  };
+
+  const openDashboardRenameDialog = (id: string, name: string) => {
+    setDashboardToRename({ id, name });
+    setNewDashboardName(name);
+    setDashboardRenameDialogOpen(true);
+  };
+
+  const handleDashboardRename = () => {
+    if (!currentProject || !dashboardToRename || !newDashboardName.trim()) return;
+    renameDashboard(dashboardToRename.id, newDashboardName.trim(), currentProject.id);
+    setDashboardRenameDialogOpen(false);
+  };
+
+  const handleDashboardDelete = (id: string) => {
+    if (!currentProject) return;
+    if (!window.confirm(t('confirmDeleteDashboard'))) return;
+    deleteDashboard(id, currentProject.id);
+  };
+
+  const filteredDashboards = dashboards.filter((d) => {
+    if (!normalizedFilter) return true;
+    return d.name.toLowerCase().includes(normalizedFilter);
+  });
+
   return (
     <div className="h-full min-h-0 flex flex-col bg-zinc-50/30 border-r border-zinc-200 relative">
       {/* Header */}
@@ -453,63 +627,103 @@ function SidebarBody() {
         <div className="w-8" />
       </div>
 
-      <div className="px-3 pt-4 space-y-2">
-        <Button
-          variant="secondary"
-          className="w-full justify-start h-10 px-3 rounded-lg bg-zinc-200/50 hover:bg-zinc-200 text-zinc-900 font-medium"
-          onClick={() => navigate("/dashboard")}
-        >
-          <LayoutDashboard className="h-4.5 w-4.5 mr-2 text-zinc-600" />
-          {t('dashboardMenu')}
-        </Button>
+      <div className="flex-none">
+        <DashboardSection
+          title={t('dashboards') || 'Dashboards'}
+          count={filteredDashboards.length}
+          items={filteredDashboards.map(d => ({ id: d.id, name: d.name }))}
+          onSelect={handleSelectDashboard}
+          onDelete={handleDashboardDelete}
+          onRename={openDashboardRenameDialog}
+          onCreate={handleCreateDashboard}
+          activeId={location.pathname === "/dashboard" ? activeDashboardId : null}
+        />
         
-        <Button 
-          variant="outline" 
-          className="w-full justify-start h-10 px-3 rounded-lg border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-600 font-medium"
-          onClick={handleNewThread}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          {t('newThread')}
-        </Button>
-      </div>
+        <div className="px-3 pt-4 mb-2">
+          <Button 
+            variant="outline" 
+            className="w-full justify-start h-10 px-3 rounded-lg border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-600 font-medium text-[14px]"
+            onClick={handleNewThread}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            {t('newThread')}
+          </Button>
+        </div>
 
-      <ScrollArea className="flex-1 min-h-0">
-        <div className="px-3 pt-4">
+        <div className="px-3 pt-2">
           <div className="relative">
             <Search className="h-4 w-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <Input
               value={sessionFilter}
               onChange={(e) => setSessionFilter(e.target.value)}
               placeholder={t('filterSessionName')}
-              className="pl-9 h-9 border-zinc-200 bg-white"
+              className="pl-9 h-9 border-zinc-200 bg-white text-[14px]"
             />
           </div>
         </div>
-        <Section 
-          title={t('threads')} 
-          count={activeSessions.length} 
-          items={activeSessions} 
-          onSelect={handleSelectSession}
-          onDelete={handleDeleteSession}
-          onBatchDelete={handleBatchDelete}
-          onRename={openRenameDialog}
-          onTogglePinned={handleTogglePinned}
-          onToggleArchived={handleToggleArchived}
-          activeKey={activeSessionKey}
-        />
-        <Section 
-          title={t('archivedThreads')} 
-          count={archivedSessions.length} 
-          items={archivedSessions} 
-          onSelect={handleSelectSession}
-          onDelete={handleDeleteSession}
-          onBatchDelete={handleBatchDelete}
-          onRename={openRenameDialog}
-          onTogglePinned={handleTogglePinned}
-          onToggleArchived={handleToggleArchived}
-          activeKey={activeSessionKey}
-        />
-      </ScrollArea>
+      </div>
+
+      <div className="flex-1 min-h-0 flex flex-col mt-2">
+        <div className="flex-1 min-h-0 flex flex-col">
+          <SectionHeader
+            title={t('threads')}
+            count={activeSessions.length}
+            isSelectionMode={activeSelectionMode}
+            setIsSelectionMode={setActiveSelectionMode}
+            selectedKeys={activeSelectedKeys}
+            setSelectedKeys={setActiveSelectedKeys}
+            items={activeSessions}
+            onBatchDelete={handleBatchDelete}
+          />
+          <ScrollArea className="flex-1 min-h-0">
+            <Section 
+              items={activeSessions} 
+              onSelect={handleSelectSession}
+              onDelete={handleDeleteSession}
+              onBatchDelete={handleBatchDelete}
+              onRename={openRenameDialog}
+              onTogglePinned={handleTogglePinned}
+              onToggleArchived={handleToggleArchived}
+              activeKey={activeSessionKey}
+              isSelectionMode={activeSelectionMode}
+              setIsSelectionMode={setActiveSelectionMode}
+              selectedKeys={activeSelectedKeys}
+              setSelectedKeys={setActiveSelectedKeys}
+            />
+          </ScrollArea>
+        </div>
+        
+        {archivedSessions.length > 0 && (
+          <div className="h-[35%] min-h-[150px] shrink-0 border-t border-zinc-200 bg-zinc-50/50 flex flex-col">
+            <SectionHeader
+              title={t('archivedThreads')}
+              count={archivedSessions.length}
+              isSelectionMode={archivedSelectionMode}
+              setIsSelectionMode={setArchivedSelectionMode}
+              selectedKeys={archivedSelectedKeys}
+              setSelectedKeys={setArchivedSelectedKeys}
+              items={archivedSessions}
+              onBatchDelete={handleBatchDelete}
+            />
+            <ScrollArea className="flex-1 min-h-0">
+              <Section 
+                items={archivedSessions} 
+                onSelect={handleSelectSession}
+                onDelete={handleDeleteSession}
+                onBatchDelete={handleBatchDelete}
+                onRename={openRenameDialog}
+                onTogglePinned={handleTogglePinned}
+                onToggleArchived={handleToggleArchived}
+                activeKey={activeSessionKey}
+                isSelectionMode={archivedSelectionMode}
+                setIsSelectionMode={setArchivedSelectionMode}
+                selectedKeys={archivedSelectedKeys}
+                setSelectedKeys={setArchivedSelectedKeys}
+              />
+            </ScrollArea>
+          </div>
+        )}
+      </div>
 
       <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
         <DialogContent className="sm:max-w-md">
@@ -532,6 +746,31 @@ function SidebarBody() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>{t('cancel')}</Button>
             <Button className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleRename}>{t('save')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={dashboardRenameDialogOpen} onOpenChange={setDashboardRenameDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('renameDashboard')}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Input 
+              value={newDashboardName} 
+              onChange={(e) => setNewDashboardName(e.target.value)} 
+              placeholder={t('enterNewDashboardName')} 
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleDashboardRename();
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDashboardRenameDialogOpen(false)}>{t('cancel')}</Button>
+            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleDashboardRename}>{t('save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

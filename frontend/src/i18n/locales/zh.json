@@ -1,5 +1,5 @@
 {
-  "selectAllOrCancel": "全选/取消全选",
+  "selectAllOrCancel": "全选 / 取消全选",
   "invertSelection": "反选",
   "batchDelete": "批量删除",
   "cancel": "取消",
@@ -11,6 +11,19 @@
   "deleteSession": "删除会话",
   "confirmDeleteSession": "确定要删除这个会话吗？",
   "confirmBatchDeleteSessions": "确定要删除选中的 {{count}} 个会话吗？",
+  "confirmDeleteDashboard": "确定要删除此仪表盘吗？",
+  "renameDashboard": "重命名仪表盘",
+  "enterNewDashboardName": "输入新的仪表盘名称",
+  "newDashboardNameDefault": "新仪表盘",
+  "dashboardLimitReached": "最多只能创建 3 个仪表盘。",
+  "dashboards": "仪表盘",
+  "new": "新建",
+  "pinChartToDashboard": "固定图表到仪表盘",
+  "selectDashboardToPin": "选择一个仪表盘以固定此图表。",
+  "selectDashboard": "选择一个仪表盘",
+  "submit": "提交",
+  "noDashboardsInCurrentProject": "当前项目下没有仪表盘",
+  "createDashboardToGetStarted": "从侧边栏创建一个新仪表盘以开始",
   "filterSessionName": "过滤会话名称",
   "renameSession": "重命名会话",
   "enterNewSessionTitle": "输入新的会话标题",
@@ -204,5 +217,6 @@
   "newThread": "新会话",
   "threads": "会话",
   "archivedThreads": "已归档会话",
-  "defaultUser": "用户"
+  "defaultUser": "默认用户",
+  "searchSkills": "搜索技能..."
 }
