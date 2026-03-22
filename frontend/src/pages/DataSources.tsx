@@ -175,6 +175,33 @@ export function DataSources() {
     );
   }
 
+  // Helper function to extract host and db from connection string
+  const parseConnectionString = (url: string | undefined, type: 'host' | 'database') => {
+    if (!url) return null;
+    try {
+      // Very basic parser for postgresql://user:pass@host:port/dbname format
+      // Works for postgresql, mysql, etc.
+      const withoutScheme = url.split('://')[1];
+      if (!withoutScheme) return null;
+      
+      const parts = withoutScheme.split('@');
+      const hostPortPath = parts.length > 1 ? parts[1] : parts[0];
+      
+      const pathParts = hostPortPath.split('/');
+      const hostAndPort = pathParts[0];
+      const host = hostAndPort.split(':')[0];
+      
+      let db = pathParts.length > 1 ? pathParts[1] : null;
+      if (db && db.includes('?')) {
+        db = db.split('?')[0]; // Remove query params like ?sslmode=require
+      }
+      
+      return type === 'host' ? host : db;
+    } catch (e) {
+      return null;
+    }
+  };
+
   return (
     <div className="h-full flex flex-col bg-white">
       <div className="border-b border-zinc-100 px-8 py-5 flex items-center justify-between">
@@ -232,14 +259,14 @@ export function DataSources() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-zinc-500">Host</span>
-                    <span className="font-medium text-zinc-700 truncate max-w-[150px]">
-                      {ds.config.host || "Local / File"}
+                    <span className="font-medium text-zinc-700 truncate max-w-[150px]" title={ds.config.host || ds.config.connection_string || "Local / File"}>
+                      {ds.config.host || parseConnectionString(ds.config.connection_string, 'host') || "Local / File"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-zinc-500">Database</span>
-                    <span className="font-medium text-zinc-700 truncate max-w-[150px]">
-                      {ds.config.database || ds.config.file_path ? (ds.config.file_path?.split('/').pop()) : "-"}
+                    <span className="font-medium text-zinc-700 truncate max-w-[150px]" title={ds.config.database || (ds.config.file_path ? ds.config.file_path.split('/').pop() : ds.config.connection_string || "-")}>
+                      {ds.config.database || parseConnectionString(ds.config.connection_string, 'database') || (ds.config.file_path ? ds.config.file_path.split('/').pop() : "-")}
                     </span>
                   </div>
                 </div>
