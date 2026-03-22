@@ -83,7 +83,8 @@ npm install
 npm run dev
 ```
 
-Open your browser and navigate to `http://localhost:5173`. Boom! 🎉 You're ready to chat with your data.
+### 3. Initial Account Setup 👤
+The first user to register in the system will automatically be granted admin privileges. You can simply click the "Register" button on the login page to create your admin account (e.g., Username: `admin`, Password: `admin`), and then log in to manage projects, data sources, and users.
 
 ***
 
