@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy';
 import { useDashboardStore } from '../store/dashboardStore';
@@ -7,7 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { X } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
+import { X, Type, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { VegaChart } from "@/components/VegaChart";
 import 'react-grid-layout/css/styles.css';
@@ -45,8 +47,12 @@ function inferChartKeys(data: Record<string, unknown>[]) {
 
 export function Dashboard() {
   const { t } = useTranslation();
-  const { dashboards, activeDashboardId, removeChart, updateLayout, loadDashboards } = useDashboardStore();
+  const { dashboards, activeDashboardId, removeChart, updateLayout, loadDashboards, renameDashboard, updateDashboardTitleStyle } = useDashboardStore();
   const { currentProject } = useProjectStore();
+
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (currentProject) {
@@ -85,6 +91,19 @@ export function Dashboard() {
     }
   };
 
+  const handleTitleSubmit = () => {
+    if (activeDashboard && currentProject && editTitle.trim()) {
+      renameDashboard(activeDashboard.id, editTitle.trim(), currentProject.id);
+    }
+    setIsEditingTitle(false);
+  };
+
+  const handleStyleChange = (key: string, value: string) => {
+    if (activeDashboard && currentProject) {
+      updateDashboardTitleStyle(activeDashboard.id, { [key]: value }, currentProject.id);
+    }
+  };
+
   if (!currentProject) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
@@ -113,7 +132,106 @@ export function Dashboard() {
 
   return (
     <div className="p-4 h-full overflow-y-auto">
-      <h1 className="text-2xl font-bold mb-4">{activeDashboard.name || t('dashboardMenu')}</h1>
+      <div className="mb-4 flex items-center justify-between group">
+        {isEditingTitle ? (
+          <Input
+            ref={titleInputRef}
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            onBlur={handleTitleSubmit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleTitleSubmit();
+              if (e.key === 'Escape') setIsEditingTitle(false);
+            }}
+            className="text-2xl font-bold h-auto py-1 px-2 -ml-2 bg-transparent border-transparent hover:border-zinc-200 focus:border-indigo-500 focus:ring-indigo-500 max-w-md"
+          />
+        ) : (
+          <div className="flex items-center gap-2">
+            <h1 
+              className="text-2xl font-bold cursor-pointer hover:bg-zinc-100 px-2 py-1 -ml-2 rounded transition-colors"
+              style={{
+                fontSize: activeDashboard.titleStyle?.fontSize || '1.5rem',
+                fontWeight: activeDashboard.titleStyle?.fontWeight || '700',
+                color: activeDashboard.titleStyle?.color || 'inherit',
+                fontStyle: activeDashboard.titleStyle?.fontStyle || 'normal',
+                textDecoration: activeDashboard.titleStyle?.textDecoration || 'none',
+                textAlign: activeDashboard.titleStyle?.textAlign || 'left',
+              }}
+              onClick={() => {
+                setEditTitle(activeDashboard.name || t('dashboardMenu'));
+                setIsEditingTitle(true);
+                setTimeout(() => titleInputRef.current?.focus(), 0);
+              }}
+            >
+              {activeDashboard.name || t('dashboardMenu')}
+            </h1>
+            <Popover>
+              <PopoverTrigger>
+                <div className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-zinc-100 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Type className="h-4 w-4 text-zinc-500" />
+                </div>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-3" align="start">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-zinc-500">{t('fontSize') || 'Font Size'}</label>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleStyleChange('fontSize', '1.25rem')}>S</Button>
+                      <Button variant="outline" size="sm" onClick={() => handleStyleChange('fontSize', '1.5rem')}>M</Button>
+                      <Button variant="outline" size="sm" onClick={() => handleStyleChange('fontSize', '1.875rem')}>L</Button>
+                      <Button variant="outline" size="sm" onClick={() => handleStyleChange('fontSize', '2.25rem')}>XL</Button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-zinc-500">{t('textStyle') || 'Text Style'}</label>
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant={activeDashboard.titleStyle?.fontWeight === 'normal' ? 'default' : 'outline'} 
+                        size="icon" 
+                        className="h-8 w-8"
+                        onClick={() => handleStyleChange('fontWeight', activeDashboard.titleStyle?.fontWeight === 'normal' ? '700' : 'normal')}
+                      >
+                        <Bold className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant={activeDashboard.titleStyle?.fontStyle === 'italic' ? 'default' : 'outline'} 
+                        size="icon" 
+                        className="h-8 w-8"
+                        onClick={() => handleStyleChange('fontStyle', activeDashboard.titleStyle?.fontStyle === 'italic' ? 'normal' : 'italic')}
+                      >
+                        <Italic className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant={activeDashboard.titleStyle?.textDecoration === 'underline' ? 'default' : 'outline'} 
+                        size="icon" 
+                        className="h-8 w-8"
+                        onClick={() => handleStyleChange('textDecoration', activeDashboard.titleStyle?.textDecoration === 'underline' ? 'none' : 'underline')}
+                      >
+                        <Underline className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-zinc-500">{t('textColor') || 'Text Color'}</label>
+                    <div className="flex items-center gap-2">
+                      {['inherit', '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'].map(color => (
+                        <button
+                          key={color}
+                          className={`w-6 h-6 rounded-full border border-zinc-200 flex items-center justify-center ${activeDashboard.titleStyle?.color === color ? 'ring-2 ring-indigo-500 ring-offset-1' : ''}`}
+                          style={{ backgroundColor: color === 'inherit' ? '#18181b' : color }}
+                          onClick={() => handleStyleChange('color', color)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+        )}
+      </div>
       <ResponsiveGridLayout
         className="layout"
         layouts={layouts}

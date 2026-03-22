@@ -8,6 +8,7 @@
   "unpin": "取消置顶",
   "archive": "归档",
   "unarchive": "取消归档",
+  "delete": "删除",
   "deleteSession": "删除会话",
   "confirmDeleteSession": "确定要删除这个会话吗？",
   "confirmBatchDeleteSessions": "确定要删除选中的 {{count}} 个会话吗？",

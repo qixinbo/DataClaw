@@ -116,6 +116,7 @@ class SessionAliasUpdateRequest(BaseModel):
     title: Optional[str] = None
     pinned: Optional[bool] = None
     archived: Optional[bool] = None
+    project_id: Optional[int] = None
 
 
 class BatchDeleteRequest(BaseModel):
@@ -299,11 +300,11 @@ async def nanobot_chat_stream(request: ChatRequest):
     )
 
 @app.get("/nanobot/sessions")
-def get_sessions():
+def get_sessions(project_id: Optional[int] = None):
     if not nanobot_service.agent:
-        return session_alias_store.list_cached_sessions()
+        return session_alias_store.list_cached_sessions(project_id=project_id)
     sessions = nanobot_service.agent.sessions.list_sessions()
-    return session_alias_store.sync_and_list(sessions)
+    return session_alias_store.sync_and_list(sessions, project_id=project_id)
 
 @app.get("/nanobot/sessions/{session_id}")
 def get_session(session_id: str):
@@ -320,12 +321,23 @@ def get_session(session_id: str):
         "messages": session.messages
     }
 
+class EnsureSessionRequest(BaseModel):
+    project_id: Optional[int] = None
+
 @app.post("/nanobot/sessions/{session_id}/ensure")
-def ensure_session(session_id: str):
+def ensure_session(session_id: str, request: EnsureSessionRequest = EnsureSessionRequest()):
     if not nanobot_service.agent:
         raise HTTPException(status_code=400, detail="Nanobot not running")
     session = nanobot_service.agent.sessions.get_or_create(session_id)
     nanobot_service.agent.sessions.save(session)
+    
+    # Save project_id to the alias store immediately upon creation
+    if request.project_id is not None:
+        session_alias_store.update_alias_meta(
+            session_key=session_id,
+            project_id=request.project_id
+        )
+        
     alias = session_alias_store.get_alias(session_id)
     return {
         "key": session.key,
@@ -333,6 +345,7 @@ def ensure_session(session_id: str):
         "updated_at": session.updated_at,
         "metadata": session.metadata,
         "alias": alias,
+        "project_id": request.project_id
     }
 
 @app.delete("/nanobot/sessions/{session_id}")
@@ -382,6 +395,7 @@ def update_session(session_id: str, payload: SessionAliasUpdateRequest):
         alias=payload.title,
         pinned=payload.pinned,
         archived=payload.archived,
+        project_id=payload.project_id,
     )
     return {"status": "success", **updated}
 

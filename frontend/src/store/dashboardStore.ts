@@ -17,6 +17,14 @@ export interface ChartConfig {
 export interface DashboardConfig {
   id: string;
   name: string;
+  titleStyle?: {
+    fontSize?: string;
+    fontWeight?: string;
+    color?: string;
+    textAlign?: 'left' | 'center' | 'right';
+    fontStyle?: string;
+    textDecoration?: string;
+  };
   createdAt: number;
   charts: ChartConfig[];
 }
@@ -28,6 +36,7 @@ interface DashboardState {
   createDashboard: (name: string, projectId: number) => string;
   deleteDashboard: (id: string, projectId: number) => void;
   renameDashboard: (id: string, newName: string, projectId: number) => void;
+  updateDashboardTitleStyle: (id: string, style: DashboardConfig['titleStyle'], projectId: number) => void;
   setActiveDashboard: (id: string | null) => void;
   addChart: (chart: Omit<ChartConfig, 'layout'>, dashboardId: string, projectId: number) => void;
   removeChart: (chartId: string, dashboardId: string, projectId: number) => void;
@@ -130,6 +139,13 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   }),
   renameDashboard: (id, newName, projectId) => set((state) => {
     const nextDashboards = state.dashboards.map((d) => d.id === id ? { ...d, name: newName } : d);
+    saveDashboardsToStorage(nextDashboards, projectId);
+    return { dashboards: nextDashboards };
+  }),
+  updateDashboardTitleStyle: (id, style, projectId) => set((state) => {
+    const nextDashboards = state.dashboards.map((d) => 
+      d.id === id ? { ...d, titleStyle: { ...d.titleStyle, ...style } } : d
+    );
     saveDashboardsToStorage(nextDashboards, projectId);
     return { dashboards: nextDashboards };
   }),

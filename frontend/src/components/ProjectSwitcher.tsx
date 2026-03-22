@@ -40,7 +40,7 @@ export function ProjectSwitcher() {
   };
 
   return (
-    <div className="flex items-center gap-2 px-4 py-2 bg-background h-12">
+    <div className="flex items-center gap-2 bg-transparent h-10">
       <DropdownMenu>
         <DropdownMenuTrigger className="flex h-8 items-center gap-1 rounded-md px-2 font-semibold hover:bg-accent hover:text-accent-foreground outline-none transition-colors">
           <Folder className="h-4 w-4 mr-1 text-blue-500" />

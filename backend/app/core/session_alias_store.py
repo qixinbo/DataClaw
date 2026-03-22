@@ -42,6 +42,8 @@ class SessionAliasStore:
                 conn.execute("ALTER TABLE session_cache ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0")
             if "archived" not in cols:
                 conn.execute("ALTER TABLE session_cache ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
+            if "project_id" not in cols:
+                conn.execute("ALTER TABLE session_cache ADD COLUMN project_id INTEGER")
 
     def sync_sessions(self, sessions: list[dict[str, Any]]) -> None:
         now = datetime.now(timezone.utc).isoformat()
@@ -75,20 +77,31 @@ class SessionAliasStore:
             else:
                 conn.execute("DELETE FROM session_cache")
 
-    def list_cached_sessions(self) -> list[dict[str, Any]]:
+    def list_cached_sessions(self, project_id: int | None = None) -> list[dict[str, Any]]:
         with self._connect() as conn:
-            rows = conn.execute(
-                """
-                SELECT session_key, created_at, updated_at, alias, pinned, archived
-                FROM session_cache
-                ORDER BY pinned DESC, archived ASC, updated_at DESC
-                """
-            ).fetchall()
+            if project_id is not None:
+                rows = conn.execute(
+                    """
+                    SELECT session_key, created_at, updated_at, alias, pinned, archived, project_id
+                    FROM session_cache
+                    WHERE project_id = ? OR project_id IS NULL
+                    ORDER BY pinned DESC, archived ASC, updated_at DESC
+                    """,
+                    (project_id,)
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT session_key, created_at, updated_at, alias, pinned, archived, project_id
+                    FROM session_cache
+                    ORDER BY pinned DESC, archived ASC, updated_at DESC
+                    """
+                ).fetchall()
         return [self._row_to_session_item(row) for row in rows]
 
-    def sync_and_list(self, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def sync_and_list(self, sessions: list[dict[str, Any]], project_id: int | None = None) -> list[dict[str, Any]]:
         self.sync_sessions(sessions)
-        return self.list_cached_sessions()
+        return self.list_cached_sessions(project_id)
 
     def set_alias(self, session_key: str, alias: str) -> None:
         now = datetime.now(timezone.utc).isoformat()
@@ -111,32 +124,36 @@ class SessionAliasStore:
         alias: str | None = None,
         pinned: bool | None = None,
         archived: bool | None = None,
+        project_id: int | None = None,
     ) -> dict[str, Any]:
         now = datetime.now(timezone.utc).isoformat()
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT alias, pinned, archived FROM session_cache WHERE session_key = ?",
+                "SELECT alias, pinned, archived, project_id FROM session_cache WHERE session_key = ?",
                 (session_key,),
             ).fetchone()
             current_alias = (str(row["alias"]) if row and row["alias"] else "")
             current_pinned = bool(row["pinned"]) if row else False
             current_archived = bool(row["archived"]) if row else False
+            current_project_id = row["project_id"] if row and "project_id" in row.keys() else None
             next_alias = current_alias if alias is None else alias.strip()
             next_pinned = current_pinned if pinned is None else bool(pinned)
             next_archived = current_archived if archived is None else bool(archived)
+            next_project_id = current_project_id if project_id is None else project_id
             conn.execute(
                 """
-                INSERT INTO session_cache (session_key, created_at, updated_at, alias, pinned, archived, last_seen_at)
-                VALUES (?, '', '', ?, ?, ?, ?)
+                INSERT INTO session_cache (session_key, created_at, updated_at, alias, pinned, archived, project_id, last_seen_at)
+                VALUES (?, '', '', ?, ?, ?, ?, ?)
                 ON CONFLICT(session_key) DO UPDATE SET
                   alias = excluded.alias,
                   pinned = excluded.pinned,
                   archived = excluded.archived,
+                  project_id = excluded.project_id,
                   last_seen_at = excluded.last_seen_at
                 """,
-                (session_key, next_alias, int(next_pinned), int(next_archived), now),
+                (session_key, next_alias, int(next_pinned), int(next_archived), next_project_id, now),
             )
-        return {"alias": next_alias or None, "pinned": next_pinned, "archived": next_archived}
+        return {"alias": next_alias or None, "pinned": next_pinned, "archived": next_archived, "project_id": next_project_id}
 
     def get_alias(self, session_key: str) -> str | None:
         with self._connect() as conn:
@@ -159,6 +176,7 @@ class SessionAliasStore:
         title = alias or fallback
         pinned = bool(row["pinned"]) if "pinned" in row.keys() else False
         archived = bool(row["archived"]) if "archived" in row.keys() else False
+        project_id = row["project_id"] if "project_id" in row.keys() else None
         return {
             "key": row["session_key"],
             "created_at": row["created_at"],
@@ -167,6 +185,7 @@ class SessionAliasStore:
             "alias": alias or None,
             "pinned": pinned,
             "archived": archived,
+            "project_id": project_id,
         }
 
 

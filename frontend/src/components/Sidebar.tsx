@@ -359,7 +359,7 @@ function DashboardSection({
                     className="text-red-600 focus:text-red-600 focus:bg-red-50"
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    <span>{t('deleteSession')}</span>
+                    <span>{t('delete')}</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
                 </DropdownMenu>
@@ -409,7 +409,10 @@ function SidebarBody() {
 
   const fetchSessions = async () => {
     try {
-      const data = await api.get<SessionInfo[]>("/nanobot/sessions");
+      const url = currentProject 
+        ? `/nanobot/sessions?project_id=${currentProject.id}`
+        : "/nanobot/sessions";
+      const data = await api.get<SessionInfo[]>(url);
       setSessions(data);
     } catch (e) {
       console.error("Failed to fetch sessions", e);
@@ -418,7 +421,7 @@ function SidebarBody() {
 
   useEffect(() => {
     fetchSessions();
-  }, [location.pathname, location.search]);
+  }, [location.pathname, location.search, currentProject?.id]);
 
   useEffect(() => {
     const onFocus = () => fetchSessions();
@@ -453,7 +456,8 @@ function SidebarBody() {
   const handleNewThread = async () => {
     const newSessionId = `api:${Date.now()}`;
     try {
-      await api.post(`/nanobot/sessions/${encodeURIComponent(newSessionId)}/ensure`, {});
+      const payload = currentProject ? { project_id: currentProject.id } : {};
+      await api.post(`/nanobot/sessions/${encodeURIComponent(newSessionId)}/ensure`, payload);
       await fetchSessions();
       window.dispatchEvent(new Event("nanobot:sessions-changed"));
     } catch (e) {
