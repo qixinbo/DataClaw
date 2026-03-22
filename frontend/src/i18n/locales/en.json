@@ -219,5 +219,19 @@
   "dashboards": "Dashboards",
   "new": "New",
   "pinChartToDashboard": "Pin chart to dashboard",
-  "selectDashboardToPin": "Select a dashboard to pin this chart to."
+  "selectDashboardToPin": "Select a dashboard to pin this chart to.",
+  "welcomeBack": "Welcome Back",
+  "createAccount": "Create Account",
+  "username": "Username",
+  "enterUsername": "Enter your username",
+  "email": "Email",
+  "enterEmail": "Enter your email",
+  "password": "Password",
+  "enterPassword": "Enter your password",
+  "signIn": "Sign In",
+  "signUp": "Sign Up",
+  "dontHaveAccount": "Don't have an account?",
+  "alreadyHaveAccount": "Already have an account?",
+  "registrationSuccess": "Registration successful! Please login.",
+  "errorOccurred": "An error occurred"
 }

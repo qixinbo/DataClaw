@@ -219,5 +219,19 @@
   "threads": "会话",
   "archivedThreads": "已归档会话",
   "defaultUser": "默认用户",
-  "searchSkills": "搜索技能..."
+  "searchSkills": "搜索技能...",
+  "welcomeBack": "欢迎回来",
+  "createAccount": "创建账号",
+  "username": "用户名",
+  "enterUsername": "请输入您的用户名",
+  "email": "邮箱",
+  "enterEmail": "请输入您的邮箱",
+  "password": "密码",
+  "enterPassword": "请输入您的密码",
+  "signIn": "登录",
+  "signUp": "注册",
+  "dontHaveAccount": "还没有账号？",
+  "alreadyHaveAccount": "已经有账号了？",
+  "registrationSuccess": "注册成功！请登录。",
+  "errorOccurred": "发生了一个错误"
 }

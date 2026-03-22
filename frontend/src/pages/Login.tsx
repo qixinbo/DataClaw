@@ -1,13 +1,21 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { Loader2, Languages } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function Login() {
+  const { t, i18n } = useTranslation();
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -58,10 +66,10 @@ export function Login() {
         
         // Auto login after successful registration
         setIsLogin(true);
-        setError("Registration successful! Please login.");
+        setError(t("registrationSuccess"));
       }
     } catch (err: any) {
-      setError(err.message || "An error occurred");
+      setError(err.message || t("errorOccurred"));
     } finally {
       setIsLoading(false);
     }
@@ -70,33 +78,50 @@ export function Login() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-50 px-4">
       <div className="w-full max-w-md">
-        <div className="mb-10 text-center flex flex-col items-center gap-4 select-none">
+        <div className="mb-10 text-center flex flex-col items-center gap-4 select-none relative">
           <div className="text-[56px] leading-none animate-bounce-slow pb-2">
             🦞
           </div>
           <h1 className="text-[40px] font-bold bg-clip-text text-transparent bg-gradient-to-r from-red-500 via-orange-500 to-amber-500 tracking-tight">
             DataClaw
           </h1>
+          <div className="absolute right-0 bottom-0 translate-y-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/50 backdrop-blur-sm shadow-sm border border-zinc-200/50 text-zinc-500 hover:text-zinc-900 hover:bg-white transition-all">
+                  <Languages className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-32">
+                <DropdownMenuItem onClick={() => i18n.changeLanguage('zh')} className={i18n.language === 'zh' ? 'bg-zinc-100' : ''}>
+                  简体中文
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => i18n.changeLanguage('en')} className={i18n.language === 'en' ? 'bg-zinc-100' : ''}>
+                  English
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl border border-zinc-100 p-8">
           <h2 className="text-2xl font-bold text-zinc-800 mb-6 text-center">
-            {isLogin ? "Welcome Back" : "Create Account"}
+            {isLogin ? t("welcomeBack") : t("createAccount")}
           </h2>
 
           {error && (
-            <div className={`p-3 rounded-lg mb-6 text-sm ${error.includes("successful") ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"}`}>
+            <div className={`p-3 rounded-lg mb-6 text-sm ${error.includes(t("registrationSuccess")) ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"}`}>
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username">{t("username")}</Label>
               <Input
                 id="username"
                 type="text"
-                placeholder="Enter your username"
+                placeholder={t("enterUsername")}
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 required
@@ -106,11 +131,11 @@ export function Login() {
 
             {!isLogin && (
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t("email")}</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder={t("enterEmail")}
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
@@ -120,11 +145,11 @@ export function Login() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t("password")}</Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="Enter your password"
+                placeholder={t("enterPassword")}
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 required
@@ -140,13 +165,13 @@ export function Login() {
               {isLoading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
-                isLogin ? "Sign In" : "Sign Up"
+                isLogin ? t("signIn") : t("signUp")
               )}
             </Button>
           </form>
 
           <div className="mt-6 text-center text-sm text-zinc-500">
-            {isLogin ? "Don't have an account?" : "Already have an account?"}
+            {isLogin ? t("dontHaveAccount") : t("alreadyHaveAccount")}
             <button
               onClick={() => {
                 setIsLogin(!isLogin);
@@ -154,7 +179,7 @@ export function Login() {
               }}
               className="ml-2 font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
             >
-              {isLogin ? "Sign Up" : "Sign In"}
+              {isLogin ? t("signUp") : t("signIn")}
             </button>
           </div>
         </div>
