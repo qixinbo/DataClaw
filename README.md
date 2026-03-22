@@ -22,11 +22,17 @@
 - **🛠️ 强大的 Agent 技能拓展**: 基于核心 `nanobot`框架（`OpenClaw`的精简版）构建。支持通过斜杠命令 (`/`) 快速调用自定义工具 (Skills)，完美贴合特定业务逻辑。
 - **📊 可定制仪表盘 (Dashboard)**: 一键将对话中生成的图表固定到看板，拖拽布局，随时查看核心指标。
 
-<br />
+***
+
+## 📸 界面预览
 
 <div align="center">
-  <img src="./examples/index.png" width="48%" />
-  <img src="./examples/dashboard.png" width="48%" />
+  <h3>对话式分析界面</h3>
+  <img src="./examples/index.png" width="80%" />
+  <br />
+  <br />
+  <h3>可定制仪表盘</h3>
+  <img src="./examples/dashboard.png" width="80%" />
 </div>
 
 <br />

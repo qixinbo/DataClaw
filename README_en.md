@@ -22,11 +22,17 @@ Whether you're querying a massive Supabase/PostgreSQL database or just tossing i
 - **🛠️ Extensible Agent Skills**: Built on top of the powerful `nanobot` framework (a lightweight version of `OpenClaw`). Add custom tools and slash commands (`/`) to tailor the agent to your specific business logic.
 - **📊 Customizable Dashboards**: Pin your favorite chat-generated charts to a drag-and-drop dashboard for quick access.
 
-<br />
+***
+
+## 📸 Screenshots
 
 <div align="center">
-  <img src="./examples/index.png" width="48%" />
-  <img src="./examples/dashboard.png" width="48%" />
+  <h3>Chat Interface</h3>
+  <img src="./examples/index.png" width="80%" />
+  <br />
+  <br />
+  <h3>Customizable Dashboard</h3>
+  <img src="./examples/dashboard.png" width="80%" />
 </div>
 
 <br />

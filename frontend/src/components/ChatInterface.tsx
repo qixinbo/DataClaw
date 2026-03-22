@@ -812,7 +812,7 @@ export function ChatInterface() {
                           <PopoverTrigger className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-zinc-100 transition-colors text-zinc-500">
                             <Plus className="h-5 w-5" />
                           </PopoverTrigger>
-                          <PopoverContent side="top" align="start" className="w-[480px] p-0 mb-2 overflow-hidden rounded-2xl border-zinc-200 shadow-xl">
+                          <PopoverContent side="bottom" align="start" className="w-[480px] p-0 mt-2 overflow-hidden rounded-2xl border-zinc-200 shadow-xl">
                             <div className="flex divide-x divide-zinc-100">
                               {/* Left Column: Data Source */}
                               <div className="flex-1 p-3 bg-zinc-50/50">

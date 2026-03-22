@@ -250,10 +250,10 @@ export function Dashboard() {
           return (
           <div key={chart.id} className="relative group">
             <Card className="h-full flex flex-col shadow-sm border-muted">
-              <CardHeader className="pb-2 shrink-0 flex flex-row items-center justify-between space-y-0">
+              <CardHeader className="p-3 pb-1 shrink-0 flex flex-row items-center justify-between space-y-0">
                 <div>
-                  <CardTitle className="text-base">{chart.title}</CardTitle>
-                  <CardDescription className="text-xs">
+                  <CardTitle className="text-sm">{chart.title}</CardTitle>
+                  <CardDescription className="text-[10px] mt-0.5">
                     {chart.type === "table"
                       ? t('tableRowColDesc', { rowCount: rows.length, colCount: columns.length })
                       : `${chart.type.toUpperCase()} Chart`}
@@ -262,13 +262,13 @@ export function Dashboard() {
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity -mr-1"
                   onClick={() => removeChart(chart.id, activeDashboard.id, currentProject.id)}
                 >
                   <X className="h-4 w-4" />
                 </Button>
               </CardHeader>
-              <CardContent className="flex-1 min-h-0 p-2">
+              <CardContent className="flex-1 min-h-0 p-3 pt-1 flex flex-col">
                 {(() => {
                   if (chart.type === "table") {
                     if (rows.length === 0) {
@@ -286,11 +286,11 @@ export function Dashboard() {
                       );
                     }
                     return (
-                      <div className="h-full w-full flex flex-col gap-2">
-                        <div className="text-[11px] text-zinc-500 px-1">
+                      <div className="flex-1 w-full flex flex-col min-h-0">
+                        <div className="text-[11px] text-zinc-500 mb-1 shrink-0">
                           {isTableTruncated ? t('previewTableRows', { previewLimit: TABLE_PREVIEW_LIMIT, rowCount: rows.length, colCount: columns.length }) : t('totalTableRows', { rowCount: rows.length, colCount: columns.length })}
                         </div>
-                        <ScrollArea className="flex-1 w-full border rounded-md">
+                        <ScrollArea className="flex-1 w-full border border-zinc-100 rounded-md bg-white">
                           <Table>
                             <TableHeader>
                               <TableRow>
@@ -313,7 +313,7 @@ export function Dashboard() {
                   }
                   if (chart.chartSpec && rows.length > 0) {
                     return (
-                      <div className="h-full w-full rounded-xl border border-zinc-100 p-2 overflow-hidden">
+                      <div className="flex-1 w-full overflow-hidden">
                         <VegaChart data={rows} spec={chart.chartSpec} />
                       </div>
                     );
