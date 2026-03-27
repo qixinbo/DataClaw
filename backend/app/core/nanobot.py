@@ -127,7 +127,13 @@ class NanobotIntegration:
         # No need to set self.config.workspace_path as it's a property that reads from agents.defaults.workspace
         
         self.bus = MessageBus()
-        provider = self._make_provider(self.config)
+        active_config = get_active_llm_config()
+        initial_model = self.config.agents.defaults.model
+        if active_config and active_config.get("model"):
+            provider = self._make_provider_from_target(active_config)
+            initial_model = self._normalize_config_value(active_config.get("model")) or initial_model
+        else:
+            provider = self._make_provider(self.config)
         
         cron_store_path = workspace_path / "cron"
         cron_store_path.mkdir(parents=True, exist_ok=True)
@@ -141,7 +147,7 @@ class NanobotIntegration:
             bus=self.bus,
             provider=provider,
             workspace=self.config.workspace_path,
-            model=self.config.agents.defaults.model,
+            model=initial_model,
             max_iterations=self.config.agents.defaults.max_tool_iterations,
             context_window_tokens=self.config.agents.defaults.context_window_tokens,
             web_search_config=self.config.tools.web.search,
