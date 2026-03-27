@@ -6,6 +6,7 @@ from urllib.parse import quote
 
 from pydantic import BaseModel
 
+from app.core.data_root import get_data_root, get_reports_root, get_uploads_root, get_workspace_root
 
 LOCAL_URI_PATTERN = re.compile(r"local://[^\s<>'\"\]\)\}]+")
 PATH_PATTERN = re.compile(
@@ -138,11 +139,11 @@ def _normalize_locator(raw_locator: str) -> str:
 
 
 def _resolve_locator(locator: str) -> Path | None:
-    backend_root = Path(__file__).resolve().parents[2]
-    data_root = backend_root / "data"
-    workspace_root = data_root / "workspace"
-    uploads_root = data_root / "uploads"
-    reports_root = data_root / "data"
+    data_root = get_data_root()
+    workspace_root = get_workspace_root()
+    uploads_root = get_uploads_root()
+    reports_root = get_reports_root()
+    repo_root = data_root.parent
     if locator.startswith("local://"):
         raw_local = locator.replace("local://", "", 1).strip().lstrip("/\\")
         if not raw_local:
@@ -160,11 +161,11 @@ def _resolve_locator(locator: str) -> Path | None:
     if path.is_absolute():
         return path
     if normalized.startswith("data/data/"):
-        return backend_root / normalized
+        return repo_root / normalized
     checks = [
         workspace_root / normalized,
         data_root / normalized,
-        backend_root / normalized,
+        repo_root / normalized,
     ]
     for candidate in checks:
         if candidate.exists():

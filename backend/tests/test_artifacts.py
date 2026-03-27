@@ -1,10 +1,11 @@
 from pathlib import Path
 
 from app.core.artifacts import extract_artifacts
+from app.core.data_root import get_data_root
 
 
 def _backend_data_root() -> Path:
-    return Path(__file__).resolve().parents[1] / "data"
+    return get_data_root()
 
 
 def test_extract_artifacts_from_local_and_tool_paths() -> None:

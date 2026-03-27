@@ -34,6 +34,7 @@ from nanobot.config.schema import Config
 from app.api.skills import load_skills
 from app.services.llm_cache import get_llm_configs
 
+from app.core.data_root import get_workspace_root
 from app.core.streaming_provider import StreamingLiteLLMProvider
 
 class NanobotIntegration:
@@ -47,8 +48,7 @@ class NanobotIntegration:
         self._model_agent_lock = asyncio.Lock()
 
     def initialize(self):
-        # Set workspace path to backend/data/workspace
-        workspace_path = Path(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "workspace"))
+        workspace_path = get_workspace_root()
         workspace_path.mkdir(parents=True, exist_ok=True)
         self._sync_builtin_skills_to_workspace(workspace_path)
         

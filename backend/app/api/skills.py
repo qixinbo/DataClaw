@@ -10,14 +10,15 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 
+from app.core.data_root import get_data_root, get_workspace_root
+
 router = APIRouter()
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-DATA_FILE = os.path.join(BASE_DIR, "data", "skills.json")
-SKILL_HUB_DIR = os.path.join(BASE_DIR, "data", "workspace", "skills")
+DATA_FILE = str(get_data_root() / "skills.json")
+SKILL_HUB_DIR = str(get_workspace_root() / "skills")
 
-# Ensure skill-hub directory exists
-os.makedirs(SKILL_HUB_DIR, exist_ok=True)
+def _ensure_skill_hub_dir() -> None:
+    os.makedirs(SKILL_HUB_DIR, exist_ok=True)
 
 class Skill(BaseModel):
     id: str = Field(..., description="Unique identifier for the skill")
@@ -134,6 +135,7 @@ def _write_skill_markdown(skill_dir: str, skill_name: str, description: Optional
     return skill_md_path
 
 def load_skills(project_id: Optional[int] = None) -> List[Dict[str, Any]]:
+    _ensure_skill_hub_dir()
     data = _load_data()
     
     registered_paths = set()
@@ -208,6 +210,7 @@ async def upload_skill(
     """Upload a skill file (SKILL.md) or a packaged skill (zip/tar.gz)."""
     filename = file.filename
     print(f"Uploading skill: {filename}, project_id: {project_id}")
+    _ensure_skill_hub_dir()
     
     # Create a unique temp directory
     temp_dir_name = f"temp_{datetime.now().timestamp()}_{os.urandom(4).hex()}"
@@ -323,6 +326,7 @@ async def upload_skill(
 
 @router.post("/skills", response_model=Skill)
 def create_skill(skill: SkillCreate):
+    _ensure_skill_hub_dir()
     data = load_skills()
     if any(item["id"] == skill.id for item in data):
         raise HTTPException(status_code=400, detail="Skill with this ID already exists")

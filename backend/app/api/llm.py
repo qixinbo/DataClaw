@@ -6,12 +6,13 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import jwt, JWTError
 from pydantic import BaseModel, Field
 from app.core.security import SECRET_KEY, ALGORITHM
+from app.core.data_root import get_data_root
 from litellm import completion
 
 router = APIRouter()
 security = HTTPBearer()
 
-DATA_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "llm_config.json")
+DATA_FILE = str(get_data_root() / "llm_config.json")
 
 
 class CurrentUser(BaseModel):

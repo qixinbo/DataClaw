@@ -5,14 +5,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from app.core.data_root import get_data_root
+
 
 class SessionAliasStore:
     def __init__(self) -> None:
-        backend_root = Path(__file__).resolve().parents[2]
-        data_dir = backend_root / "data"
-        data_dir.mkdir(parents=True, exist_ok=True)
+        data_dir = get_data_root()
+        try:
+            data_dir.mkdir(parents=True, exist_ok=True)
+        except PermissionError as exc:
+            raise RuntimeError(f"DATA_ROOT 权限不足: {data_dir}") from exc
         self.db_path = data_dir / "nanobot_sessions.db"
-        self._init_db()
+        try:
+            self._init_db()
+        except PermissionError as exc:
+            raise RuntimeError(f"DATA_ROOT 权限不足: {data_dir}") from exc
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(str(self.db_path))

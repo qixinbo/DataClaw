@@ -1114,8 +1114,20 @@ export function ChatInterface() {
                                 <iframe
                                   title={`report-${msg.id}`}
                                   srcDoc={reportHtml}
-                                  sandbox="allow-same-origin"
+                                  sandbox="allow-same-origin allow-scripts"
                                   className="w-full h-[620px] bg-white"
+                                  onLoad={(e) => {
+                                    try {
+                                      const doc = (e.target as HTMLIFrameElement).contentDocument;
+                                      if (doc) {
+                                        const style = doc.createElement('style');
+                                        style.textContent = `html, body { overflow: auto !important; }`;
+                                        doc.head.appendChild(style);
+                                      }
+                                    } catch (err) {
+                                      console.error("Failed to inject styles", err);
+                                    }
+                                  }}
                                 />
                               </div>
                             ) : null}
@@ -1371,7 +1383,19 @@ export function ChatInterface() {
               <iframe
                 title={artifactPreview.name}
                 src={artifactPreview.previewUrl}
-                className="w-full h-full"
+                className="w-full h-full border-0"
+                onLoad={(e) => {
+                  try {
+                    const doc = (e.target as HTMLIFrameElement).contentDocument;
+                    if (doc) {
+                      const style = doc.createElement('style');
+                      style.textContent = `html, body { overflow: auto !important; }`;
+                      doc.head.appendChild(style);
+                    }
+                  } catch (err) {
+                    console.error("Failed to inject styles into iframe", err);
+                  }
+                }}
               />
             ) : null}
           </div>

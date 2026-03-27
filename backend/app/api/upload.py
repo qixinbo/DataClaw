@@ -3,14 +3,15 @@ import pandas as pd
 import duckdb
 import io
 import uuid
-from pathlib import Path
+
+from app.core.data_root import get_uploads_root
 
 router = APIRouter()
-upload_dir = Path(__file__).resolve().parents[2] / "data" / "uploads"
-upload_dir.mkdir(parents=True, exist_ok=True)
+upload_dir = get_uploads_root()
 
 @router.post("/upload/file")
 async def upload_file(file: UploadFile = File(...)):
+    upload_dir.mkdir(parents=True, exist_ok=True)
     allowed_extensions = ('.csv', '.xls', '.xlsx', '.parquet', '.db', '.sqlite', '.sqlite3')
     filename_lower = file.filename.lower()
     if not filename_lower.endswith(allowed_extensions):

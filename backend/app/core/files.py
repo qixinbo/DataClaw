@@ -2,12 +2,13 @@ import os
 from pathlib import Path
 from typing import Optional
 
+from app.core.data_root import get_data_root, get_reports_root, get_uploads_root, get_workspace_root
 
-backend_root = Path(__file__).resolve().parents[2]
-data_root = backend_root / "data"
-workspace_root = data_root / "workspace"
-uploads_root = data_root / "uploads"
-reports_root = data_root / "data"
+
+data_root = get_data_root()
+workspace_root = get_workspace_root()
+uploads_root = get_uploads_root()
+reports_root = get_reports_root()
 allowed_artifact_roots = (workspace_root, uploads_root, reports_root)
 
 
@@ -50,7 +51,7 @@ def resolve_artifact_target(target: str) -> Path | None:
     if path.is_absolute():
         return path
     if normalized.startswith("data/data/"):
-        return backend_root / normalized
+        return data_root.parent / normalized
     checks = (
         workspace_root / normalized,
         data_root / normalized,

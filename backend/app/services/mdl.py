@@ -6,9 +6,9 @@ from app.models.datasource import DataSource
 from app.schemas.mdl import MDLManifest, Model, Column, TableReference
 from app.connectors.factory import get_connector
 from app.database import SessionLocal
+from app.core.data_root import get_data_root
 
-# Assuming running from backend/ directory
-MDL_STORAGE_PATH = Path("data/mdl")
+MDL_STORAGE_PATH = get_data_root() / "mdl"
 
 class MDLService:
     @staticmethod

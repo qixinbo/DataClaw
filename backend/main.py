@@ -20,6 +20,7 @@ from app.api import upload, llm, skills, users, datasources, projects, semantic
 from app.connectors.postgres import postgres_connector
 from app.connectors.clickhouse import clickhouse_connector
 from app.core.artifacts import extract_artifacts
+from app.core.data_root import ensure_data_layout, get_data_root, get_reports_root
 from app.core.files import ensure_artifact_access, resolve_artifact_target
 from app.core.nanobot import nanobot_service
 from app.core.session_alias_store import session_alias_store
@@ -44,9 +45,12 @@ app.add_middleware(
 Base.metadata.create_all(bind=engine)
 
 # Mount static directory for reports
-data_dir = os.path.join(os.path.dirname(__file__), "data", "data")
-os.makedirs(data_dir, exist_ok=True)
-app.mount("/reports", StaticFiles(directory=data_dir), name="reports")
+try:
+    ensure_data_layout()
+except Exception as e:
+    raise RuntimeError(f"DATA_ROOT 初始化失败: {e}") from e
+reports_dir = get_reports_root()
+app.mount("/reports", StaticFiles(directory=str(reports_dir)), name="reports")
 
 app.include_router(upload.router, prefix="/api/v1")
 app.include_router(llm.router, prefix="/api/v1")
@@ -71,6 +75,13 @@ PREVIEWABLE_TEXT_EXTENSIONS = {
 
 @app.on_event("startup")
 async def startup_event():
+    try:
+        data_root = get_data_root()
+        data_root.mkdir(parents=True, exist_ok=True)
+        if not os.access(data_root, os.R_OK | os.W_OK | os.X_OK):
+            raise RuntimeError(f"DATA_ROOT 权限不足: {data_root}")
+    except Exception as e:
+        raise RuntimeError(f"DATA_ROOT 初始化失败: {e}") from e
     # Initialize nanobot in background
     try:
         await nanobot_service.start()

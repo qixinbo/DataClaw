@@ -44,6 +44,7 @@ DataClaw is divided into three main claws (components):
 1. **`frontend/`** 🎨: The shiny shell. Built with **React 19**, **Vite**, **TailwindCSS**, and **Zustand**. It features a chat-like interface, streaming AI responses, and interactive Vega charts.
 2. **`backend/`** ⚙️: The muscle. A **FastAPI** application managing projects, data source connections, user sessions, and API gateways.
 3. **`nanobot/`** 🧠: The brain. The core AI agent framework handling NL2SQL, schema caching, prompt injection, and LLM routing.
+4. **`data/`** 🗄️: Runtime data root. Decoupled from code directories and used for uploads, sessions, workspace skills, reports, and cached configs.
 
 ***
 
@@ -67,6 +68,14 @@ pip install -r requirements.txt
 # Start the FastAPI server
 uvicorn app.main:app --reload --port 8000
 ```
+
+Optional environment variable:
+
+```bash
+export DATA_ROOT=/absolute/path/to/data
+```
+
+If not set, DataClaw uses the repository-level `data/` directory by default.
 
 *Note: Ensure your* *`nanobot`* *is properly linked or installed in editable mode as per the project workspace.*
 
@@ -149,4 +158,3 @@ The development of DataClaw was deeply inspired by the following excellent open-
 - [Aix-DB](https://github.com/apconw/Aix-DB): Provided an excellent reference for intelligent data analysis and interactive user experience.
 
 <br />
-

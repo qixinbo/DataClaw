@@ -3,11 +3,12 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.data_root import get_data_root
 from main import app
 
 
 def _backend_data_root() -> Path:
-    return Path(__file__).resolve().parents[1] / "data"
+    return get_data_root()
 
 
 def test_download_artifact_within_whitelist() -> None:

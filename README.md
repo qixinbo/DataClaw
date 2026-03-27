@@ -44,6 +44,7 @@ DataClaw 的架构主要分为三只“大钳子”：
 1. **`frontend/`** 🎨: 闪亮的外壳。基于 **React 19**、**Vite**、**TailwindCSS** 和 **Zustand** 构建。拥有类似微信/ChatGPT的对话界面、支持流式思考过程渲染以及交互式图表展示。
 2. **`backend/`** ⚙️: 强健的肌肉。一个 **FastAPI** 后端服务，负责管理项目、数据源连接、用户会话持久化以及作为 API 网关。
 3. **`nanobot/`** 🧠: 智慧的大脑。核心的 AI Agent 框架，负责处理意图路由、NL2SQL 转换、Schema 缓存管理以及与 LLM 的底层交互。
+4. **`data/`** 🗄️: 运行时数据目录。与代码目录解耦，存放上传文件、会话、技能工作区、报告与配置缓存。
 
 ***
 
@@ -67,6 +68,14 @@ pip install -r requirements.txt
 # 启动 FastAPI 服务器
 uvicorn app.main:app --reload --port 8000
 ```
+
+可选环境变量：
+
+```bash
+export DATA_ROOT=/absolute/path/to/data
+```
+
+若未设置，默认使用仓库根目录下的 `data/`。
 
 *提示：请确保* *`nanobot`* *核心库已根据项目工作区的要求正确链接或以可编辑模式 (editable mode) 安装。*
 
@@ -150,4 +159,3 @@ DataClaw 的开发深受以下优秀开源项目的启发，特此致谢：
 - [Aix-DB](https://github.com/apconw/Aix-DB): 在智能数据分析和交互式体验方面提供了极好的参考。
 
 <br />
-
