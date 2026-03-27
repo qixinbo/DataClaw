@@ -1,8 +1,13 @@
 import asyncio
+import base64
+import binascii
 from typing import Any, Dict, List, Optional, Literal, Tuple
-from fastapi import FastAPI, HTTPException
+import mimetypes
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -14,6 +19,8 @@ from datetime import datetime
 from app.api import upload, llm, skills, users, datasources, projects, semantic
 from app.connectors.postgres import postgres_connector
 from app.connectors.clickhouse import clickhouse_connector
+from app.core.artifacts import extract_artifacts
+from app.core.files import ensure_artifact_access, resolve_artifact_target
 from app.core.nanobot import nanobot_service
 from app.core.session_alias_store import session_alias_store
 from app.context import current_session_id, current_progress_callback, current_viz_data, current_data_source, current_file_url
@@ -50,6 +57,17 @@ app.include_router(datasources.router, prefix="/api/v1")
 app.include_router(semantic.router, prefix="/api/v1")
 
 STREAM_DELTA_CHUNK_SIZE = 48
+PREVIEWABLE_TEXT_EXTENSIONS = {
+    ".txt",
+    ".md",
+    ".json",
+    ".csv",
+    ".tsv",
+    ".yaml",
+    ".yml",
+    ".xml",
+    ".log",
+}
 
 @app.on_event("startup")
 async def startup_event():
@@ -84,6 +102,100 @@ def nanobot_status():
     if nanobot_service.agent:
         return {"status": "running", "model": nanobot_service.agent.model}
     return {"status": "stopped"}
+
+
+def _guess_mime_type(path: os.PathLike[str] | str) -> str:
+    mime_type, _ = mimetypes.guess_type(str(path))
+    return mime_type or "application/octet-stream"
+
+
+def _resolve_checked_target(target: str) -> os.PathLike[str]:
+    path = resolve_artifact_target(target)
+    if path is None:
+        raise HTTPException(status_code=404, detail="目标文件不存在")
+    try:
+        return ensure_artifact_access(path, require_file=True)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="目标文件不存在")
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="非法路径访问")
+
+
+def _is_previewable(path: os.PathLike[str], mime_type: str) -> bool:
+    suffix = os.path.splitext(str(path))[1].lower()
+    if suffix in {".html", ".htm", ".pdf", ".pptx"}:
+        return True
+    if suffix in PREVIEWABLE_TEXT_EXTENSIONS:
+        return True
+    return mime_type.startswith("image/") or mime_type.startswith("text/")
+
+
+def _encode_web_root(path: Path) -> str:
+    return base64.urlsafe_b64encode(str(path).encode("utf-8")).decode("utf-8").rstrip("=")
+
+
+def _decode_web_root(token: str) -> Path:
+    padding = "=" * (-len(token) % 4)
+    try:
+        decoded = base64.urlsafe_b64decode((token + padding).encode("utf-8")).decode("utf-8")
+    except (binascii.Error, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="非法预览目录标识")
+    return Path(decoded)
+
+
+@app.get("/nanobot/artifacts/download")
+def download_artifact(target: str = Query(...)):
+    resolved = _resolve_checked_target(target)
+    return FileResponse(
+        path=str(resolved),
+        media_type="application/octet-stream",
+        filename=os.path.basename(str(resolved)),
+    )
+
+
+@app.get("/nanobot/artifacts/preview")
+def preview_artifact(target: str = Query(...)):
+    resolved = _resolve_checked_target(target)
+    mime_type = _guess_mime_type(resolved)
+    if not _is_previewable(resolved, mime_type):
+        raise HTTPException(status_code=415, detail="当前文件类型不支持预览，请使用下载")
+    suffix = os.path.splitext(str(resolved))[1].lower()
+    if suffix in {".html", ".htm"}:
+        root_token = _encode_web_root(Path(resolved).parent)
+        entry = Path(resolved).name
+        return RedirectResponse(url=f"/nanobot/artifacts/web/{root_token}/{entry}", status_code=307)
+    return FileResponse(
+        path=str(resolved),
+        media_type=mime_type,
+        filename=os.path.basename(str(resolved)),
+        content_disposition_type="inline",
+    )
+
+
+@app.get("/nanobot/artifacts/web/{root_token}/{resource_path:path}")
+def preview_web_artifact_resource(root_token: str, resource_path: str):
+    root_dir = _decode_web_root(root_token)
+    try:
+        safe_root = ensure_artifact_access(root_dir, require_file=False)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Web 预览目录不存在")
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="非法路径访问")
+    candidate = os.path.join(str(safe_root), resource_path)
+    try:
+        resolved = ensure_artifact_access(Path(candidate), require_file=True)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Web 资源不存在")
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="非法路径访问")
+    if not Path(resolved).is_relative_to(Path(safe_root)):
+        raise HTTPException(status_code=403, detail="非法路径访问")
+    return FileResponse(
+        path=str(resolved),
+        media_type=_guess_mime_type(resolved),
+        filename=os.path.basename(str(resolved)),
+        content_disposition_type="inline",
+    )
 
 class ChatRequest(BaseModel):
     message: str
@@ -127,6 +239,27 @@ class SessionFileContextUpdateRequest(BaseModel):
     active_data_file: Optional[Dict[str, Any]] = None
     selected_data_source: Optional[str] = None
 
+
+def _persist_assistant_enrichment(
+    session_id: str,
+    viz_payload: Optional[Dict[str, Any]] = None,
+    artifacts: Optional[List[Dict[str, Any]]] = None,
+) -> None:
+    if not nanobot_service.agent:
+        return
+    session = nanobot_service.agent.sessions.get_or_create(session_id)
+    if not session.messages or session.messages[-1].get("role") != "assistant":
+        return
+    changed = False
+    if viz_payload:
+        session.messages[-1]["viz"] = viz_payload
+        changed = True
+    if artifacts:
+        session.messages[-1]["artifacts"] = artifacts
+        changed = True
+    if changed:
+        nanobot_service.agent.sessions.save(session)
+
 @app.post("/nanobot/chat")
 async def nanobot_chat(request: ChatRequest):
     try:
@@ -154,20 +287,28 @@ async def nanobot_chat(request: ChatRequest):
             skill_ids=request.skill_ids,
             model_id=request.model_id,
         )
+        text = response or ""
+        session_messages = []
+        if nanobot_service.agent:
+            session = nanobot_service.agent.sessions.get_or_create(request.session_id)
+            session_messages = session.messages
+        artifacts = extract_artifacts(text, session_messages)
 
         viz_payload = current_viz_data.get()
-        if viz_payload and nanobot_service.agent:
-            # Update the last assistant message with viz data
-            session = nanobot_service.agent.sessions.get_or_create(request.session_id)
-            if session.messages and session.messages[-1].get("role") == "assistant":
-                session.messages[-1]["viz"] = viz_payload
-                nanobot_service.agent.sessions.save(session)
+        _persist_assistant_enrichment(
+            session_id=request.session_id,
+            viz_payload=viz_payload if isinstance(viz_payload, dict) else None,
+            artifacts=artifacts,
+        )
 
-        return {
-            "response": response,
+        payload = {
+            "response": text,
             "viz": viz_payload,
             "routing": {"selected": "agent", "reason": "auto_routed_by_agent"},
         }
+        if artifacts:
+            payload["artifacts"] = artifacts
+        return payload
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -252,6 +393,11 @@ async def nanobot_chat_stream(request: ChatRequest):
 
             response = await current_task
             text = response or ""
+            session_messages = []
+            if nanobot_service.agent:
+                session = nanobot_service.agent.sessions.get_or_create(request.session_id)
+                session_messages = session.messages
+            artifacts = extract_artifacts(text, session_messages)
 
             # Check again for viz payload after task completes if not sent yet
             viz_payload = current_viz_data.get()
@@ -268,17 +414,19 @@ async def nanobot_chat_stream(request: ChatRequest):
                 except Exception as e:
                     pass
 
-            # Persist viz payload to session
-            if viz_payload and nanobot_service.agent:
-                session = nanobot_service.agent.sessions.get_or_create(request.session_id)
-                if session.messages and session.messages[-1].get("role") == "assistant":
-                    session.messages[-1]["viz"] = viz_payload
-                    nanobot_service.agent.sessions.save(session)
+            _persist_assistant_enrichment(
+                session_id=request.session_id,
+                viz_payload=viz_payload if isinstance(viz_payload, dict) else None,
+                artifacts=artifacts,
+            )
             
             # Since true streaming is enabled via StreamingLiteLLMProvider, 
             # we no longer need to chunk and yield `text` here.
             # Just yield the final text to signal completion and update final state.
-            yield f"data: {json.dumps({'type': 'final', 'content': text}, ensure_ascii=False)}\n\n"
+            final_payload = {"type": "final", "content": text}
+            if artifacts:
+                final_payload["artifacts"] = artifacts
+            yield f"data: {json.dumps(final_payload, ensure_ascii=False)}\n\n"
             yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
         except asyncio.CancelledError:
             raise

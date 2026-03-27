@@ -15,8 +15,9 @@ logger = logging.getLogger(__name__)
 
 # Add project root to sys.path to allow importing nanobot
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.append(str(PROJECT_ROOT))
+NANOBOT_ROOT = PROJECT_ROOT / "nanobot"
+if str(NANOBOT_ROOT) not in sys.path:
+    sys.path.append(str(NANOBOT_ROOT))
 
 from nanobot.providers.litellm_provider import LiteLLMProvider
 from app.connectors.postgres import postgres_connector

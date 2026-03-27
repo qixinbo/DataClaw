@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { User, Loader2, ArrowUp, ChevronDown, Check, Square, Plus, Database, Wand2, Zap, CheckCircle2, Table, XCircle, Settings, ExternalLink } from "lucide-react";
+import { User, Loader2, ArrowUp, ChevronDown, Check, Square, Plus, Database, Wand2, Zap, CheckCircle2, Table, XCircle, Settings, ExternalLink, FileText, Download, Eye } from "lucide-react";
 import { api } from "@/lib/api";
 import { type ChartSpec } from "@/store/visualizationStore";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { InlineVisualizationCard } from "./InlineVisualizationCard";
 import { useProjectStore } from "@/store/projectStore";
 import { SlashCommandMenu } from "./SlashCommandMenu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Message {
   id: string;
@@ -24,6 +25,7 @@ interface Message {
   progressLogs?: string[];
   routeInfo?: string;
   reasoningContent?: string;
+  artifacts?: MessageArtifact[];
 }
 
 interface MessageViz {
@@ -33,6 +35,21 @@ interface MessageViz {
   canVisualize: boolean;
   reasoning?: string;
   error?: string | null;
+}
+
+interface MessageArtifact {
+  name: string;
+  mime_type: string;
+  size: number;
+  download_url: string;
+  previewable: boolean;
+  preview_url?: string;
+}
+
+interface ArtifactPreviewTarget {
+  name: string;
+  mimeType: string;
+  previewUrl: string;
 }
 
 const REPORT_HTML_BLOCK_REGEX = /<!--\s*REPORT_HTML_START\s*-->([\s\S]*?)<!--\s*REPORT_HTML_END\s*-->/i;
@@ -97,6 +114,56 @@ interface SessionData {
   }>;
 }
 
+const formatArtifactSize = (size: number): string => {
+  if (!Number.isFinite(size) || size < 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = size;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  const fixed = value >= 10 || unitIndex === 0 ? 0 : 1;
+  return `${value.toFixed(fixed)} ${units[unitIndex]}`;
+};
+
+const normalizeArtifacts = (raw: unknown): MessageArtifact[] => {
+  if (!Array.isArray(raw)) return [];
+  return raw.reduce<MessageArtifact[]>((acc, item) => {
+    if (!item || typeof item !== "object") return acc;
+    const source = item as Record<string, unknown>;
+    const name = typeof source.name === "string" ? source.name : "";
+    const mimeType = typeof source.mime_type === "string"
+      ? source.mime_type
+      : typeof source.mimeType === "string"
+        ? source.mimeType
+        : "application/octet-stream";
+    const size = typeof source.size === "number" ? source.size : 0;
+    const downloadUrl = typeof source.download_url === "string"
+      ? source.download_url
+      : typeof source.downloadUrl === "string"
+        ? source.downloadUrl
+        : "";
+    const previewable = Boolean(source.previewable);
+    const previewUrl = typeof source.preview_url === "string"
+      ? source.preview_url
+      : typeof source.previewUrl === "string"
+        ? source.previewUrl
+        : undefined;
+    if (!name || !downloadUrl) return acc;
+    const normalized: MessageArtifact = {
+      name,
+      mime_type: mimeType,
+      size,
+      download_url: downloadUrl,
+      previewable,
+      preview_url: previewUrl,
+    };
+    acc.push(normalized);
+    return acc;
+  }, []);
+};
+
 export function ChatInterface() {
   const { t } = useTranslation();
   const [messagesBySession, setMessagesBySession] = useState<Record<string, Message[]>>({});
@@ -105,6 +172,7 @@ export function ChatInterface() {
   const [availableSkills, setAvailableSkills] = useState<Skill[]>([]);
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [artifactPreview, setArtifactPreview] = useState<ArtifactPreviewTarget | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const { currentProject } = useProjectStore();
@@ -294,6 +362,7 @@ export function ChatInterface() {
                 role: m.role as 'user' | 'assistant',
                 content: cleanContent,
                 viz: m.viz ? buildMessageViz(m.viz) : undefined,
+                artifacts: normalizeArtifacts(m.artifacts),
               };
             });
           setMessagesForSession(activeSessionKey, formattedMessages);
@@ -643,6 +712,7 @@ export function ChatInterface() {
             selected?: string;
             reason?: string;
             chart?: { chart_spec?: ChartSpec | null; reasoning?: string; can_visualize?: boolean; chart_type?: string } | null;
+            artifacts?: unknown;
           };
 
            if (payload.type === "delta" && payload.content) {
@@ -667,14 +737,17 @@ export function ChatInterface() {
             pushProgressLog(payload.content, payload.is_reasoning || false);
           }
 
-           if (payload.type === "final" && payload.content) {
+           if (payload.type === "final") {
             hasFinalPayload = true;
-             streamedText = payload.content;
+            if (typeof payload.content === "string") {
+              streamedText = payload.content;
+            }
             flushAssistant(true);
             pushProgressLog(t('answerGenerationCompleted'));
+            const messageArtifacts = normalizeArtifacts(payload.artifacts);
              setMessagesForSession(targetSessionKey, (prev) =>
                prev.map((msg) =>
-                msg.id === assistantId ? { ...msg, content: payload.content || "", awaitingFirstToken: false, viz: streamedViz ?? msg.viz } : msg
+                msg.id === assistantId ? { ...msg, content: typeof payload.content === "string" ? payload.content : msg.content || "", awaitingFirstToken: false, viz: streamedViz ?? msg.viz, artifacts: messageArtifacts.length > 0 ? messageArtifacts : msg.artifacts } : msg
                )
              );
            }
@@ -1059,6 +1132,43 @@ export function ChatInterface() {
                                 </a>
                               </div>
                             ) : null}
+                            {msg.artifacts && msg.artifacts.length > 0 ? (
+                              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                                {msg.artifacts.map((artifact, artifactIndex) => (
+                                  <div key={`${msg.id}-artifact-${artifactIndex}`} className="rounded-xl border border-zinc-200 bg-zinc-50/60 px-3 py-2.5">
+                                    <div className="flex items-center gap-2.5">
+                                      <div className="h-8 w-8 rounded-lg bg-white border border-zinc-200 flex items-center justify-center text-zinc-500 shrink-0">
+                                        <FileText className="h-4 w-4" />
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="text-sm font-medium text-zinc-800 truncate">{artifact.name}</div>
+                                        <div className="text-[11px] text-zinc-500">{formatArtifactSize(artifact.size)}</div>
+                                      </div>
+                                    </div>
+                                    <div className="mt-2 flex items-center gap-2">
+                                      {artifact.previewable && artifact.preview_url ? (
+                                        <button
+                                          onClick={() => setArtifactPreview({ name: artifact.name, mimeType: artifact.mime_type, previewUrl: artifact.preview_url || "" })}
+                                          className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border border-zinc-300 text-zinc-700 hover:bg-white transition-colors"
+                                        >
+                                          <Eye className="h-3.5 w-3.5" />
+                                          {t('preview')}
+                                        </button>
+                                      ) : null}
+                                      <a
+                                        href={artifact.download_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border border-zinc-300 text-zinc-700 hover:bg-white transition-colors"
+                                      >
+                                        <Download className="h-3.5 w-3.5" />
+                                        {t('download')}
+                                      </a>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
                             {msg.viz ? (
                               <div className="mt-3 pt-3 border-t border-zinc-100">
                                 <InlineVisualizationCard viz={msg.viz} />
@@ -1243,6 +1353,30 @@ export function ChatInterface() {
           </div>
         </div>
       )}
+      <Dialog open={Boolean(artifactPreview)} onOpenChange={(open) => {
+        if (!open) setArtifactPreview(null);
+      }}>
+        <DialogContent className="sm:max-w-[min(1100px,95vw)] h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{artifactPreview?.name || t('artifactPreview')}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 rounded-lg border border-zinc-200 bg-white overflow-hidden">
+            {artifactPreview?.mimeType.startsWith("image/") ? (
+              <img
+                src={artifactPreview.previewUrl}
+                alt={artifactPreview.name}
+                className="w-full h-full object-contain bg-zinc-50"
+              />
+            ) : artifactPreview ? (
+              <iframe
+                title={artifactPreview.name}
+                src={artifactPreview.previewUrl}
+                className="w-full h-full"
+              />
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

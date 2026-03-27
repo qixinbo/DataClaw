@@ -7,8 +7,9 @@ from pathlib import Path
 
 # Add project root to sys.path
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.append(str(PROJECT_ROOT))
+NANOBOT_ROOT = PROJECT_ROOT / "nanobot"
+if str(NANOBOT_ROOT) not in sys.path:
+    sys.path.append(str(NANOBOT_ROOT))
 
 from nanobot.providers.litellm_provider import LiteLLMProvider
 from app.schemas.chart import ChartGenerationResponse
