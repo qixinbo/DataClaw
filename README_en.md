@@ -21,6 +21,7 @@ Whether you're querying a massive Supabase/PostgreSQL database or just tossing i
 - **🧠 Bring Your Own LLM**: Native integration with LiteLLM. Plug in OpenAI, DeepSeek, Zhipu, DashScope, Volcengine, or any compatible provider.
 - **🛠️ Extensible Agent Skills**: Built on top of the powerful `nanobot` framework (a lightweight version of `OpenClaw`). Add custom tools and slash commands (`/`) to tailor the agent to your specific business logic.
 - **📊 Customizable Dashboards**: Pin your favorite chat-generated charts to a drag-and-drop dashboard for quick access.
+- **📦 Intelligent Artifact Management**: Automatically extracts generated files (HTML reports, PDFs, PPTs, images, etc.) from conversations, providing embedded previews and one-click downloads.
 
 ***
 
@@ -33,6 +34,10 @@ Whether you're querying a massive Supabase/PostgreSQL database or just tossing i
   <br />
   <h3>Customizable Dashboard</h3>
   <img src="./examples/dashboard.png" width="80%" />
+  <br />
+  <br />
+  <h3>Artifact Preview</h3>
+  <img src="./examples/artifact.png" width="80%" />
 </div>
 
 <br />

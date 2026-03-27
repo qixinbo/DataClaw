@@ -21,6 +21,7 @@
 - **🧠 灵活的模型接入**: 原生集成 LiteLLM，支持随插随用 OpenAI、DeepSeek、智谱、通义千问 (DashScope)、火山引擎或任何兼容的 LLM 提供商。
 - **🛠️ 强大的 Agent 技能拓展**: 基于核心 `nanobot`框架（`OpenClaw`的精简版）构建。支持通过斜杠命令 (`/`) 快速调用自定义工具 (Skills)，完美贴合特定业务逻辑。
 - **📊 可定制仪表盘 (Dashboard)**: 一键将对话中生成的图表固定到看板，拖拽布局，随时查看核心指标。
+- **📦 智能产物管理 (Artifact)**: 自动提取对话中生成的各种文件（网页报告、PDF、PPT、图片等），提供一键内嵌预览与下载功能，让成果触手可及。
 
 ***
 
@@ -33,6 +34,10 @@
   <br />
   <h3>可定制仪表盘</h3>
   <img src="./examples/dashboard.png" width="80%" />
+  <br />
+  <br />
+  <h3>智能产物预览 (Artifact)</h3>
+  <img src="./examples/artifact.png" width="80%" />
 </div>
 
 <br />
