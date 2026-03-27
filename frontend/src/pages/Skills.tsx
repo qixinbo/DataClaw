@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Trash2, Terminal, Loader2, FolderOpen, Eye, ShieldCheck, AlertCircle, Wand2, Upload } from "lucide-react";
+import { Trash2, Terminal, Loader2, FolderOpen, Eye, ShieldCheck, AlertCircle, Wand2, Upload, Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,21 +26,78 @@ interface Skill {
   is_builtin?: boolean;
 }
 
+interface MCPServer {
+  id?: string;
+  project_id?: number;
+  name: string;
+  type: 'stdio' | 'sse' | 'streamableHttp';
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  url?: string;
+  headers?: Record<string, string>;
+  status?: string;
+}
+
 export function Skills() {
   const { t } = useTranslation();
+  const [activeTab, setActiveTab] = useState<'skills' | 'mcp'>('skills');
+
+  // Skills state
   const [skills, setSkills] = useState<Skill[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSkill, setEditingSkill] = useState<Skill | null>(null);
   const [newSkill, setNewSkill] = useState<Partial<Skill>>({ type: 'python', content: '', source: t('localImport'), status: t('safe') });
+  
+  // MCP state
+  const [mcpServers, setMcpServers] = useState<MCPServer[]>([]);
+  const [isMcpLoading, setIsMcpLoading] = useState(false);
+  const [isMcpDialogOpen, setIsMcpDialogOpen] = useState(false);
+  const [editingMcp, setEditingMcp] = useState<MCPServer | null>(null);
+  const [newMcp, setNewMcp] = useState<Partial<MCPServer>>({ type: 'stdio' });
+  const [mcpArgsStr, setMcpArgsStr] = useState('');
+  const [mcpEnvStr, setMcpEnvStr] = useState('');
+  const [mcpHeadersStr, setMcpHeadersStr] = useState('');
+
   const { currentProject } = useProjectStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    const fetchSkills = async () => {
+      if (!currentProject) return;
+      setIsLoading(true);
+      try {
+          const data = await api.get<Skill[]>(`/api/v1/skills?project_id=${currentProject.id}`);
+          setSkills(data);
+      } catch (error) {
+          console.error("Failed to fetch skills", error);
+      } finally {
+          setIsLoading(false);
+      }
+    };
+
+    const fetchMcpServers = async () => {
+      if (!currentProject) return;
+      setIsMcpLoading(true);
+      try {
+          const data = await api.get<MCPServer[]>(`/api/v1/mcp?project_id=${currentProject.id}`);
+          setMcpServers(data);
+      } catch (error) {
+          console.error("Failed to fetch MCP servers", error);
+      } finally {
+          setIsMcpLoading(false);
+      }
+    };
+
     if (currentProject) {
-      fetchSkills();
+      if (activeTab === 'skills') {
+        fetchSkills();
+      } else {
+        fetchMcpServers();
+      }
     }
-  }, [currentProject]);
+  }, [currentProject, activeTab]);
 
   const fetchSkills = async () => {
     if (!currentProject) return;
@@ -52,6 +109,19 @@ export function Skills() {
         console.error("Failed to fetch skills", error);
     } finally {
         setIsLoading(false);
+    }
+  };
+
+  const fetchMcpServers = async () => {
+    if (!currentProject) return;
+    setIsMcpLoading(true);
+    try {
+        const data = await api.get<MCPServer[]>(`/api/v1/mcp?project_id=${currentProject.id}`);
+        setMcpServers(data);
+    } catch (error) {
+        console.error("Failed to fetch MCP servers", error);
+    } finally {
+        setIsMcpLoading(false);
     }
   };
 
@@ -67,9 +137,10 @@ export function Skills() {
     try {
       await api.post('/api/v1/skills/upload', formData);
       await fetchSkills();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to upload skill", error);
-      const errorMessage = error.response?.data?.detail || error.message || t('unknownError');
+      const err = error as { response?: { data?: { detail?: string } }, message?: string };
+      const errorMessage = err.response?.data?.detail || err.message || t('unknownError');
       alert(t('uploadFailed') + ': ' + errorMessage);
     } finally {
       setIsLoading(false);
@@ -121,6 +192,79 @@ export function Skills() {
     }
   };
 
+  const handleAddMcpServer = async () => {
+    if (!currentProject) return;
+    try {
+      const payload: Partial<MCPServer> = {
+        name: newMcp.name,
+        type: newMcp.type,
+        project_id: currentProject.id
+      };
+
+      if (newMcp.type === 'stdio') {
+        payload.command = newMcp.command;
+        try {
+          payload.args = mcpArgsStr ? JSON.parse(mcpArgsStr) : [];
+        } catch {
+          alert("Args must be a valid JSON array");
+          return;
+        }
+        try {
+          payload.env = mcpEnvStr ? JSON.parse(mcpEnvStr) : {};
+        } catch {
+          alert("Env must be a valid JSON object");
+          return;
+        }
+      } else {
+        payload.url = newMcp.url;
+        try {
+          payload.headers = mcpHeadersStr ? JSON.parse(mcpHeadersStr) : {};
+        } catch {
+          alert("Headers must be a valid JSON object");
+          return;
+        }
+      }
+
+      if (editingMcp && editingMcp.id) {
+        await api.put(`/api/v1/mcp/${editingMcp.id}?project_id=${currentProject.id}`, payload);
+      } else {
+        await api.post(`/api/v1/mcp`, payload);
+      }
+      
+      await fetchMcpServers();
+      setIsMcpDialogOpen(false);
+      setEditingMcp(null);
+      setNewMcp({ type: 'stdio' });
+      setMcpArgsStr('');
+      setMcpEnvStr('');
+      setMcpHeadersStr('');
+    } catch (error: unknown) {
+      console.error("Failed to save MCP server", error);
+      const err = error as { response?: { data?: { detail?: string } }, message?: string };
+      alert(t('saveFailed') + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleEditMcpServer = (mcp: MCPServer) => {
+    setEditingMcp(mcp);
+    setNewMcp(mcp);
+    setMcpArgsStr(mcp.args ? JSON.stringify(mcp.args, null, 2) : '');
+    setMcpEnvStr(mcp.env ? JSON.stringify(mcp.env, null, 2) : '');
+    setMcpHeadersStr(mcp.headers ? JSON.stringify(mcp.headers, null, 2) : '');
+    setIsMcpDialogOpen(true);
+  };
+
+  const handleDeleteMcpServer = async (id: string) => {
+    if (!currentProject) return;
+    if (!window.confirm(t('confirmDeleteMcpServer'))) return;
+    try {
+        await api.delete(`/api/v1/mcp/${id}?project_id=${currentProject.id}`);
+        setMcpServers(mcpServers.filter(s => s.id !== id));
+    } catch (error) {
+        console.error("Failed to delete MCP server", error);
+    }
+  };
+
   if (!currentProject) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-zinc-500 gap-4">
@@ -132,30 +276,59 @@ export function Skills() {
 
   return (
     <div className="h-full flex flex-col bg-white overflow-hidden">
-      <div className="border-b border-zinc-100 px-8 py-5 flex items-center justify-between bg-white shrink-0">
-        <div>
-          <h1 className="text-2xl font-bold text-zinc-900 flex items-center gap-2">
-            < Wand2 className="h-6 w-6 text-indigo-500" />{t('skillsRepository', { project: currentProject.name })}</h1>
-          <p className="text-sm text-zinc-500 mt-1">{t('manageAiSkillsDesc')}</p>
+      <div className="border-b border-zinc-100 px-8 pt-5 bg-white shrink-0">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-zinc-900 flex items-center gap-2">
+              < Wand2 className="h-6 w-6 text-indigo-500" />{t('skillsRepository')}</h1>
+            <p className="text-sm text-zinc-500 mt-1">{t('manageAiSkillsDesc')}</p>
+          </div>
+          <div className="flex gap-3">
+            {activeTab === 'skills' ? (
+              <>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  accept=".md,.zip,.tar.gz,.tgz"
+                />
+                <Button 
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4" />{t('uploadSkill')}
+                </Button>
+              </>
+            ) : (
+              <Button 
+                className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
+                onClick={() => setIsMcpDialogOpen(true)}
+              >
+                <Plus className="h-4 w-4" />{t('addMcpServer')}
+              </Button>
+            )}
+          </div>
         </div>
-        <div className="flex gap-3">
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileUpload}
-            className="hidden"
-            accept=".md,.zip,.tar.gz,.tgz"
-          />
-          <Button 
-            className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
-            onClick={() => fileInputRef.current?.click()}
+        <div className="flex gap-6">
+          <button 
+            className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'skills' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-zinc-500 hover:text-zinc-700'}`}
+            onClick={() => setActiveTab('skills')}
           >
-            <Upload className="h-4 w-4" />{t('uploadSkill')}</Button>
+            {t('skills')}
+          </button>
+          <button 
+            className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'mcp' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-zinc-500 hover:text-zinc-700'}`}
+            onClick={() => setActiveTab('mcp')}
+          >
+            {t('mcpConfig')}
+          </button>
         </div>
       </div>
 
       <div className="flex-1 overflow-auto p-4 md:p-8 bg-zinc-50/30">
-        <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden min-w-[800px] lg:min-w-0">
+        {activeTab === 'skills' ? (
+          <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden min-w-[800px] lg:min-w-0">
           <Table className="table-fixed w-full">
             <TableHeader className="bg-zinc-50/50">
               <TableRow className="hover:bg-transparent">
@@ -265,6 +438,94 @@ export function Skills() {
             </TableBody>
           </Table>
         </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden min-w-[800px] lg:min-w-0">
+            <Table className="table-fixed w-full">
+              <TableHeader className="bg-zinc-50/50">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-[25%] font-semibold text-zinc-700 py-3 px-4 text-sm">{t('mcpServerName')}</TableHead>
+                  <TableHead className="w-[15%] font-semibold text-zinc-700 py-3 px-4 text-sm">{t('transport')}</TableHead>
+                  <TableHead className="w-[30%] font-semibold text-zinc-700 py-3 px-4 text-sm">{t('content')}</TableHead>
+                  <TableHead className="w-[15%] font-semibold text-zinc-700 py-3 px-4 text-sm">{t('status')}</TableHead>
+                  <TableHead className="w-[15%] font-semibold text-zinc-700 py-3 px-4 text-sm text-right">{t('actions')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isMcpLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-24 text-center">
+                      <div className="flex items-center justify-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  <>
+                    {mcpServers.map((mcp) => (
+                      <TableRow key={mcp.id} className="group hover:bg-zinc-50/50 transition-colors border-zinc-100">
+                        <TableCell className="py-4 px-4 overflow-hidden">
+                          <h3 className="font-bold text-zinc-900 text-sm md:text-base truncate flex-1" title={mcp.name}>{mcp.name}</h3>
+                        </TableCell>
+                        <TableCell className="py-4 px-4 text-zinc-600 text-sm">
+                          {mcp.type}
+                        </TableCell>
+                        <TableCell className="py-4 px-4 text-zinc-600 text-sm truncate" title={mcp.type === 'stdio' ? mcp.command : mcp.url}>
+                          {mcp.type === 'stdio' ? mcp.command : mcp.url}
+                        </TableCell>
+                        <TableCell className="py-4 px-4 text-zinc-600 text-sm truncate">
+                          <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] md:text-xs font-medium whitespace-nowrap ${
+                            mcp.status === 'connected' 
+                            ? 'bg-green-50 text-green-700 border border-green-100' 
+                            : 'bg-zinc-50 text-zinc-700 border border-zinc-100'
+                          }`}>
+                            {mcp.status === 'connected' ? (
+                              <ShieldCheck className="h-3 w-3" />
+                            ) : (
+                              <AlertCircle className="h-3 w-3" />
+                            )}
+                            {mcp.status}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-all shrink-0"
+                              onClick={() => handleEditMcpServer(mcp)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-all shrink-0"
+                              onClick={() => handleDeleteMcpServer(mcp.id!)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {mcpServers.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="py-24 text-center">
+                          <div className="flex flex-col items-center gap-3 text-zinc-400">
+                            <div className="p-4 bg-zinc-50 rounded-2xl">
+                              <Terminal className="h-10 w-10 opacity-20" />
+                            </div>
+                            <p className="text-sm">{t('noMcpServers')}</p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={(open) => {
@@ -296,7 +557,7 @@ export function Skills() {
                   <Label htmlFor="type" className="text-zinc-600 font-medium text-sm">{t('type')}</Label>
                   <Select 
                       value={newSkill.type} 
-                      onValueChange={(val: any) => setNewSkill({...newSkill, type: val})}
+                      onValueChange={(val) => { if (val) setNewSkill({...newSkill, type: val}) }}
                       disabled={editingSkill?.is_builtin}
                   >
                       <SelectTrigger className="rounded-lg border-zinc-200 h-10">
@@ -313,7 +574,7 @@ export function Skills() {
                   <Label htmlFor="status" className="text-zinc-600 font-medium text-sm">{t('status')}</Label>
                   <Select 
                       value={newSkill.status} 
-                      onValueChange={(val: any) => setNewSkill({...newSkill, status: val})}
+                      onValueChange={(val) => { if (val) setNewSkill({...newSkill, status: val}) }}
                       disabled={editingSkill?.is_builtin}
                   >
                       <SelectTrigger className="rounded-lg border-zinc-200 h-10">
@@ -354,6 +615,114 @@ export function Skills() {
             {!editingSkill?.is_builtin && (
               <Button onClick={handleAddSkill} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-6 h-10 w-full">{t('saveSkill')}</Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isMcpDialogOpen} onOpenChange={(open) => {
+          setIsMcpDialogOpen(open);
+          if (!open) {
+              setEditingMcp(null);
+              setNewMcp({ type: 'stdio' });
+              setMcpArgsStr('');
+              setMcpEnvStr('');
+              setMcpHeadersStr('');
+          }
+      }}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col rounded-2xl p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle className="text-xl font-bold text-zinc-900">{editingMcp ? t('editMcpServer') : t('addMcpServer')}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto px-6 py-2">
+            <div className="grid gap-5">
+              <div className="grid gap-1.5">
+                <Label htmlFor="mcp-name" className="text-zinc-600 font-medium text-sm">{t('name')}</Label>
+                <Input 
+                  id="mcp-name" 
+                  placeholder={t('mcpServerName')}
+                  value={newMcp.name || ''} 
+                  onChange={(e) => setNewMcp({...newMcp, name: e.target.value})}
+                  className="rounded-lg border-zinc-200 h-10" 
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="transport" className="text-zinc-600 font-medium text-sm">{t('transport')}</Label>
+                <Select 
+                    value={newMcp.type} 
+                    onValueChange={(val) => { if (val) setNewMcp({...newMcp, type: val as 'stdio' | 'sse' | 'streamableHttp'}) }}
+                >
+                    <SelectTrigger className="rounded-lg border-zinc-200 h-10">
+                        <SelectValue placeholder={t('transport')} />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-lg">
+                        <SelectItem value="stdio">stdio</SelectItem>
+                        <SelectItem value="sse">sse</SelectItem>
+                        <SelectItem value="streamableHttp">streamableHttp</SelectItem>
+                    </SelectContent>
+                </Select>
+              </div>
+
+              {newMcp.type === 'stdio' ? (
+                <>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="command" className="text-zinc-600 font-medium text-sm">{t('command')}</Label>
+                    <Input 
+                      id="command" 
+                      placeholder="e.g. npx, python"
+                      value={newMcp.command || ''} 
+                      onChange={(e) => setNewMcp({...newMcp, command: e.target.value})}
+                      className="rounded-lg border-zinc-200 h-10" 
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="args" className="text-zinc-600 font-medium text-sm">{t('args')}</Label>
+                    <Textarea 
+                      id="args" 
+                      value={mcpArgsStr} 
+                      onChange={(e) => setMcpArgsStr(e.target.value)}
+                      className="rounded-lg border-zinc-200 font-mono text-xs min-h-[80px] py-3 bg-zinc-50" 
+                      placeholder='e.g. ["-y", "@modelcontextprotocol/server-everything"]'
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="env" className="text-zinc-600 font-medium text-sm">{t('env')}</Label>
+                    <Textarea 
+                      id="env" 
+                      value={mcpEnvStr} 
+                      onChange={(e) => setMcpEnvStr(e.target.value)}
+                      className="rounded-lg border-zinc-200 font-mono text-xs min-h-[80px] py-3 bg-zinc-50" 
+                      placeholder='e.g. {"FOO": "bar"}'
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="url" className="text-zinc-600 font-medium text-sm">{t('url')}</Label>
+                    <Input 
+                      id="url" 
+                      placeholder="e.g. http://localhost:8000/sse"
+                      value={newMcp.url || ''} 
+                      onChange={(e) => setNewMcp({...newMcp, url: e.target.value})}
+                      className="rounded-lg border-zinc-200 h-10" 
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="headers" className="text-zinc-600 font-medium text-sm">{t('headers')}</Label>
+                    <Textarea 
+                      id="headers" 
+                      value={mcpHeadersStr} 
+                      onChange={(e) => setMcpHeadersStr(e.target.value)}
+                      className="rounded-lg border-zinc-200 font-mono text-xs min-h-[80px] py-3 bg-zinc-50" 
+                      placeholder='e.g. {"Authorization": "Bearer token"}'
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="p-6 pt-2">
+            <Button onClick={handleAddMcpServer} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-6 h-10 w-full">{t('saveMcpServer')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
