@@ -39,6 +39,16 @@ interface MCPServer {
   status?: string;
 }
 
+const dedupeSkillsById = (skills: Skill[]): Skill[] => {
+  const map = new Map<string, Skill>();
+  for (const skill of skills) {
+    const id = (skill.id || "").trim();
+    if (!id || map.has(id)) continue;
+    map.set(id, skill);
+  }
+  return Array.from(map.values());
+};
+
 export function Skills() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'skills' | 'mcp'>('skills');
@@ -69,7 +79,7 @@ export function Skills() {
       setIsLoading(true);
       try {
           const data = await api.get<Skill[]>(`/api/v1/skills?project_id=${currentProject.id}`);
-          setSkills(data);
+          setSkills(dedupeSkillsById(data || []));
       } catch (error) {
           console.error("Failed to fetch skills", error);
       } finally {
@@ -104,7 +114,7 @@ export function Skills() {
     setIsLoading(true);
     try {
         const data = await api.get<Skill[]>(`/api/v1/skills?project_id=${currentProject.id}`);
-        setSkills(data);
+        setSkills(dedupeSkillsById(data || []));
     } catch (error) {
         console.error("Failed to fetch skills", error);
     } finally {
@@ -153,7 +163,7 @@ export function Skills() {
     if (newSkill.name && newSkill.description && newSkill.content) {
       try {
           if (editingSkill) {
-              await api.put<Skill>(`/api/v1/skills/${editingSkill.id}?project_id=${currentProject.id}`, {
+              await api.put<Skill>(`/api/v1/skills/${encodeURIComponent(editingSkill.id)}?project_id=${currentProject.id}`, {
                   ...newSkill,
                   project_id: currentProject.id
               });
@@ -185,7 +195,7 @@ export function Skills() {
     if (!currentProject) return;
     if (!window.confirm(t('confirmDeleteSkill'))) return;
     try {
-        await api.delete(`/api/v1/skills/${id}?project_id=${currentProject.id}`);
+        await api.delete(`/api/v1/skills/${encodeURIComponent(id)}?project_id=${currentProject.id}`);
         setSkills(skills.filter(s => s.id !== id));
     } catch (error) {
         console.error("Failed to delete skill", error);
@@ -350,8 +360,8 @@ export function Skills() {
                 </TableRow>
               ) : (
                 <>
-                  {skills.map((skill) => (
-                    <TableRow key={skill.id} className="group hover:bg-zinc-50/50 transition-colors border-zinc-100">
+                  {skills.map((skill, index) => (
+                    <TableRow key={`${skill.id}_${index}`} className="group hover:bg-zinc-50/50 transition-colors border-zinc-100">
                       <TableCell className="py-4 px-4 overflow-hidden">
                         <div className="flex items-start gap-3 min-w-0">
                           <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600 mt-0.5 shrink-0">
@@ -729,4 +739,3 @@ export function Skills() {
     </div>
   );
 }
-

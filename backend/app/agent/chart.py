@@ -11,7 +11,7 @@ NANOBOT_ROOT = PROJECT_ROOT / "nanobot"
 if str(NANOBOT_ROOT) not in sys.path:
     sys.path.append(str(NANOBOT_ROOT))
 
-from nanobot.providers.litellm_provider import LiteLLMProvider
+from app.core.llm_provider import build_llm_provider
 from app.schemas.chart import ChartGenerationResponse
 from app.services.llm_cache import get_active_llm_config
 
@@ -150,12 +150,12 @@ async def generate_chart(data: List[Dict[str, Any]], query: str) -> ChartGenerat
         )
     
     try:
-        provider = LiteLLMProvider(
+        provider = build_llm_provider(
+            model=active_config.get("model"),
+            provider=active_config.get("provider"),
             api_key=active_config.get("api_key"),
             api_base=active_config.get("api_base"),
-            default_model=active_config.get("model"),
             extra_headers=active_config.get("extra_headers") or {},
-            provider_name=active_config.get("provider")
         )
     except Exception as e:
         return ChartGenerationResponse(

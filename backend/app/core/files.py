@@ -2,14 +2,32 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from app.core.data_root import get_data_root, get_reports_root, get_uploads_root, get_workspace_root
+from app.core.data_root import (
+    BACKEND_ROOT,
+    LEGACY_DATA_ROOT,
+    get_data_root,
+    get_reports_root,
+    get_uploads_root,
+    get_workspace_root,
+)
 
 
 data_root = get_data_root()
 workspace_root = get_workspace_root()
 uploads_root = get_uploads_root()
 reports_root = get_reports_root()
-allowed_artifact_roots = (workspace_root, uploads_root, reports_root)
+legacy_workspace_root = LEGACY_DATA_ROOT / "workspace"
+legacy_uploads_root = LEGACY_DATA_ROOT / "uploads"
+legacy_reports_root = LEGACY_DATA_ROOT / "data"
+backend_root = BACKEND_ROOT
+allowed_artifact_roots = (
+    workspace_root,
+    uploads_root,
+    reports_root,
+    legacy_workspace_root,
+    legacy_uploads_root,
+    legacy_reports_root,
+)
 
 
 def resolve_upload_file_path(file_url: Optional[str]) -> Path:

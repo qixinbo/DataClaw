@@ -7,7 +7,7 @@ from jose import jwt, JWTError
 from pydantic import BaseModel, Field
 from app.core.security import SECRET_KEY, ALGORITHM
 from app.core.data_root import get_data_root
-from litellm import completion
+from app.core.llm_provider import build_llm_provider
 
 router = APIRouter()
 security = HTTPBearer()
@@ -154,52 +154,30 @@ def delete_llm_config(config_id: str, _: CurrentUser = Depends(get_admin_user)):
     return {"message": "LLM configuration deleted successfully"}
 
 @router.post("/llm/test")
-def test_connection(request: TestConnectionRequest, _: CurrentUser = Depends(get_admin_user)):
+async def test_connection(request: TestConnectionRequest, _: CurrentUser = Depends(get_admin_user)):
     try:
-        # Use litellm to test connection
-        # litellm handles many providers
-        kwargs = {
-            "model": request.model,
-            "messages": [{"role": "user", "content": "Hello"}],
-            "max_tokens": 5
+        provider = build_llm_provider(
+            model=request.model.strip(),
+            provider=request.provider,
+            api_key=request.api_key,
+            api_base=request.api_base,
+            extra_headers=request.extra_headers,
+        )
+        response = await provider.chat(
+            messages=[{"role": "user", "content": "Hello"}],
+            max_tokens=5,
+            temperature=0,
+        )
+        if response.finish_reason == "error":
+            raise ValueError(response.content or "Unknown provider error")
+        return {
+            "success": True,
+            "message": "Connection successful",
+            "details": {
+                "content": response.content,
+                "finish_reason": response.finish_reason,
+                "usage": response.usage,
+            },
         }
-        
-        if request.api_key:
-            kwargs["api_key"] = request.api_key
-        
-        if request.api_base:
-            kwargs["api_base"] = request.api_base
-            
-        if request.extra_headers:
-            kwargs["extra_headers"] = request.extra_headers
-
-        # For OpenAI-compatible endpoints that are not standard OpenAI (like Local, vLLM etc)
-        # usually user sets provider to "openai" and api_base to their custom URL.
-        # litellm usually works well if we pass custom_llm_provider="openai" if provider is openai but custom url
-        
-        # If provider is "local" or "openai", we generally use "openai" format
-        if request.provider == "local":
-            kwargs["custom_llm_provider"] = "openai"
-        elif request.provider:
-            kwargs["custom_llm_provider"] = request.provider
-
-        # If user explicitly selected provider in UI, we might want to respect that
-        # But litellm completion main arg is 'model'. 
-        # If the UI 'model' input doesn't have prefix, we might need to add it or pass custom_llm_provider.
-        
-        # Simple heuristic: if provider is set, try to pass it if litellm supports it or just rely on env vars/args
-        # For this simple test, we just try to call it.
-        
-        try:
-            response = completion(**kwargs)
-        except Exception as first_error:
-            error_text = str(first_error)
-            if request.provider and "Provider NOT provided" in error_text and "/" not in request.model:
-                retry_kwargs = kwargs.copy()
-                retry_kwargs["model"] = f"{request.provider}/{request.model}"
-                response = completion(**retry_kwargs)
-            else:
-                raise first_error
-        return {"success": True, "message": "Connection successful", "details": str(response)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Connection failed: {str(e)}")

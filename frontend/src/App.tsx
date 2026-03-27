@@ -11,6 +11,7 @@ import { Login } from "./pages/Login";
 import { ModelConfigs } from "./pages/ModelConfigs";
 import { DataSources } from "./pages/DataSources";
 import { Modeling } from "./pages/Modeling";
+import { Subagents } from "./pages/Subagents";
 import { useAuthStore } from "./store/authStore";
 
 // Protected Route Component
@@ -91,6 +92,14 @@ function App() {
           <ProtectedRoute>
             <MainLayout>
               <Projects />
+            </MainLayout>
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/projects/:projectId/subagents" element={
+          <ProtectedRoute>
+            <MainLayout>
+              <Subagents />
             </MainLayout>
           </ProtectedRoute>
         } />

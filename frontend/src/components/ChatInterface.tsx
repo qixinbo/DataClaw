@@ -100,6 +100,16 @@ interface Skill {
   type: string;
 }
 
+const dedupeSkillsById = (skills: Skill[]): Skill[] => {
+  const map = new Map<string, Skill>();
+  for (const skill of skills) {
+    const id = (skill.id || "").trim();
+    if (!id || map.has(id)) continue;
+    map.set(id, skill);
+  }
+  return Array.from(map.values());
+};
+
 interface SessionData {
   key: string;
   metadata?: {
@@ -537,7 +547,7 @@ export function ChatInterface() {
           url += `?project_id=${currentProject.id}`;
         }
         const skills = await api.get<Skill[]>(url);
-        setAvailableSkills(skills);
+        setAvailableSkills(dedupeSkillsById(skills || []));
       } catch (err) {
         console.error("Failed to fetch skills:", err);
       }

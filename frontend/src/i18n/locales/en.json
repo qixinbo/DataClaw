@@ -251,5 +251,16 @@
   "mcpServerName": "MCP Server Name",
   "noMcpServers": "No MCP servers configured",
   "confirmDeleteMcpServer": "Are you sure you want to delete this MCP server?",
-  "saveMcpServer": "Save MCP Server"
+  "saveMcpServer": "Save MCP Server",
+  "subagents": "Subagents",
+  "subagentManagement": "Subagent Management",
+  "manageSubagentsDesc": "Manage subagents for this project",
+  "addSubagent": "Add Subagent",
+  "editSubagent": "Edit Subagent",
+  "subagentName": "Subagent Name",
+  "systemInstructionsPlaceholder": "You are a helpful AI assistant...",
+  "selectModel": "Select a model",
+  "noSubagents": "No subagents configured",
+  "confirmDeleteSubagent": "Are you sure you want to delete this subagent?",
+  "selectProjectToManageSubagents": "Please select a project to manage subagents"
 }

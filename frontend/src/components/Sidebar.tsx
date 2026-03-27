@@ -1,7 +1,7 @@
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Menu, LayoutDashboard, Plus, MoreVertical, User, Search, Settings, Brain, Trash2, Pencil, Pin, Archive, Database, CheckSquare, Square, ListChecks, RotateCcw, Wand2, Folder, Globe } from "lucide-react";
+import { Menu, LayoutDashboard, Plus, MoreVertical, User, Search, Settings, Brain, Trash2, Pencil, Pin, Archive, Database, CheckSquare, Square, ListChecks, RotateCcw, Wand2, Folder, Globe, Bot } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -819,6 +819,21 @@ function SidebarBody() {
             >
               <Folder className="h-4 w-4 text-zinc-500" />
               {t('projectManagement')}
+            </button>
+
+            <button 
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 transition-colors"
+              onClick={() => {
+                if (currentProject?.id) {
+                  navigate(`/projects/${currentProject.id}/subagents`);
+                } else {
+                  navigate("/projects");
+                }
+                setShowUserMenu(false);
+              }}
+            >
+              <Bot className="h-4 w-4 text-zinc-500" />
+              {t('subagents', 'Subagents')}
             </button>
 
             <button 

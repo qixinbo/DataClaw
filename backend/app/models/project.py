@@ -14,3 +14,4 @@ class Project(Base):
 
     owner = relationship("User", back_populates="projects")
     data_sources = relationship("DataSource", back_populates="project", cascade="all, delete-orphan")
+    subagents = relationship("Subagent", back_populates="project", cascade="all, delete-orphan")

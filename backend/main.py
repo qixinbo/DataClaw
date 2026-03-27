@@ -16,7 +16,7 @@ import re
 import os
 from datetime import datetime
 
-from app.api import upload, llm, skills, users, datasources, projects, semantic, mcp
+from app.api import upload, llm, skills, users, datasources, projects, semantic, mcp, subagents
 from app.connectors.postgres import postgres_connector
 from app.connectors.clickhouse import clickhouse_connector
 from app.core.artifacts import extract_artifacts
@@ -30,6 +30,7 @@ from app.database import engine, Base
 from app.models.user import User
 from app.models.project import Project
 from app.models.datasource import DataSource
+from app.models.subagent import Subagent
 
 app = FastAPI()
 
@@ -60,6 +61,7 @@ app.include_router(projects.router, prefix="/api/v1")
 app.include_router(datasources.router, prefix="/api/v1")
 app.include_router(semantic.router, prefix="/api/v1")
 app.include_router(mcp.router, prefix="/api/v1")
+app.include_router(subagents.router, prefix="/api/v1")
 
 STREAM_DELTA_CHUNK_SIZE = 48
 PREVIEWABLE_TEXT_EXTENSIONS = {
@@ -324,8 +326,6 @@ async def nanobot_chat(request: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-from app.core.streaming_provider import streaming_queue_var
-
 @app.post("/nanobot/chat/stream")
 async def nanobot_chat_stream(request: ChatRequest):
     async def event_generator():
@@ -339,13 +339,15 @@ async def nanobot_chat_stream(request: ChatRequest):
 
             yield f"data: {json.dumps({'type': 'routing', 'selected': 'agent', 'reason': 'auto_routed_by_agent'}, ensure_ascii=False)}\n\n"
             
-            progress_queue: asyncio.Queue[str] = asyncio.Queue()
-            # 设置 streaming_queue_var 为当前请求的 progress_queue
-            streaming_queue_var.set(progress_queue)
+            progress_queue: asyncio.Queue[Any] = asyncio.Queue()
 
             async def _on_progress(content: str, **kwargs: Any) -> None:
                 if content:
                     await progress_queue.put(content)
+
+            async def _on_stream(delta: str) -> None:
+                if delta:
+                    await progress_queue.put({"type": "delta", "content": delta})
 
             current_progress_callback.set(_on_progress)
 
@@ -368,6 +370,7 @@ async def nanobot_chat_stream(request: ChatRequest):
                     skill_ids=request.skill_ids,
                     model_id=request.model_id,
                     on_progress=_on_progress,
+                    on_stream=_on_stream,
                 )
             )
             
@@ -432,9 +435,6 @@ async def nanobot_chat_stream(request: ChatRequest):
                 artifacts=artifacts,
             )
             
-            # Since true streaming is enabled via StreamingLiteLLMProvider, 
-            # we no longer need to chunk and yield `text` here.
-            # Just yield the final text to signal completion and update final state.
             final_payload = {"type": "final", "content": text}
             if artifacts:
                 final_payload["artifacts"] = artifacts

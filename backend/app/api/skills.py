@@ -114,6 +114,22 @@ def _save_data(data: List[Dict[str, Any]]):
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
+def _dedupe_skills(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    deduped: Dict[str, Dict[str, Any]] = {}
+    for item in data:
+        skill_id = str(item.get("id") or "").strip()
+        if not skill_id:
+            continue
+        existing = deduped.get(skill_id)
+        if existing is None:
+            deduped[skill_id] = item
+            continue
+        existing_project = existing.get("project_id")
+        incoming_project = item.get("project_id")
+        if existing_project is None and incoming_project is not None:
+            deduped[skill_id] = item
+    return list(deduped.values())
+
 def _safe_skill_dir_name(value: str) -> str:
     safe = re.sub(r'[^a-zA-Z0-9_\-]', '_', value or "").lower()
     return safe or "skill"
@@ -183,9 +199,10 @@ def load_skills(project_id: Optional[int] = None) -> List[Dict[str, Any]]:
                     data.append(new_skill)
                     registered_paths.add(skill_dir)
 
+    deduped = _dedupe_skills(data)
     if project_id is not None:
-        return [item for item in data if item.get("project_id") == project_id or item.get("project_id") is None]
-    return data
+        return [item for item in deduped if item.get("project_id") == project_id or item.get("project_id") is None]
+    return deduped
 
 @router.get("/skills", response_model=List[Skill])
 def list_skills(project_id: Optional[int] = None):
@@ -384,7 +401,7 @@ def delete_skill(skill_id: str, project_id: Optional[int] = None):
         if item["id"] == skill_id:
             if item.get("is_builtin"):
                 raise HTTPException(status_code=400, detail="Builtin skills cannot be deleted")
-            if project_id is not None and item.get("project_id") != project_id:
+            if project_id is not None and item.get("project_id") not in (project_id, None):
                 new_data.append(item)
                 continue
             found = True

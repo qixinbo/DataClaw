@@ -19,7 +19,7 @@ NANOBOT_ROOT = PROJECT_ROOT / "nanobot"
 if str(NANOBOT_ROOT) not in sys.path:
     sys.path.append(str(NANOBOT_ROOT))
 
-from nanobot.providers.litellm_provider import LiteLLMProvider
+from app.core.llm_provider import build_llm_provider
 from app.connectors.postgres import postgres_connector
 from app.connectors.clickhouse import clickhouse_connector
 from app.connectors.factory import get_connector
@@ -358,12 +358,12 @@ async def process_nl2sql(
 
     # 3. Initialize Provider
     try:
-        provider = LiteLLMProvider(
+        provider = build_llm_provider(
+            model=active_config.get("model"),
+            provider=active_config.get("provider"),
             api_key=active_config.get("api_key"),
             api_base=active_config.get("api_base"),
-            default_model=active_config.get("model"),
             extra_headers=active_config.get("extra_headers") or {},
-            provider_name=active_config.get("provider")
         )
     except Exception as e:
         return NL2SQLResponse(sql="", result=[], error=f"Failed to initialize LLM provider: {e}")
@@ -410,8 +410,6 @@ Language: Chinese (Simplified)
                             max_tokens=NL2SQL_MAX_TOKENS,
                             temperature=NL2SQL_TEMPERATURE,
                             reasoning_effort=NL2SQL_REASONING_EFFORT,
-                            request_timeout=NL2SQL_LLM_REQUEST_TIMEOUT_SECONDS,
-                            num_retries=0,
                         ),
                         timeout=NL2SQL_LLM_TIMEOUT_SECONDS,
                     )
