@@ -648,6 +648,7 @@ export function ChatInterface() {
          body: JSON.stringify({
              message: messagePayload,
              session_id: targetSessionKey,
+             project_id: currentProject?.id,
              model_id: effectiveModelId,
              skill_ids: selectedSkillIds,
              source,

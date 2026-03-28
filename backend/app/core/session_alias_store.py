@@ -173,6 +173,22 @@ class SessionAliasStore:
         alias = row["alias"]
         return str(alias) if alias else None
 
+    def get_alias_meta(self, session_key: str) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT alias, pinned, archived, project_id FROM session_cache WHERE session_key = ?",
+                (session_key,),
+            ).fetchone()
+        if not row:
+            return None
+        alias = (row["alias"] or "").strip()
+        return {
+            "alias": alias or None,
+            "pinned": bool(row["pinned"]) if "pinned" in row.keys() else False,
+            "archived": bool(row["archived"]) if "archived" in row.keys() else False,
+            "project_id": row["project_id"] if "project_id" in row.keys() else None,
+        }
+
     def delete_session(self, session_key: str) -> None:
         with self._connect() as conn:
             conn.execute("DELETE FROM session_cache WHERE session_key = ?", (session_key,))

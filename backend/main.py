@@ -214,6 +214,7 @@ def preview_web_artifact_resource(root_token: str, resource_path: str):
 class ChatRequest(BaseModel):
     message: str
     session_id: str = "api:default"
+    project_id: Optional[int] = None
     skill_ids: Optional[List[str]] = None
     model_id: Optional[str] = None
     source: str = "postgres"
@@ -237,6 +238,15 @@ def _resolve_effective_source(request: ChatRequest) -> str:
     if session_source.startswith("ds:") or session_source == "upload":
         effective_source = session_source
     return effective_source
+
+
+def _sync_session_project(session_id: str, project_id: Optional[int]) -> None:
+    if project_id is None:
+        return
+    session_alias_store.update_alias_meta(
+        session_key=session_id,
+        project_id=project_id,
+    )
 
 class SessionAliasUpdateRequest(BaseModel):
     title: Optional[str] = None
@@ -277,6 +287,7 @@ def _persist_assistant_enrichment(
 @app.post("/nanobot/chat")
 async def nanobot_chat(request: ChatRequest):
     try:
+        _sync_session_project(request.session_id, request.project_id)
         resolved_source = _resolve_effective_source(request)
         current_data_source.set(resolved_source)
         current_file_url.set(request.file_url)
@@ -300,6 +311,7 @@ async def nanobot_chat(request: ChatRequest):
             session_id=request.session_id,
             skill_ids=request.skill_ids,
             model_id=request.model_id,
+            project_id=request.project_id,
         )
         text = response or ""
         session_messages = []
@@ -331,6 +343,7 @@ async def nanobot_chat_stream(request: ChatRequest):
     async def event_generator():
         current_task = None
         try:
+            _sync_session_project(request.session_id, request.project_id)
             resolved_source = _resolve_effective_source(request)
             current_data_source.set(resolved_source)
             current_file_url.set(request.file_url)
@@ -369,6 +382,7 @@ async def nanobot_chat_stream(request: ChatRequest):
                     session_id=request.session_id,
                     skill_ids=request.skill_ids,
                     model_id=request.model_id,
+                    project_id=request.project_id,
                     on_progress=_on_progress,
                     on_stream=_on_stream,
                 )

@@ -29,8 +29,8 @@ export const subagentApi = {
     return response.data;
   },
   
-  get: async (projectId: string, id: string) => {
-    const response = await axiosInstance.get<Subagent>(`${API_BASE_URL}/${projectId}/subagents/${id}`);
+  get: async (_projectId: string, id: string) => {
+    const response = await axiosInstance.get<Subagent>(`/api/v1/subagents/${id}`);
     return response.data;
   },
 

@@ -5,7 +5,22 @@ from nanobot.agent.tools.base import Tool
 from app.database import SessionLocal
 from app.models.subagent import Subagent
 from app.core.nanobot import nanobot_service
+from app.core.session_alias_store import session_alias_store
 from app.services.llm_cache import get_llm_configs, get_active_llm_config
+
+
+def _resolve_project_id(preferred_project_id: Optional[int]) -> Optional[int]:
+    if preferred_project_id is not None:
+        return preferred_project_id
+    from app.context import current_session_id
+    session_id = (current_session_id.get() or "").strip()
+    if not session_id:
+        return None
+    alias_meta = session_alias_store.get_alias_meta(session_id)
+    if not alias_meta:
+        return None
+    project_id = alias_meta.get("project_id")
+    return project_id if isinstance(project_id, int) else None
 
 class ListSubagentsTool(Tool):
     """
@@ -32,11 +47,12 @@ class ListSubagentsTool(Tool):
         }
 
     async def execute(self, **kwargs: Any) -> str:
-        if not self.project_id:
+        resolved_project_id = _resolve_project_id(self.project_id)
+        if resolved_project_id is None:
             return "Error: No project context available to list subagents."
             
         with SessionLocal() as db:
-            subagents = db.query(Subagent).filter(Subagent.project_id == self.project_id).all()
+            subagents = db.query(Subagent).filter(Subagent.project_id == resolved_project_id).all()
             
         if not subagents:
             return "No subagents found in the current project."
@@ -91,8 +107,9 @@ class InvokeSubagentTool(Tool):
     async def execute(self, **kwargs: Any) -> str:
         subagent_name = kwargs.get("subagent_name")
         task = kwargs.get("task")
+        resolved_project_id = _resolve_project_id(self.project_id)
         
-        if not self.project_id:
+        if resolved_project_id is None:
             return "Error: No project context available to invoke subagent."
             
         if not subagent_name or not task:
@@ -100,7 +117,7 @@ class InvokeSubagentTool(Tool):
             
         with SessionLocal() as db:
             subagent = db.query(Subagent).filter(
-                Subagent.project_id == self.project_id,
+                Subagent.project_id == resolved_project_id,
                 Subagent.name == subagent_name
             ).first()
             
@@ -141,7 +158,7 @@ class InvokeSubagentTool(Tool):
             response = await nanobot_service.process_message(
                 message=message,
                 session_id=subagent_session_id,
-                project_id=self.project_id,
+                project_id=resolved_project_id,
                 model_id=resolved_model_id,
             )
             return f"Subagent '{subagent.name}' completed the task.\nResult:\n{response}"

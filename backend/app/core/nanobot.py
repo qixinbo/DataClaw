@@ -185,9 +185,8 @@ class NanobotIntegration:
         agent.tools.register(NL2SQLTool())
         agent.tools.register(VisualizationTool())
         agent.tools.register(GetDatabaseSchemaTool())
-        if project_id is not None:
-            agent.tools.register(ListSubagentsTool(project_id=project_id))
-            agent.tools.register(InvokeSubagentTool(project_id=project_id))
+        agent.tools.register(ListSubagentsTool(project_id=project_id))
+        agent.tools.register(InvokeSubagentTool(project_id=project_id))
 
     def _build_provider(
         self,
@@ -357,9 +356,9 @@ class NanobotIntegration:
             
         if project_id is None:
             from app.core.session_alias_store import session_alias_store
-            alias_info = session_alias_store.get_alias(session_id)
-            if alias_info and alias_info.get("project_id"):
-                project_id = alias_info.get("project_id")
+            alias_meta = session_alias_store.get_alias_meta(session_id)
+            if alias_meta and alias_meta.get("project_id") is not None:
+                project_id = alias_meta.get("project_id")
                 
         agent_to_use = self.agent
         need_custom_agent = False
