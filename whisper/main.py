@@ -41,6 +41,10 @@ print("Loading Whisper model (small)... This may take a moment.")
 model = whisper.load_model("small")
 print("Model loaded successfully.")
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
 @app.post("/transcribe")
 async def transcribe_audio(file: UploadFile = File(...)):
     # Save the uploaded file to a temporary file

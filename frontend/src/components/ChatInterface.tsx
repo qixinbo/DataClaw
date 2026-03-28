@@ -14,10 +14,7 @@ import { useTranslation } from "react-i18next";
 import { InlineVisualizationCard } from "./InlineVisualizationCard";
 import { useProjectStore } from "@/store/projectStore";
 import { SlashCommandMenu } from "./SlashCommandMenu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Message {
   id: string;
@@ -315,16 +312,6 @@ export function ChatInterface() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioAnimationRef = useRef<number | null>(null);
 
-  // Local storage for whisper URL
-  const [whisperUrl, setWhisperUrl] = useState(() => localStorage.getItem("whisper_url") || "http://localhost:8001");
-  const [isVoiceSettingsOpen, setIsVoiceSettingsOpen] = useState(false);
-
-  const handleSaveWhisperUrl = (url: string) => {
-    setWhisperUrl(url);
-    localStorage.setItem("whisper_url", url);
-    setIsVoiceSettingsOpen(false);
-  };
-
   const stopAudioMeter = () => {
     if (audioAnimationRef.current) {
       cancelAnimationFrame(audioAnimationRef.current);
@@ -364,6 +351,11 @@ export function ChatInterface() {
 
   const startRecording = async () => {
     try {
+      const configuredWhisperUrl = (localStorage.getItem("whisper_url") || "").trim();
+      if (!configuredWhisperUrl) {
+        alert(t('voiceServerNotConfigured', '请先配置语音识别服务地址：点击左下角用户名 -> 语音输入配置'));
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
@@ -389,7 +381,7 @@ export function ChatInterface() {
           const formData = new FormData();
           formData.append("file", audioBlob, "audio.webm");
 
-          const baseUrl = whisperUrl || "http://localhost:8001";
+          const baseUrl = configuredWhisperUrl;
           const response = await fetch(`${baseUrl.replace(/\/$/, '')}/transcribe`, {
             method: "POST",
             body: formData,
@@ -1283,13 +1275,6 @@ export function ChatInterface() {
                               )}
                             </button>
                             <button
-                              onClick={() => setIsVoiceSettingsOpen(true)}
-                              className="flex items-center justify-center h-10 w-10 rounded-full bg-transparent text-muted-foreground hover:bg-muted transition-colors"
-                              title={t('voiceSettings', '语音输入配置')}
-                            >
-                              <Settings className="h-4 w-4" />
-                            </button>
-                            <button
                               onClick={handleSend}
                               disabled={isLoading || !input.trim()}
                               className={cn(
@@ -1725,13 +1710,6 @@ export function ChatInterface() {
                         )}
                       </button>
                       <button
-                        onClick={() => setIsVoiceSettingsOpen(true)}
-                        className="flex items-center justify-center h-10 w-10 rounded-full bg-transparent text-muted-foreground hover:bg-muted transition-colors"
-                        title={t('voiceSettings', '语音输入配置')}
-                      >
-                        <Settings className="h-4 w-4" />
-                      </button>
-                      <button
                         onClick={isLoading ? handleForceStop : handleSend}
                         disabled={isLoading ? false : !input.trim()}
                         className={cn(
@@ -1794,34 +1772,6 @@ export function ChatInterface() {
               />
             ) : null}
           </div>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={isVoiceSettingsOpen} onOpenChange={setIsVoiceSettingsOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>{t('voiceSettings', '语音输入配置')}</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="whisperUrl" className="text-right">
-                {t('serviceUrl', '服务地址')}
-              </Label>
-              <Input
-                id="whisperUrl"
-                value={whisperUrl}
-                onChange={(e) => setWhisperUrl(e.target.value)}
-                className="col-span-3"
-                placeholder="http://localhost:8001"
-              />
-            </div>
-            <p className="text-xs text-muted-foreground px-1">
-              请在此配置独立的 Whisper 语音识别服务地址。例如：http://localhost:8001
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsVoiceSettingsOpen(false)}>{t('cancel', '取消')}</Button>
-            <Button onClick={() => handleSaveWhisperUrl(whisperUrl)}>{t('save', '保存')}</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

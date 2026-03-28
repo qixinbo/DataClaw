@@ -1,7 +1,7 @@
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Menu, LayoutDashboard, Plus, MoreVertical, User, Search, Settings, Brain, Trash2, Pencil, Pin, Archive, Database, CheckSquare, Square, ListChecks, RotateCcw, Wand2, Folder, Globe, Bot } from "lucide-react";
+import { Menu, LayoutDashboard, Plus, MoreVertical, User, Search, Settings, Brain, Trash2, Pencil, Pin, Archive, Database, CheckSquare, Square, ListChecks, RotateCcw, Wand2, Folder, Globe, Bot, Mic, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -376,6 +376,11 @@ function SidebarBody() {
   const { t, i18n } = useTranslation();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [voiceSettingsOpen, setVoiceSettingsOpen] = useState(false);
+  const [whisperUrlDraft, setWhisperUrlDraft] = useState("");
+  const [isTestingVoice, setIsTestingVoice] = useState(false);
+  const [voiceTestStatus, setVoiceTestStatus] = useState<"success" | "error" | null>(null);
+  const [voiceTestMessage, setVoiceTestMessage] = useState("");
   
   // Session management state
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
@@ -443,6 +448,50 @@ function SidebarBody() {
   const handleLogout = () => {
     logout();
     navigate("/login");
+  };
+
+  const openVoiceSettings = () => {
+    const saved = (localStorage.getItem("whisper_url") || "").trim();
+    setWhisperUrlDraft(saved);
+    setVoiceTestStatus(null);
+    setVoiceTestMessage("");
+    setVoiceSettingsOpen(true);
+  };
+
+  const handleSaveVoiceSettings = () => {
+    const normalized = whisperUrlDraft.trim();
+    if (!normalized) {
+      alert(t('voiceServerRequired', '请填写语音识别服务地址'));
+      return;
+    }
+    localStorage.setItem("whisper_url", normalized);
+    setVoiceSettingsOpen(false);
+  };
+
+  const handleTestVoiceConnection = async () => {
+    const normalized = whisperUrlDraft.trim();
+    if (!normalized) {
+      alert(t('voiceServerRequired', '请填写语音识别服务地址'));
+      return;
+    }
+    setIsTestingVoice(true);
+    setVoiceTestStatus(null);
+    setVoiceTestMessage("");
+    try {
+      const response = await fetch(`${normalized.replace(/\/$/, "")}/health`, {
+        method: "GET",
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      setVoiceTestStatus("success");
+      setVoiceTestMessage(t('voiceConnectionSuccess', '连接成功'));
+    } catch (error: any) {
+      setVoiceTestStatus("error");
+      setVoiceTestMessage(`${t('voiceConnectionFailed', '连接失败')}: ${error?.message || t('unknownError', '未知错误')}`);
+    } finally {
+      setIsTestingVoice(false);
+    }
   };
 
   const handleSelectSession = (key: string) => {
@@ -771,6 +820,37 @@ function SidebarBody() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={voiceSettingsOpen} onOpenChange={setVoiceSettingsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('voiceSettings', '语音输入配置')}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-3">
+            <Input
+              value={whisperUrlDraft}
+              onChange={(e) => setWhisperUrlDraft(e.target.value)}
+              placeholder="http://localhost:8001"
+            />
+            <p className="text-xs text-muted-foreground">
+              {t('voiceSettingsHint', '请输入语音识别服务地址，例如：http://localhost:8001')}
+            </p>
+            {voiceTestStatus && (
+              <div className={`flex items-center gap-2 text-xs ${voiceTestStatus === "success" ? "text-emerald-600" : "text-red-600"}`}>
+                {voiceTestStatus === "success" ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                <span>{voiceTestMessage}</span>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVoiceSettingsOpen(false)}>{t('cancel')}</Button>
+            <Button variant="outline" onClick={handleTestVoiceConnection} disabled={isTestingVoice}>
+              {isTestingVoice ? <Loader2 className="h-4 w-4 animate-spin" /> : t('testConnection', '测试连接')}
+            </Button>
+            <Button className="bg-indigo-600 hover:bg-indigo-700 text-primary-foreground" onClick={handleSaveVoiceSettings}>{t('save')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="p-4 border-t border-border mt-auto relative" ref={menuRef}>
         <div className="flex items-center justify-between text-muted-foreground">
           <button 
@@ -848,6 +928,17 @@ function SidebarBody() {
             >
               <Settings className="h-4 w-4 text-muted-foreground" />
               {t('personalSettings')}
+            </button>
+
+            <button 
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors"
+              onClick={() => {
+                openVoiceSettings();
+                setShowUserMenu(false);
+              }}
+            >
+              <Mic className="h-4 w-4 text-muted-foreground" />
+              {t('voiceSettings', '语音输入配置')}
             </button>
 
             {user?.is_admin && (
