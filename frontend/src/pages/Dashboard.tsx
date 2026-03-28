@@ -143,12 +143,12 @@ export function Dashboard() {
               if (e.key === 'Enter') handleTitleSubmit();
               if (e.key === 'Escape') setIsEditingTitle(false);
             }}
-            className="text-2xl font-bold h-auto py-1 px-2 -ml-2 bg-transparent border-transparent hover:border-zinc-200 focus:border-indigo-500 focus:ring-indigo-500 max-w-md"
+            className="text-2xl font-bold h-auto py-1 px-2 -ml-2 bg-transparent border-transparent hover:border-border focus:border-indigo-500 focus:ring-indigo-500 max-w-md"
           />
         ) : (
           <div className="flex items-center gap-2">
             <h1 
-              className="text-2xl font-bold cursor-pointer hover:bg-zinc-100 px-2 py-1 -ml-2 rounded transition-colors"
+              className="text-2xl font-bold cursor-pointer hover:bg-muted px-2 py-1 -ml-2 rounded transition-colors"
               style={{
                 fontSize: activeDashboard.titleStyle?.fontSize || '1.5rem',
                 fontWeight: activeDashboard.titleStyle?.fontWeight || '700',
@@ -167,14 +167,14 @@ export function Dashboard() {
             </h1>
             <Popover>
               <PopoverTrigger>
-                <div className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-zinc-100 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Type className="h-4 w-4 text-zinc-500" />
+                <div className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Type className="h-4 w-4 text-muted-foreground" />
                 </div>
               </PopoverTrigger>
               <PopoverContent className="w-64 p-3" align="start">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-zinc-500">{t('fontSize') || 'Font Size'}</label>
+                    <label className="text-xs font-medium text-muted-foreground">{t('fontSize') || 'Font Size'}</label>
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" onClick={() => handleStyleChange('fontSize', '1.25rem')}>S</Button>
                       <Button variant="outline" size="sm" onClick={() => handleStyleChange('fontSize', '1.5rem')}>M</Button>
@@ -184,7 +184,7 @@ export function Dashboard() {
                   </div>
                   
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-zinc-500">{t('textStyle') || 'Text Style'}</label>
+                    <label className="text-xs font-medium text-muted-foreground">{t('textStyle') || 'Text Style'}</label>
                     <div className="flex items-center gap-2">
                       <Button 
                         variant={activeDashboard.titleStyle?.fontWeight === 'normal' ? 'default' : 'outline'} 
@@ -214,12 +214,12 @@ export function Dashboard() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-zinc-500">{t('textColor') || 'Text Color'}</label>
+                    <label className="text-xs font-medium text-muted-foreground">{t('textColor') || 'Text Color'}</label>
                     <div className="flex items-center gap-2">
                       {['inherit', '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'].map(color => (
                         <button
                           key={color}
-                          className={`w-6 h-6 rounded-full border border-zinc-200 flex items-center justify-center ${activeDashboard.titleStyle?.color === color ? 'ring-2 ring-indigo-500 ring-offset-1' : ''}`}
+                          className={`w-6 h-6 rounded-full border border-border flex items-center justify-center ${activeDashboard.titleStyle?.color === color ? 'ring-2 ring-indigo-500 ring-offset-1' : ''}`}
                           style={{ backgroundColor: color === 'inherit' ? '#18181b' : color }}
                           onClick={() => handleStyleChange('color', color)}
                         />
@@ -273,24 +273,24 @@ export function Dashboard() {
                   if (chart.type === "table") {
                     if (rows.length === 0) {
                       return (
-                        <div className="h-full w-full flex items-center justify-center text-xs text-zinc-500">
+                        <div className="h-full w-full flex items-center justify-center text-xs text-muted-foreground">
                           当前表格没有可展示数据
                         </div>
                       );
                     }
                     if (columns.length === 0) {
                       return (
-                        <div className="h-full w-full flex items-center justify-center text-xs text-zinc-500">
+                        <div className="h-full w-full flex items-center justify-center text-xs text-muted-foreground">
                           当前表格数据缺少可展示字段
                         </div>
                       );
                     }
                     return (
                       <div className="flex-1 w-full flex flex-col min-h-0">
-                        <div className="text-[11px] text-zinc-500 mb-1 shrink-0">
+                        <div className="text-[11px] text-muted-foreground mb-1 shrink-0">
                           {isTableTruncated ? t('previewTableRows', { previewLimit: TABLE_PREVIEW_LIMIT, rowCount: rows.length, colCount: columns.length }) : t('totalTableRows', { rowCount: rows.length, colCount: columns.length })}
                         </div>
-                        <ScrollArea className="flex-1 w-full border border-zinc-100 rounded-md bg-white">
+                        <ScrollArea className="flex-1 w-full border border-border rounded-md bg-background">
                           <Table>
                             <TableHeader>
                               <TableRow>
@@ -321,7 +321,7 @@ export function Dashboard() {
                   const { xKey, yKeys } = inferChartKeys(rows);
                   if (!xKey || yKeys.length === 0) {
                     return (
-                      <div className="h-full w-full flex items-center justify-center text-xs text-zinc-500">
+                      <div className="h-full w-full flex items-center justify-center text-xs text-muted-foreground">
                         当前图表数据缺少可绘制字段
                       </div>
                     );

@@ -382,9 +382,9 @@ export function Modeling() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-full bg-muted/50">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 bg-white border-b">
+      <div className="flex items-center justify-between px-6 py-4 bg-background border-b">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate("/datasources")}>
             <ArrowLeft className="w-5 h-5" />
@@ -450,14 +450,14 @@ export function Modeling() {
                         className={`p-3 rounded-lg border transition-colors ${
                           selectedTables.includes(table)
                             ? "bg-primary/5 border-primary"
-                            : "bg-white hover:bg-gray-50"
+                            : "bg-background hover:bg-muted/50"
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center space-x-3">
                             <input
                               type="checkbox"
-                              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                               checked={selectedTables.includes(table)}
                               onChange={() => toggleTable(table)}
                             />
@@ -471,16 +471,16 @@ export function Modeling() {
                           </Button>
                         </div>
                         {expandedTables[table] && (
-                          <div className="mt-3 max-h-48 overflow-auto border rounded-md bg-white">
+                          <div className="mt-3 max-h-48 overflow-auto border rounded-md bg-background">
                             {schema[table].map((col) => (
                               <label
                                 key={`${table}:${col.name}`}
-                                className="flex items-center justify-between px-3 py-2 border-b last:border-b-0 cursor-pointer hover:bg-gray-50"
+                                className="flex items-center justify-between px-3 py-2 border-b last:border-b-0 cursor-pointer hover:bg-muted/50"
                               >
                                 <div className="flex items-center gap-2 min-w-0">
                                   <input
                                     type="checkbox"
-                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                                     checked={(selectedColumns[table] ?? []).includes(col.name)}
                                     onChange={() => toggleColumn(table, col.name)}
                                   />
@@ -516,7 +516,7 @@ export function Modeling() {
                   {mdl?.models.map((model) => (
                     <div
                       key={model.name}
-                      className="flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-gray-100 cursor-pointer"
+                      className="flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-muted cursor-pointer"
                       onClick={() => openModelDetail(model.name)}
                     >
                       <TableIcon className="w-4 h-4 text-muted-foreground" />
@@ -528,7 +528,7 @@ export function Modeling() {
             </Card>
 
             {/* Canvas Area (ReactFlow) */}
-            <div className="flex-1 overflow-hidden bg-slate-50 rounded-lg border relative">
+            <div className="flex-1 overflow-hidden bg-muted/50 rounded-lg border relative">
               <ReactFlow
                 nodes={nodes}
                 edges={edges}

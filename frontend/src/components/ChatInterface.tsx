@@ -545,19 +545,19 @@ export function ChatInterface() {
     if (!file) return null;
     return (
       <div className="px-2 pt-2">
-        <div className="p-2.5 bg-white border border-zinc-100 rounded-2xl flex items-center gap-3 relative group/file shadow-sm max-w-[280px]">
+        <div className="p-2.5 bg-background border border-border rounded-2xl flex items-center gap-3 relative group/file shadow-sm max-w-[280px]">
           <div className="h-10 w-10 bg-emerald-600 rounded-xl flex items-center justify-center shrink-0">
-            <Table className="h-6 w-6 text-white" />
+            <Table className="h-6 w-6 text-primary-foreground" />
           </div>
           <div className="flex-1 min-w-0 pr-6">
-            <div className="text-sm font-bold text-zinc-900 truncate">{file.filename}</div>
-            <div className="text-xs text-zinc-500">{t('spreadsheet')}</div>
+            <div className="text-sm font-bold text-foreground truncate">{file.filename}</div>
+            <div className="text-xs text-muted-foreground">{t('spreadsheet')}</div>
           </div>
           <button 
             onClick={handleRemoveFile}
             className="absolute top-1.5 right-1.5 h-5 w-5 rounded-full flex items-center justify-center transition-colors group/close"
           >
-            <XCircle className="h-5 w-5 fill-zinc-900 text-white" />
+            <XCircle className="h-5 w-5 fill-zinc-900 text-primary-foreground" />
           </button>
         </div>
       </div>
@@ -892,15 +892,15 @@ export function ChatInterface() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white relative">
+    <div className="flex flex-col h-full bg-background relative">
       {/* Header with Model Selection */}
-      <div className="px-4 py-3 flex items-center justify-between border-b border-zinc-100 bg-white/50 backdrop-blur-md sticky top-0 z-20">
+      <div className="px-4 py-3 flex items-center justify-between border-b border-border bg-background/50 backdrop-blur-md sticky top-0 z-20">
         <Popover open={modelOpen} onOpenChange={setModelOpen}>
-          <PopoverTrigger className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-zinc-100 transition-colors group">
-            <span className="font-semibold text-zinc-900">
+          <PopoverTrigger className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-muted transition-colors group">
+            <span className="font-semibold text-foreground">
               {selectedModelId ? models.find(m => m.id === selectedModelId)?.name || 'DataClaw' : 'DataClaw'}
             </span>
-            <ChevronDown className="h-4 w-4 text-zinc-400 group-hover:text-zinc-600 transition-colors" />
+            <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-muted-foreground transition-colors" />
           </PopoverTrigger>
           <PopoverContent className="w-[280px] p-0" align="start">
             <Command>
@@ -918,8 +918,8 @@ export function ChatInterface() {
                       className="flex items-center gap-2 py-2.5 cursor-pointer"
                     >
                       <div className="flex flex-col">
-                        <span className="font-medium text-zinc-900">{model.name || model.model}</span>
-                        <span className="text-xs text-zinc-400">{model.provider}</span>
+                        <span className="font-medium text-foreground">{model.name || model.model}</span>
+                        <span className="text-xs text-muted-foreground">{model.provider}</span>
                       </div>
                       <Check
                         className={cn(
@@ -961,20 +961,20 @@ export function ChatInterface() {
               {/* Input Area */}
               <div className="w-full max-w-4xl px-4">
                 <div className="relative group">
-                  <div className="flex flex-col bg-white rounded-[26px] border border-zinc-200 shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-all duration-200">
+                  <div className="flex flex-col bg-background rounded-[26px] border border-border shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-all duration-200">
                     {renderFileCard()}
                     {renderActiveSelections()}
                     <div className="flex items-center pl-2 pr-2 py-2">
                       <div className="flex items-center">
                         <Popover open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-                          <PopoverTrigger className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-zinc-100 transition-colors text-zinc-500">
+                          <PopoverTrigger className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted transition-colors text-muted-foreground">
                             <Plus className="h-5 w-5" />
                           </PopoverTrigger>
-                          <PopoverContent side="bottom" align="start" className="w-[480px] p-0 mt-2 overflow-hidden rounded-2xl border-zinc-200 shadow-xl">
+                          <PopoverContent side="bottom" align="start" className="w-[480px] p-0 mt-2 overflow-hidden rounded-2xl border-border shadow-xl">
                             <div className="flex divide-x divide-zinc-100">
                               {/* Left Column: Data Source */}
-                              <div className="flex-1 p-3 bg-zinc-50/50">
-                                <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
+                              <div className="flex-1 p-3 bg-muted/50/50">
+                                <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
                                   <Database className="h-3 w-3" />
                                   {t('dataSource')}
                                 </div>
@@ -988,24 +988,24 @@ export function ChatInterface() {
                                       className={cn(
                                         "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
                                         selectedDataSource === ds.id 
-                                          ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200" 
-                                          : "text-zinc-600 hover:bg-white hover:shadow-sm"
+                                          ? "bg-background text-foreground shadow-sm ring-1 ring-border" 
+                                          : "text-muted-foreground hover:bg-background hover:shadow-sm"
                                       )}
                                     >
                                       <div className="flex items-center gap-2.5">
-                                        <Database className={cn("h-4 w-4", selectedDataSource === ds.id ? "text-blue-500" : "text-zinc-400")} />
+                                        <Database className={cn("h-4 w-4", selectedDataSource === ds.id ? "text-blue-500" : "text-muted-foreground")} />
                                         <span className="font-medium">{ds.name}</span>
                                       </div>
                                       {selectedDataSource === ds.id && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
                                     </button>
                                   ))}
                                   {selectedDataSource && (
-                                    <div className="mt-2 pt-2 border-t border-zinc-100">
+                                    <div className="mt-2 pt-2 border-t border-border">
                                       <button
                                         onClick={() => {
                                           void handleClearDataSource();
                                         }}
-                                        className="w-full py-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 transition-colors flex items-center justify-center gap-1"
+                                        className="w-full py-1.5 text-[11px] text-muted-foreground hover:text-muted-foreground transition-colors flex items-center justify-center gap-1"
                                       >
                                         {t('clearSelected')}
                                       </button>
@@ -1015,8 +1015,8 @@ export function ChatInterface() {
                               </div>
 
                               {/* Right Column: Skills */}
-                              <div className="flex-1 p-3 bg-white">
-                                <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
+                              <div className="flex-1 p-3 bg-background">
+                                <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
                                   <Wand2 className="h-3 w-3" />
                                   Skills
                                 </div>
@@ -1037,8 +1037,8 @@ export function ChatInterface() {
                                           className={cn(
                                             "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
                                             isSelected 
-                                              ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200" 
-                                              : "text-zinc-600 hover:bg-white hover:shadow-sm"
+                                              ? "bg-background text-foreground shadow-sm ring-1 ring-border" 
+                                              : "text-muted-foreground hover:bg-background hover:shadow-sm"
                                           )}
                                         >
                                           <div className="flex items-center text-left">
@@ -1051,15 +1051,15 @@ export function ChatInterface() {
                                   ) : (
                                     <div className="px-3 py-8 text-center">
                                       <Zap className="h-8 w-8 text-zinc-100 mx-auto mb-2" />
-                                      <p className="text-xs text-zinc-400">{t('noAvailableSkills')}</p>
+                                      <p className="text-xs text-muted-foreground">{t('noAvailableSkills')}</p>
                                     </div>
                                   )}
                                 </div>
                                 {selectedSkillIds.length > 0 && (
-                                  <div className="mt-2 pt-2 border-t border-zinc-100">
+                                  <div className="mt-2 pt-2 border-t border-border">
                                     <button 
                                       onClick={() => setSelectedSkillIds([])}
-                                      className="w-full py-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 transition-colors flex items-center justify-center gap-1"
+                                      className="w-full py-1.5 text-[11px] text-muted-foreground hover:text-muted-foreground transition-colors flex items-center justify-center gap-1"
                                     >
                                       {t('clearSelectedWithCount', { count: selectedSkillIds.length })}
                                     </button>
@@ -1077,7 +1077,7 @@ export function ChatInterface() {
                         onChange={handleInputChange}
                         onKeyDown={handleInputKeyDown}
                         placeholder={t('askAnything')}
-                        className="flex-1 bg-transparent border-none focus:ring-0 text-lg px-3 py-2 text-zinc-900 placeholder:text-zinc-300 outline-none"
+                        className="flex-1 bg-transparent border-none focus:ring-0 text-lg px-3 py-2 text-foreground placeholder:text-muted-foreground/50 outline-none"
                         disabled={isLoading}
                       />
                       <SlashCommandMenu
@@ -1095,8 +1095,8 @@ export function ChatInterface() {
                           className={cn(
                             "flex items-center justify-center h-10 w-10 rounded-full transition-all duration-200",
                             (input.trim() || attachedFile || activeDataFile) && !isLoading
-                              ? "bg-zinc-900 text-white hover:bg-zinc-800 shadow-sm"
-                              : "bg-zinc-100 text-zinc-300"
+                              ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                              : "bg-muted text-muted-foreground/50"
                           )}
                         >
                           {isLoading ? (
@@ -1141,18 +1141,18 @@ export function ChatInterface() {
                   <div
                     className={`rounded-2xl px-5 py-3.5 text-[15px] leading-relaxed max-w-[85%] shadow-sm ${
                       msg.role === "user"
-                        ? "bg-zinc-100 text-zinc-800"
-                        : "bg-white border border-zinc-100 text-zinc-700 overflow-hidden"
+                        ? "bg-muted text-foreground/90"
+                        : "bg-background border border-border text-foreground/80 overflow-hidden"
                     }`}
                   >
                     {msg.role === "assistant" ? (
                       <>
                         {displayedThinkingContent && (
-                          <div className="mb-3 rounded-xl border border-zinc-200 bg-zinc-50/50 p-3 text-sm text-zinc-600 font-mono whitespace-pre-wrap leading-relaxed shadow-inner">
+                          <div className="mb-3 rounded-xl border border-border bg-muted/50/50 p-3 text-sm text-muted-foreground font-mono whitespace-pre-wrap leading-relaxed shadow-inner">
                             <button
                               type="button"
                               onClick={() => toggleThinkingCollapsed(msg.id)}
-                              className="w-full flex items-center justify-between gap-2 mb-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider hover:text-zinc-700 transition-colors"
+                              className="w-full flex items-center justify-between gap-2 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground/80 transition-colors"
                             >
                               <span className="flex items-center gap-2">
                                 <Settings className={`h-3.5 w-3.5 ${msg.awaitingFirstToken ? 'animate-spin' : ''}`} />
@@ -1178,7 +1178,7 @@ export function ChatInterface() {
                                       void copyThinkingContent(msg.id, displayedThinkingContent);
                                     }
                                   }}
-                                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 hover:bg-zinc-200/70 transition-colors"
+                                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 hover:bg-muted/80/70 transition-colors"
                                 >
                                   {thinkingCopiedByMessage[msg.id] ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                                   <span>{thinkingCopiedByMessage[msg.id] ? t('copied') : t('copy')}</span>
@@ -1197,8 +1197,8 @@ export function ChatInterface() {
                           </div>
                         )}
                         {msg.progressLogs && msg.progressLogs.length > 0 ? (
-                          <div className="mb-2 rounded-xl border border-zinc-100 bg-zinc-50/70 px-3 py-2">
-                            <div className="flex items-center gap-2 text-zinc-500 text-xs mb-1.5 pb-1.5 border-b border-zinc-100/50">
+                          <div className="mb-2 rounded-xl border border-border bg-muted/50/70 px-3 py-2">
+                            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1.5 pb-1.5 border-b border-border/50">
                               {isMessageGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
                               <span>{isMessageGenerating ? t('processing') : t('processCompleted')}</span>
                             </div>
@@ -1215,7 +1215,7 @@ export function ChatInterface() {
                                 // 只有当是整个会话的最后一条消息，且当前日志是最后一条时，才显示 loading 动画
                                 const isLoadingLog = isLast && isMessageGenerating;
                                 return (
-                                  <div key={`${msg.id}-log-${idx}`} className="flex items-start gap-2 text-[12px] text-zinc-500 leading-5">
+                                  <div key={`${msg.id}-log-${idx}`} className="flex items-start gap-2 text-[12px] text-muted-foreground leading-5">
                                     {isLoadingLog ? (
                                       <Settings className="mt-0.5 h-3.5 w-3.5 text-amber-500 animate-spin shrink-0" />
                                     ) : (
@@ -1229,26 +1229,26 @@ export function ChatInterface() {
                           </div>
                         ) : null}
                         {msg.awaitingFirstToken && !msg.content ? (
-                          <div className="flex items-center gap-2 text-zinc-500 text-sm py-1">
+                          <div className="flex items-center gap-2 text-muted-foreground text-sm py-1">
                             <Loader2 className="h-4 w-4 animate-spin" />
                             <span>{t('modelThinking')}</span>
                           </div>
                         ) : (
                           <>
                             {markdown ? (
-                              <div className="prose prose-sm prose-zinc max-w-none prose-p:leading-normal prose-p:my-2 prose-headings:my-3 prose-ul:my-2 prose-li:my-0.5 prose-pre:bg-zinc-50 prose-pre:text-zinc-800 prose-pre:border prose-pre:border-zinc-200">
+                              <div className="prose prose-sm prose-zinc dark:prose-invert max-w-none prose-p:leading-normal prose-p:my-2 prose-headings:my-3 prose-ul:my-2 prose-li:my-0.5 prose-pre:bg-muted/50 prose-pre:text-foreground/90 prose-pre:border prose-pre:border-border">
                                 <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
                                   {markdown}
                                 </ReactMarkdown>
                               </div>
                             ) : null}
                             {reportHtml ? (
-                              <div className="mt-3 rounded-xl border border-zinc-200 overflow-hidden bg-white">
+                              <div className="mt-3 rounded-xl border border-border overflow-hidden bg-background">
                                 <iframe
                                   title={`report-${msg.id}`}
                                   srcDoc={reportHtml}
                                   sandbox="allow-same-origin allow-scripts"
-                                  className="w-full h-[620px] bg-white"
+                                  className="w-full h-[620px] bg-background"
                                   onLoad={(e) => {
                                     try {
                                       const doc = (e.target as HTMLIFrameElement).contentDocument;
@@ -1280,21 +1280,21 @@ export function ChatInterface() {
                             {msg.artifacts && msg.artifacts.length > 0 ? (
                               <div className="mt-4 grid gap-2 sm:grid-cols-2">
                                 {msg.artifacts.map((artifact, artifactIndex) => (
-                                  <div key={`${msg.id}-artifact-${artifactIndex}`} className="rounded-xl border border-zinc-200 bg-zinc-50/60 px-3 py-2.5">
+                                  <div key={`${msg.id}-artifact-${artifactIndex}`} className="rounded-xl border border-border bg-muted/50/60 px-3 py-2.5">
                                     <div className="flex items-center gap-2.5">
-                                      <div className="h-8 w-8 rounded-lg bg-white border border-zinc-200 flex items-center justify-center text-zinc-500 shrink-0">
+                                      <div className="h-8 w-8 rounded-lg bg-background border border-border flex items-center justify-center text-muted-foreground shrink-0">
                                         <FileText className="h-4 w-4" />
                                       </div>
                                       <div className="min-w-0 flex-1">
-                                        <div className="text-sm font-medium text-zinc-800 truncate">{artifact.name}</div>
-                                        <div className="text-[11px] text-zinc-500">{formatArtifactSize(artifact.size)}</div>
+                                        <div className="text-sm font-medium text-foreground/90 truncate">{artifact.name}</div>
+                                        <div className="text-[11px] text-muted-foreground">{formatArtifactSize(artifact.size)}</div>
                                       </div>
                                     </div>
                                     <div className="mt-2 flex items-center gap-2">
                                       {artifact.previewable && artifact.preview_url ? (
                                         <button
                                           onClick={() => setArtifactPreview({ name: artifact.name, mimeType: artifact.mime_type, previewUrl: artifact.preview_url || "" })}
-                                          className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border border-zinc-300 text-zinc-700 hover:bg-white transition-colors"
+                                          className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border border-border text-foreground/80 hover:bg-background transition-colors"
                                         >
                                           <Eye className="h-3.5 w-3.5" />
                                           {t('preview')}
@@ -1304,7 +1304,7 @@ export function ChatInterface() {
                                         href={artifact.download_url}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border border-zinc-300 text-zinc-700 hover:bg-white transition-colors"
+                                        className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border border-border text-foreground/80 hover:bg-background transition-colors"
                                       >
                                         <Download className="h-3.5 w-3.5" />
                                         {t('download')}
@@ -1315,7 +1315,7 @@ export function ChatInterface() {
                               </div>
                             ) : null}
                             {msg.viz ? (
-                              <div className="mt-3 pt-3 border-t border-zinc-100">
+                              <div className="mt-3 pt-3 border-t border-border">
                                 <InlineVisualizationCard viz={msg.viz} />
                               </div>
                             ) : null}
@@ -1327,7 +1327,7 @@ export function ChatInterface() {
                     )}
                   </div>
                   {msg.role === "user" && (
-                    <div className="w-8 h-8 rounded-full bg-zinc-200 flex items-center justify-center text-zinc-500 shrink-0 mt-1">
+                    <div className="w-8 h-8 rounded-full bg-muted/80 flex items-center justify-center text-muted-foreground shrink-0 mt-1">
                       <User className="h-4 w-4" />
                     </div>
                   )}
@@ -1341,22 +1341,22 @@ export function ChatInterface() {
       
       {/* Floating Input for Chat State */}
       {messages.length > 0 && (
-        <div className="px-4 pb-6 pt-3 border-t border-zinc-100 bg-white">
+        <div className="px-4 pb-6 pt-3 border-t border-border bg-background">
           <div className="relative group max-w-4xl mx-auto">
-            <div className="flex flex-col bg-white rounded-[26px] border border-zinc-200 shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-all duration-200">
+            <div className="flex flex-col bg-background rounded-[26px] border border-border shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-all duration-200">
               {renderFileCard()}
               {renderActiveSelections()}
               <div className="flex items-center pl-2 pr-2 py-2">
                 <div className="flex items-center">
                   <Popover open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-                    <PopoverTrigger className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-zinc-100 transition-colors text-zinc-500">
+                    <PopoverTrigger className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted transition-colors text-muted-foreground">
                       <Plus className="h-5 w-5" />
                     </PopoverTrigger>
-                    <PopoverContent side="top" align="start" className="w-[480px] p-0 mb-2 overflow-hidden rounded-2xl border-zinc-200 shadow-xl">
+                    <PopoverContent side="top" align="start" className="w-[480px] p-0 mb-2 overflow-hidden rounded-2xl border-border shadow-xl">
                       <div className="flex divide-x divide-zinc-100">
                         {/* Left Column: Data Source */}
-                        <div className="flex-1 p-3 bg-zinc-50/50">
-                          <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
+                        <div className="flex-1 p-3 bg-muted/50/50">
+                          <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
                             <Database className="h-3 w-3" />
                             {t('dataSource')}
                           </div>
@@ -1370,24 +1370,24 @@ export function ChatInterface() {
                                 className={cn(
                                   "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
                                   selectedDataSource === ds.id 
-                                    ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200" 
-                                    : "text-zinc-600 hover:bg-white hover:shadow-sm"
+                                    ? "bg-background text-foreground shadow-sm ring-1 ring-border" 
+                                    : "text-muted-foreground hover:bg-background hover:shadow-sm"
                                 )}
                               >
                                 <div className="flex items-center gap-2.5">
-                                  <Database className={cn("h-4 w-4", selectedDataSource === ds.id ? "text-blue-500" : "text-zinc-400")} />
+                                  <Database className={cn("h-4 w-4", selectedDataSource === ds.id ? "text-blue-500" : "text-muted-foreground")} />
                                   <span className="font-medium">{ds.name}</span>
                                 </div>
                                 {selectedDataSource === ds.id && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
                               </button>
                             ))}
                             {selectedDataSource && (
-                              <div className="mt-2 pt-2 border-t border-zinc-100">
+                              <div className="mt-2 pt-2 border-t border-border">
                                 <button
                                   onClick={() => {
                                     void handleClearDataSource();
                                   }}
-                                  className="w-full py-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 transition-colors flex items-center justify-center gap-1"
+                                  className="w-full py-1.5 text-[11px] text-muted-foreground hover:text-muted-foreground transition-colors flex items-center justify-center gap-1"
                                 >
                                   {t('clearSelected')}
                                 </button>
@@ -1397,8 +1397,8 @@ export function ChatInterface() {
                         </div>
 
                         {/* Right Column: Skills */}
-                        <div className="flex-1 p-3 bg-white">
-                          <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
+                        <div className="flex-1 p-3 bg-background">
+                          <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
                             <Wand2 className="h-3 w-3" />
                             Skills
                           </div>
@@ -1419,8 +1419,8 @@ export function ChatInterface() {
                                     className={cn(
                                       "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
                                       isSelected 
-                                        ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200" 
-                                        : "text-zinc-600 hover:bg-white hover:shadow-sm"
+                                        ? "bg-background text-foreground shadow-sm ring-1 ring-border" 
+                                        : "text-muted-foreground hover:bg-background hover:shadow-sm"
                                     )}
                                   >
                                     <div className="flex items-center text-left">
@@ -1433,15 +1433,15 @@ export function ChatInterface() {
                             ) : (
                               <div className="px-3 py-8 text-center">
                                 <Zap className="h-8 w-8 text-zinc-100 mx-auto mb-2" />
-                                <p className="text-xs text-zinc-400">{t('noAvailableSkills')}</p>
+                                <p className="text-xs text-muted-foreground">{t('noAvailableSkills')}</p>
                               </div>
                             )}
                           </div>
                           {selectedSkillIds.length > 0 && (
-                            <div className="mt-2 pt-2 border-t border-zinc-100">
+                            <div className="mt-2 pt-2 border-t border-border">
                               <button 
                                 onClick={() => setSelectedSkillIds([])}
-                                className="w-full py-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 transition-colors flex items-center justify-center gap-1"
+                                className="w-full py-1.5 text-[11px] text-muted-foreground hover:text-muted-foreground transition-colors flex items-center justify-center gap-1"
                               >
                                 {t('clearSelectedWithCount', { count: selectedSkillIds.length })}
                               </button>
@@ -1459,7 +1459,7 @@ export function ChatInterface() {
                   onChange={handleInputChange}
                   onKeyDown={handleInputKeyDown}
                   placeholder={t('askAnything')}
-                  className="flex-1 bg-transparent border-none focus:ring-0 text-lg px-3 py-2 text-zinc-900 placeholder:text-zinc-300 outline-none"
+                  className="flex-1 bg-transparent border-none focus:ring-0 text-lg px-3 py-2 text-foreground placeholder:text-muted-foreground/50 outline-none"
                   disabled={isLoading}
                 />
                 <SlashCommandMenu
@@ -1477,8 +1477,8 @@ export function ChatInterface() {
                     className={cn(
                       "flex items-center justify-center h-10 w-10 rounded-full transition-all duration-200",
                       (input.trim() || isLoading)
-                        ? (isLoading ? "bg-red-600 text-white hover:bg-red-700" : "bg-zinc-900 text-white hover:bg-zinc-800")
-                        : "bg-zinc-100 text-zinc-300"
+                        ? (isLoading ? "bg-red-600 text-primary-foreground hover:bg-red-700" : "bg-primary text-primary-foreground hover:bg-primary/90")
+                        : "bg-muted text-muted-foreground/50"
                     )}
                   >
                     {isLoading ? (
@@ -1491,7 +1491,7 @@ export function ChatInterface() {
               </div>
             </div>
             <div className="mt-2 flex justify-center">
-              <p className="text-[11px] text-zinc-400">
+              <p className="text-[11px] text-muted-foreground">
                 {t('dataClawDisclaimer')}
               </p>
             </div>
@@ -1505,12 +1505,12 @@ export function ChatInterface() {
           <DialogHeader>
             <DialogTitle>{artifactPreview?.name || t('artifactPreview')}</DialogTitle>
           </DialogHeader>
-          <div className="flex-1 min-h-0 rounded-lg border border-zinc-200 bg-white overflow-hidden">
+          <div className="flex-1 min-h-0 rounded-lg border border-border bg-background overflow-hidden">
             {artifactPreview?.mimeType.startsWith("image/") ? (
               <img
                 src={artifactPreview.previewUrl}
                 alt={artifactPreview.name}
-                className="w-full h-full object-contain bg-zinc-50"
+                className="w-full h-full object-contain bg-muted/50"
               />
             ) : artifactPreview ? (
               <iframe

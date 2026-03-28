@@ -14,6 +14,8 @@ import { Modeling } from "./pages/Modeling";
 import { Subagents } from "./pages/Subagents";
 import { useAuthStore } from "./store/authStore";
 
+import { ThemeToggle } from "./components/ThemeToggle";
+
 // Protected Route Component
 function ProtectedRoute({ children, requireAdmin = false }: { children: React.ReactNode, requireAdmin?: boolean }) {
   const { isAuthenticated, user } = useAuthStore();
@@ -34,9 +36,15 @@ function MainLayout({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
       <Sidebar />
       <main className="flex-1 flex flex-col overflow-hidden h-screen relative">
-        <div className="absolute top-0 left-0 right-0 h-14 flex justify-center items-center pointer-events-none z-30">
-          <div className="pointer-events-auto">
+        <div className="absolute top-0 left-0 right-0 h-14 flex items-center justify-between pointer-events-none z-30 px-4">
+          <div className="flex-1 pointer-events-auto">
+            {/* Left side empty for balance */}
+          </div>
+          <div className="flex-1 flex justify-center pointer-events-auto">
             <ProjectSwitcher />
+          </div>
+          <div className="flex-1 flex justify-end pointer-events-auto">
+            <ThemeToggle />
           </div>
         </div>
         <div className="flex-1 overflow-hidden">
@@ -57,7 +65,7 @@ function App() {
         <Route path="/" element={
           <ProtectedRoute>
             <MainLayout>
-              <div className="h-full overflow-hidden bg-white">
+              <div className="h-full overflow-hidden bg-background">
                 <ChatInterface />
               </div>
             </MainLayout>

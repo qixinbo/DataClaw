@@ -277,21 +277,21 @@ export function Skills() {
 
   if (!currentProject) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-zinc-500 gap-4">
-        <FolderOpen className="h-12 w-12 text-zinc-200" />
+      <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-4">
+        <FolderOpen className="h-12 w-12 text-muted-foreground/30" />
         <p>{t('selectProjectToManageSkills')}</p>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col bg-white overflow-hidden">
-      <div className="border-b border-zinc-100 px-8 pt-5 bg-white shrink-0">
+    <div className="h-full flex flex-col bg-background overflow-hidden">
+      <div className="border-b border-border px-8 pt-5 bg-background shrink-0">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-zinc-900 flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
               < Wand2 className="h-6 w-6 text-indigo-500" />{t('skillsRepository')}</h1>
-            <p className="text-sm text-zinc-500 mt-1">{t('manageAiSkillsDesc')}</p>
+            <p className="text-sm text-muted-foreground mt-1">{t('manageAiSkillsDesc')}</p>
           </div>
           <div className="flex gap-3">
             {activeTab === 'skills' ? (
@@ -304,7 +304,7 @@ export function Skills() {
                   accept=".md,.zip,.tar.gz,.tgz"
                 />
                 <Button 
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-primary-foreground gap-2"
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <Upload className="h-4 w-4" />{t('uploadSkill')}
@@ -312,7 +312,7 @@ export function Skills() {
               </>
             ) : (
               <Button 
-                className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
+                className="bg-indigo-600 hover:bg-indigo-700 text-primary-foreground gap-2"
                 onClick={() => setIsMcpDialogOpen(true)}
               >
                 <Plus className="h-4 w-4" />{t('addMcpServer')}
@@ -322,13 +322,13 @@ export function Skills() {
         </div>
         <div className="flex gap-6">
           <button 
-            className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'skills' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-zinc-500 hover:text-zinc-700'}`}
+            className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'skills' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-muted-foreground hover:text-foreground/80'}`}
             onClick={() => setActiveTab('skills')}
           >
             {t('skills')}
           </button>
           <button 
-            className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'mcp' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-zinc-500 hover:text-zinc-700'}`}
+            className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'mcp' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-muted-foreground hover:text-foreground/80'}`}
             onClick={() => setActiveTab('mcp')}
           >
             {t('mcpConfig')}
@@ -336,17 +336,17 @@ export function Skills() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-4 md:p-8 bg-zinc-50/30">
+      <div className="flex-1 overflow-auto p-4 md:p-8 bg-muted/50/30">
         {activeTab === 'skills' ? (
-          <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden min-w-[800px] lg:min-w-0">
+          <div className="bg-background rounded-xl border border-border shadow-sm overflow-hidden min-w-[800px] lg:min-w-0">
           <Table className="table-fixed w-full">
-            <TableHeader className="bg-zinc-50/50">
+            <TableHeader className="bg-muted/50/50">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="w-[40%] font-semibold text-zinc-700 py-3 px-4 text-sm">{t('name')}</TableHead>
-                <TableHead className="w-[15%] font-semibold text-zinc-700 py-3 px-4 text-sm">{t('source')}</TableHead>
-                <TableHead className="w-[15%] font-semibold text-zinc-700 py-3 px-4 text-sm text-center">{t('installationTime')}</TableHead>
-                <TableHead className="w-[15%] font-semibold text-zinc-700 py-3 px-4 text-sm text-center">{t('status')}</TableHead>
-                <TableHead className="w-[15%] font-semibold text-zinc-700 py-3 px-4 text-sm text-right">{t('actions')}</TableHead>
+                <TableHead className="w-[40%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('name')}</TableHead>
+                <TableHead className="w-[15%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('source')}</TableHead>
+                <TableHead className="w-[15%] font-semibold text-foreground/80 py-3 px-4 text-sm text-center">{t('installationTime')}</TableHead>
+                <TableHead className="w-[15%] font-semibold text-foreground/80 py-3 px-4 text-sm text-center">{t('status')}</TableHead>
+                <TableHead className="w-[15%] font-semibold text-foreground/80 py-3 px-4 text-sm text-right">{t('actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -361,7 +361,7 @@ export function Skills() {
               ) : (
                 <>
                   {skills.map((skill, index) => (
-                    <TableRow key={`${skill.id}_${index}`} className="group hover:bg-zinc-50/50 transition-colors border-zinc-100">
+                    <TableRow key={`${skill.id}_${index}`} className="group hover:bg-muted/50/50 transition-colors border-border">
                       <TableCell className="py-4 px-4 overflow-hidden">
                         <div className="flex items-start gap-3 min-w-0">
                           <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600 mt-0.5 shrink-0">
@@ -369,7 +369,7 @@ export function Skills() {
                           </div>
                           <div className="flex-1 min-w-0 space-y-1">
                             <div className="flex items-center gap-2">
-                              <h3 className="font-bold text-zinc-900 text-sm md:text-base truncate flex-1" title={skill.name}>{skill.name}</h3>
+                              <h3 className="font-bold text-foreground text-sm md:text-base truncate flex-1" title={skill.name}>{skill.name}</h3>
                               {skill.type === 'agentskill' && (
                                 <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded uppercase tracking-wider shrink-0">
                                   Agent
@@ -377,7 +377,7 @@ export function Skills() {
                               )}
                             </div>
                             <p 
-                              className="text-zinc-500 text-xs leading-relaxed truncate cursor-help"
+                              className="text-muted-foreground text-xs leading-relaxed truncate cursor-help"
                               title={skill.description}
                             >
                               {skill.description}
@@ -385,10 +385,10 @@ export function Skills() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="py-4 px-4 text-zinc-600 text-sm">
+                      <TableCell className="py-4 px-4 text-muted-foreground text-sm">
                         <div className="truncate" title={skill.source}>{skill.source}</div>
                       </TableCell>
-                      <TableCell className="py-4 px-4 text-zinc-400 text-center text-xs">
+                      <TableCell className="py-4 px-4 text-muted-foreground text-center text-xs">
                         <div className="truncate">{skill.installation_time}</div>
                       </TableCell>
                       <TableCell className="py-4 px-4 text-center">
@@ -410,7 +410,7 @@ export function Skills() {
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-8 w-8 text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-all shrink-0"
+                            className="h-8 w-8 text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-all shrink-0"
                             onClick={() => handleEditSkill(skill)}
                           >
                             <Eye className="h-4 w-4" />
@@ -419,7 +419,7 @@ export function Skills() {
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-8 w-8 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-all shrink-0"
+                              className="h-8 w-8 text-muted-foreground hover:text-rose-600 hover:bg-rose-50 rounded-md transition-all shrink-0"
                               onClick={() => handleDeleteSkill(skill.id)}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -434,8 +434,8 @@ export function Skills() {
                   {skills.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={5} className="py-24 text-center">
-                        <div className="flex flex-col items-center gap-3 text-zinc-400">
-                          <div className="p-4 bg-zinc-50 rounded-2xl">
+                        <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                          <div className="p-4 bg-muted/50 rounded-2xl">
                             <Terminal className="h-10 w-10 opacity-20" />
                           </div>
                           <p className="text-sm">{t('noSkillsInProjectClickImport')}</p>
@@ -449,15 +449,15 @@ export function Skills() {
           </Table>
         </div>
         ) : (
-          <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden min-w-[800px] lg:min-w-0">
+          <div className="bg-background rounded-xl border border-border shadow-sm overflow-hidden min-w-[800px] lg:min-w-0">
             <Table className="table-fixed w-full">
-              <TableHeader className="bg-zinc-50/50">
+              <TableHeader className="bg-muted/50/50">
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-[25%] font-semibold text-zinc-700 py-3 px-4 text-sm">{t('mcpServerName')}</TableHead>
-                  <TableHead className="w-[15%] font-semibold text-zinc-700 py-3 px-4 text-sm">{t('transport')}</TableHead>
-                  <TableHead className="w-[30%] font-semibold text-zinc-700 py-3 px-4 text-sm">{t('content')}</TableHead>
-                  <TableHead className="w-[15%] font-semibold text-zinc-700 py-3 px-4 text-sm">{t('status')}</TableHead>
-                  <TableHead className="w-[15%] font-semibold text-zinc-700 py-3 px-4 text-sm text-right">{t('actions')}</TableHead>
+                  <TableHead className="w-[25%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('mcpServerName')}</TableHead>
+                  <TableHead className="w-[15%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('transport')}</TableHead>
+                  <TableHead className="w-[30%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('content')}</TableHead>
+                  <TableHead className="w-[15%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('status')}</TableHead>
+                  <TableHead className="w-[15%] font-semibold text-foreground/80 py-3 px-4 text-sm text-right">{t('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -472,21 +472,21 @@ export function Skills() {
                 ) : (
                   <>
                     {mcpServers.map((mcp) => (
-                      <TableRow key={mcp.id} className="group hover:bg-zinc-50/50 transition-colors border-zinc-100">
+                      <TableRow key={mcp.id} className="group hover:bg-muted/50/50 transition-colors border-border">
                         <TableCell className="py-4 px-4 overflow-hidden">
-                          <h3 className="font-bold text-zinc-900 text-sm md:text-base truncate flex-1" title={mcp.name}>{mcp.name}</h3>
+                          <h3 className="font-bold text-foreground text-sm md:text-base truncate flex-1" title={mcp.name}>{mcp.name}</h3>
                         </TableCell>
-                        <TableCell className="py-4 px-4 text-zinc-600 text-sm">
+                        <TableCell className="py-4 px-4 text-muted-foreground text-sm">
                           {mcp.type}
                         </TableCell>
-                        <TableCell className="py-4 px-4 text-zinc-600 text-sm truncate" title={mcp.type === 'stdio' ? mcp.command : mcp.url}>
+                        <TableCell className="py-4 px-4 text-muted-foreground text-sm truncate" title={mcp.type === 'stdio' ? mcp.command : mcp.url}>
                           {mcp.type === 'stdio' ? mcp.command : mcp.url}
                         </TableCell>
-                        <TableCell className="py-4 px-4 text-zinc-600 text-sm truncate">
+                        <TableCell className="py-4 px-4 text-muted-foreground text-sm truncate">
                           <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] md:text-xs font-medium whitespace-nowrap ${
                             mcp.status === 'connected' 
                             ? 'bg-green-50 text-green-700 border border-green-100' 
-                            : 'bg-zinc-50 text-zinc-700 border border-zinc-100'
+                            : 'bg-muted/50 text-foreground/80 border border-border'
                           }`}>
                             {mcp.status === 'connected' ? (
                               <ShieldCheck className="h-3 w-3" />
@@ -501,7 +501,7 @@ export function Skills() {
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-8 w-8 text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-all shrink-0"
+                              className="h-8 w-8 text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-all shrink-0"
                               onClick={() => handleEditMcpServer(mcp)}
                             >
                               <Eye className="h-4 w-4" />
@@ -509,7 +509,7 @@ export function Skills() {
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-8 w-8 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-all shrink-0"
+                              className="h-8 w-8 text-muted-foreground hover:text-rose-600 hover:bg-rose-50 rounded-md transition-all shrink-0"
                               onClick={() => handleDeleteMcpServer(mcp.id!)}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -521,8 +521,8 @@ export function Skills() {
                     {mcpServers.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={5} className="py-24 text-center">
-                          <div className="flex flex-col items-center gap-3 text-zinc-400">
-                            <div className="p-4 bg-zinc-50 rounded-2xl">
+                          <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                            <div className="p-4 bg-muted/50 rounded-2xl">
                               <Terminal className="h-10 w-10 opacity-20" />
                             </div>
                             <p className="text-sm">{t('noMcpServers')}</p>
@@ -547,30 +547,30 @@ export function Skills() {
       }}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col rounded-2xl p-0 overflow-hidden">
           <DialogHeader className="p-6 pb-2">
-            <DialogTitle className="text-xl font-bold text-zinc-900">{editingSkill ? t('viewOrEditSkill') : t('addNewSkill')}</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-foreground">{editingSkill ? t('viewOrEditSkill') : t('addNewSkill')}</DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto px-6 py-2">
             <div className="grid gap-5">
               <div className="grid gap-1.5">
-                <Label htmlFor="name" className="text-zinc-600 font-medium text-sm">{t('name')}</Label>
+                <Label htmlFor="name" className="text-muted-foreground font-medium text-sm">{t('name')}</Label>
                 <Input 
                   id="name" 
                   placeholder={t('skillName')}
                   value={newSkill.name || ''} 
                   onChange={(e) => setNewSkill({...newSkill, name: e.target.value})}
-                  className="rounded-lg border-zinc-200 h-10" 
+                  className="rounded-lg border-border h-10" 
                   disabled={editingSkill?.is_builtin}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="type" className="text-zinc-600 font-medium text-sm">{t('type')}</Label>
+                  <Label htmlFor="type" className="text-muted-foreground font-medium text-sm">{t('type')}</Label>
                   <Select 
                       value={newSkill.type} 
                       onValueChange={(val) => { if (val) setNewSkill({...newSkill, type: val}) }}
                       disabled={editingSkill?.is_builtin}
                   >
-                      <SelectTrigger className="rounded-lg border-zinc-200 h-10">
+                      <SelectTrigger className="rounded-lg border-border h-10">
                           <SelectValue placeholder={t('selectType')} />
                       </SelectTrigger>
                       <SelectContent className="rounded-lg">
@@ -581,13 +581,13 @@ export function Skills() {
                   </Select>
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="status" className="text-zinc-600 font-medium text-sm">{t('status')}</Label>
+                  <Label htmlFor="status" className="text-muted-foreground font-medium text-sm">{t('status')}</Label>
                   <Select 
                       value={newSkill.status} 
                       onValueChange={(val) => { if (val) setNewSkill({...newSkill, status: val}) }}
                       disabled={editingSkill?.is_builtin}
                   >
-                      <SelectTrigger className="rounded-lg border-zinc-200 h-10">
+                      <SelectTrigger className="rounded-lg border-border h-10">
                           <SelectValue placeholder={t('selectStatus')} />
                       </SelectTrigger>
                       <SelectContent className="rounded-lg">
@@ -598,23 +598,23 @@ export function Skills() {
                 </div>
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="description" className="text-zinc-600 font-medium text-sm">{t('description')}</Label>
+                <Label htmlFor="description" className="text-muted-foreground font-medium text-sm">{t('description')}</Label>
                 <Textarea 
                   id="description" 
                   placeholder={t('brieflyDescribeSkillFunction')}
                   value={newSkill.description || ''} 
                   onChange={(e) => setNewSkill({...newSkill, description: e.target.value})}
-                  className="rounded-lg border-zinc-200 min-h-[80px] py-2 text-sm" 
+                  className="rounded-lg border-border min-h-[80px] py-2 text-sm" 
                   disabled={editingSkill?.is_builtin}
                 />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="content" className="text-zinc-600 font-medium text-sm">{t('content')}</Label>
+                <Label htmlFor="content" className="text-muted-foreground font-medium text-sm">{t('content')}</Label>
                 <Textarea 
                   id="content" 
                   value={newSkill.content || ''} 
                   onChange={(e) => setNewSkill({...newSkill, content: e.target.value})}
-                  className="rounded-lg border-zinc-200 font-mono text-xs min-h-[160px] py-3 bg-zinc-50" 
+                  className="rounded-lg border-border font-mono text-xs min-h-[160px] py-3 bg-muted/50" 
                   placeholder={t('pythonSqlApiContentPlaceholder')}
                   disabled={editingSkill?.is_builtin}
                 />
@@ -623,7 +623,7 @@ export function Skills() {
           </div>
           <DialogFooter className="p-6 pt-2">
             {!editingSkill?.is_builtin && (
-              <Button onClick={handleAddSkill} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-6 h-10 w-full">{t('saveSkill')}</Button>
+              <Button onClick={handleAddSkill} className="bg-indigo-600 hover:bg-indigo-700 text-primary-foreground rounded-lg px-6 h-10 w-full">{t('saveSkill')}</Button>
             )}
           </DialogFooter>
         </DialogContent>
@@ -641,27 +641,27 @@ export function Skills() {
       }}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col rounded-2xl p-0 overflow-hidden">
           <DialogHeader className="p-6 pb-2">
-            <DialogTitle className="text-xl font-bold text-zinc-900">{editingMcp ? t('editMcpServer') : t('addMcpServer')}</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-foreground">{editingMcp ? t('editMcpServer') : t('addMcpServer')}</DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto px-6 py-2">
             <div className="grid gap-5">
               <div className="grid gap-1.5">
-                <Label htmlFor="mcp-name" className="text-zinc-600 font-medium text-sm">{t('name')}</Label>
+                <Label htmlFor="mcp-name" className="text-muted-foreground font-medium text-sm">{t('name')}</Label>
                 <Input 
                   id="mcp-name" 
                   placeholder={t('mcpServerName')}
                   value={newMcp.name || ''} 
                   onChange={(e) => setNewMcp({...newMcp, name: e.target.value})}
-                  className="rounded-lg border-zinc-200 h-10" 
+                  className="rounded-lg border-border h-10" 
                 />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="transport" className="text-zinc-600 font-medium text-sm">{t('transport')}</Label>
+                <Label htmlFor="transport" className="text-muted-foreground font-medium text-sm">{t('transport')}</Label>
                 <Select 
                     value={newMcp.type} 
                     onValueChange={(val) => { if (val) setNewMcp({...newMcp, type: val as 'stdio' | 'sse' | 'streamableHttp'}) }}
                 >
-                    <SelectTrigger className="rounded-lg border-zinc-200 h-10">
+                    <SelectTrigger className="rounded-lg border-border h-10">
                         <SelectValue placeholder={t('transport')} />
                     </SelectTrigger>
                     <SelectContent className="rounded-lg">
@@ -675,32 +675,32 @@ export function Skills() {
               {newMcp.type === 'stdio' ? (
                 <>
                   <div className="grid gap-1.5">
-                    <Label htmlFor="command" className="text-zinc-600 font-medium text-sm">{t('command')}</Label>
+                    <Label htmlFor="command" className="text-muted-foreground font-medium text-sm">{t('command')}</Label>
                     <Input 
                       id="command" 
                       placeholder="e.g. npx, python"
                       value={newMcp.command || ''} 
                       onChange={(e) => setNewMcp({...newMcp, command: e.target.value})}
-                      className="rounded-lg border-zinc-200 h-10" 
+                      className="rounded-lg border-border h-10" 
                     />
                   </div>
                   <div className="grid gap-1.5">
-                    <Label htmlFor="args" className="text-zinc-600 font-medium text-sm">{t('args')}</Label>
+                    <Label htmlFor="args" className="text-muted-foreground font-medium text-sm">{t('args')}</Label>
                     <Textarea 
                       id="args" 
                       value={mcpArgsStr} 
                       onChange={(e) => setMcpArgsStr(e.target.value)}
-                      className="rounded-lg border-zinc-200 font-mono text-xs min-h-[80px] py-3 bg-zinc-50" 
+                      className="rounded-lg border-border font-mono text-xs min-h-[80px] py-3 bg-muted/50" 
                       placeholder='e.g. ["-y", "@modelcontextprotocol/server-everything"]'
                     />
                   </div>
                   <div className="grid gap-1.5">
-                    <Label htmlFor="env" className="text-zinc-600 font-medium text-sm">{t('env')}</Label>
+                    <Label htmlFor="env" className="text-muted-foreground font-medium text-sm">{t('env')}</Label>
                     <Textarea 
                       id="env" 
                       value={mcpEnvStr} 
                       onChange={(e) => setMcpEnvStr(e.target.value)}
-                      className="rounded-lg border-zinc-200 font-mono text-xs min-h-[80px] py-3 bg-zinc-50" 
+                      className="rounded-lg border-border font-mono text-xs min-h-[80px] py-3 bg-muted/50" 
                       placeholder='e.g. {"FOO": "bar"}'
                     />
                   </div>
@@ -708,22 +708,22 @@ export function Skills() {
               ) : (
                 <>
                   <div className="grid gap-1.5">
-                    <Label htmlFor="url" className="text-zinc-600 font-medium text-sm">{t('url')}</Label>
+                    <Label htmlFor="url" className="text-muted-foreground font-medium text-sm">{t('url')}</Label>
                     <Input 
                       id="url" 
                       placeholder="e.g. http://localhost:8000/sse"
                       value={newMcp.url || ''} 
                       onChange={(e) => setNewMcp({...newMcp, url: e.target.value})}
-                      className="rounded-lg border-zinc-200 h-10" 
+                      className="rounded-lg border-border h-10" 
                     />
                   </div>
                   <div className="grid gap-1.5">
-                    <Label htmlFor="headers" className="text-zinc-600 font-medium text-sm">{t('headers')}</Label>
+                    <Label htmlFor="headers" className="text-muted-foreground font-medium text-sm">{t('headers')}</Label>
                     <Textarea 
                       id="headers" 
                       value={mcpHeadersStr} 
                       onChange={(e) => setMcpHeadersStr(e.target.value)}
-                      className="rounded-lg border-zinc-200 font-mono text-xs min-h-[80px] py-3 bg-zinc-50" 
+                      className="rounded-lg border-border font-mono text-xs min-h-[80px] py-3 bg-muted/50" 
                       placeholder='e.g. {"Authorization": "Bearer token"}'
                     />
                   </div>
@@ -732,7 +732,7 @@ export function Skills() {
             </div>
           </div>
           <DialogFooter className="p-6 pt-2">
-            <Button onClick={handleAddMcpServer} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-6 h-10 w-full">{t('saveMcpServer')}</Button>
+            <Button onClick={handleAddMcpServer} className="bg-indigo-600 hover:bg-indigo-700 text-primary-foreground rounded-lg px-6 h-10 w-full">{t('saveMcpServer')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

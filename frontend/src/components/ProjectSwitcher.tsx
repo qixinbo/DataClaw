@@ -75,7 +75,7 @@ export function ProjectSwitcher() {
                 }}
                 className={currentProject?.id === project.id ? 'bg-accent' : ''}
               >
-                <Folder className="h-4 w-4 mr-2 text-zinc-400" />
+                <Folder className="h-4 w-4 mr-2 text-muted-foreground" />
                 {project.name}
               </DropdownMenuItem>
             ))}

@@ -142,7 +142,7 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
                 placeholder="••••••" 
               />
             </div>
-            <div className="text-xs text-zinc-500 pt-2">
+            <div className="text-xs text-muted-foreground pt-2">
               {t('orUseSupabaseConnectionString')}
             </div>
             <div className="space-y-2">
@@ -207,7 +207,7 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
                 placeholder="••••••" 
               />
             </div>
-            <div className="text-xs text-zinc-500 pt-2">
+            <div className="text-xs text-muted-foreground pt-2">
               {t('orUseConnectionString')}
             </div>
             <div className="space-y-2">
@@ -294,7 +294,7 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
                   onChange={handleFileUpload}
                 />
               </div>
-              <p className="text-xs text-zinc-500">{t('uploadFileOrEnterPath')}</p>
+              <p className="text-xs text-muted-foreground">{t('uploadFileOrEnterPath')}</p>
             </div>
           </div>
         );
@@ -302,8 +302,8 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
         return (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <AlertTriangle className="h-10 w-10 text-amber-500 mb-3" />
-            <h3 className="font-medium text-zinc-900">{t('unsupportedDataSourceType')}</h3>
-            <p className="text-sm text-zinc-500 mt-1 max-w-[300px]">
+            <h3 className="font-medium text-foreground">{t('unsupportedDataSourceType')}</h3>
+            <p className="text-sm text-muted-foreground mt-1 max-w-[300px]">
               {t('dataSourceConnectorInDevelopment')}
             </p>
           </div>
@@ -327,7 +327,7 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
         <div className="space-y-2">
           <label className="text-sm font-medium">{t('type')}</label>
           <select
-            className="w-full h-10 px-3 rounded-md border border-zinc-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-zinc-950 focus:border-transparent"
+            className="w-full h-10 px-3 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
             value={type}
             onChange={e => setType(e.target.value)}
           >
@@ -342,7 +342,7 @@ export function DataSourceForm({ initialData, onSubmit, onTest, onCancel }: Data
         </div>
       )}
 
-      <div className="p-4 border border-zinc-200 rounded-lg bg-zinc-50/50">
+      <div className="p-4 border border-border rounded-lg bg-muted/50/50">
         {renderConfigFields()}
       </div>
 

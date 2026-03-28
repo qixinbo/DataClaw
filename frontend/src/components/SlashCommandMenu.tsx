@@ -48,7 +48,7 @@ export function SlashCommandMenu({ isOpen, skills, selectedIndex, onSelect, onCl
   return (
     <div 
       ref={menuRef}
-      className="absolute bottom-full left-0 mb-2 w-full max-w-md overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-100 z-50"
+      className="absolute bottom-full left-0 mb-2 w-full max-w-md overflow-hidden rounded-xl border border-border bg-popover shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-100 z-50"
     >
       <div className="max-h-[240px] overflow-y-auto py-1.5 custom-scrollbar">
         {skills.map((skill, index) => (
@@ -58,11 +58,11 @@ export function SlashCommandMenu({ isOpen, skills, selectedIndex, onSelect, onCl
             onClick={() => onSelect(skill)}
             className={cn(
               "w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors",
-              index === selectedIndex ? "bg-zinc-800" : "hover:bg-zinc-900"
+              index === selectedIndex ? "bg-accent" : "hover:bg-accent/50"
             )}
           >
             <span className="font-bold text-blue-400 shrink-0 font-mono">/{skill.name}</span>
-            <span className="text-zinc-400 truncate text-xs">{skill.description || t('noDescription')}</span>
+            <span className="text-muted-foreground truncate text-xs">{skill.description || t('noDescription')}</span>
           </button>
         ))}
       </div>

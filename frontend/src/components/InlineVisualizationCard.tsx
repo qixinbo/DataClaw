@@ -101,13 +101,13 @@ export function InlineVisualizationCard({ viz }: InlineVisualizationCardProps) {
   }
 
   return (
-    <Card className="w-full border border-zinc-100 shadow-none">
+    <Card className="w-full border border-border shadow-none">
       <CardHeader className="pb-2">
         <CardTitle className="text-base">{viz.chartSpec?.title || t('visualizationResult')}</CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
         <div className="flex items-center justify-between mb-3">
-          <div className="flex bg-zinc-100 rounded-md p-1">
+          <div className="flex bg-muted rounded-md p-1">
             <Button
               variant={view === "table" ? "secondary" : "ghost"}
               size="sm"
@@ -158,7 +158,7 @@ export function InlineVisualizationCard({ viz }: InlineVisualizationCardProps) {
                     )}
                   </Button>
                 </DialogHeader>
-                <div className="relative rounded-md overflow-hidden bg-[#1e1e1e] border border-zinc-200 shadow-inner mt-2">
+                <div className="relative rounded-md overflow-hidden bg-[#1e1e1e] border border-border shadow-inner mt-2">
                   <ScrollArea className="max-h-[500px]">
                     <SyntaxHighlighter
                       language="sql"
@@ -188,11 +188,11 @@ export function InlineVisualizationCard({ viz }: InlineVisualizationCardProps) {
 
         {view === "chart" ? (
           viz.chartSpec && objectRows.length > 0 ? (
-            <div className="w-full h-80 min-h-[320px] rounded-xl border border-zinc-100 p-2">
+            <div className="w-full h-80 min-h-[320px] rounded-xl border border-border p-2">
               <VegaChart data={objectRows} spec={viz.chartSpec} />
             </div>
           ) : (
-            <div className="text-sm text-zinc-500">{t('resultNotSuitableForChart')}</div>
+            <div className="text-sm text-muted-foreground">{t('resultNotSuitableForChart')}</div>
           )
         ) : objectRows.length > 0 ? (
           <ScrollArea className="h-80 border rounded-md">
@@ -214,7 +214,7 @@ export function InlineVisualizationCard({ viz }: InlineVisualizationCardProps) {
             </Table>
           </ScrollArea>
         ) : (
-          <div className="text-sm text-zinc-500">{t('noStructuredDataToRender')}</div>
+          <div className="text-sm text-muted-foreground">{t('noStructuredDataToRender')}</div>
         )}
       </CardContent>
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>

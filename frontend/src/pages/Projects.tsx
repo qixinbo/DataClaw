@@ -75,9 +75,9 @@ export function Projects() {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-zinc-50/30 overflow-hidden">
-      <div className="h-14 px-6 flex items-center justify-between border-b border-zinc-100 bg-white">
-        <div className="flex items-center gap-2 text-zinc-700 font-medium">
+    <div className="flex-1 flex flex-col h-full bg-muted/50/30 overflow-hidden">
+      <div className="h-14 px-6 flex items-center justify-between border-b border-border bg-background">
+        <div className="flex items-center gap-2 text-foreground/80 font-medium">
           <Folder className="h-5 w-5 text-blue-500" />{t('projectManagement')}</div>
         <Button onClick={() => {
           setFormData({ name: '', description: '' });
@@ -88,21 +88,21 @@ export function Projects() {
 
       <div className="flex-1 p-6 overflow-auto">
         <div className="max-w-5xl mx-auto space-y-6">
-          <Card className="border-zinc-200 shadow-sm">
+          <Card className="border-border shadow-sm">
             <CardHeader>
               <CardTitle>{t('projectList')}</CardTitle>
               <CardDescription>{t('manageProjectsDesc')}</CardDescription>
             </CardHeader>
             <CardContent>
               {loading && projects.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-zinc-400">
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                   <Loader2 className="h-8 w-8 animate-spin mb-4" />
                   <p>{t('loading')}</p>
                 </div>
               ) : projects.length === 0 ? (
-                <div className="text-center py-12 border-2 border-dashed rounded-lg border-zinc-100">
-                  <Folder className="h-12 w-12 text-zinc-200 mx-auto mb-4" />
-                  <p className="text-zinc-500">{t('noProjectsCreateOne')}</p>
+                <div className="text-center py-12 border-2 border-dashed rounded-lg border-border">
+                  <Folder className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
+                  <p className="text-muted-foreground">{t('noProjectsCreateOne')}</p>
                 </div>
               ) : (
                 <Table>
@@ -118,10 +118,10 @@ export function Projects() {
                     {projects.map((project) => (
                       <TableRow key={project.id}>
                         <TableCell className="font-medium">{project.name}</TableCell>
-                        <TableCell className="text-zinc-500 max-w-xs truncate">
+                        <TableCell className="text-muted-foreground max-w-xs truncate">
                           {project.description || '-'}
                         </TableCell>
-                        <TableCell className="text-zinc-500">
+                        <TableCell className="text-muted-foreground">
                           {new Date(project.created_at).toLocaleDateString()}
                         </TableCell>
                         <TableCell className="text-right">

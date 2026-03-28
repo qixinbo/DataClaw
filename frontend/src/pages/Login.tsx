@@ -76,7 +76,7 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-50 px-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-muted/50 px-4">
       <div className="w-full max-w-md">
         <div className="mb-10 text-center flex flex-col items-center gap-4 select-none relative">
           <div className="text-[56px] leading-none animate-bounce-slow pb-2">
@@ -87,14 +87,14 @@ export function Login() {
           </h1>
           <div className="absolute right-0 bottom-0 translate-y-4">
             <DropdownMenu>
-              <DropdownMenuTrigger className="h-9 w-9 rounded-full bg-white/50 backdrop-blur-sm shadow-sm border border-zinc-200/50 text-zinc-500 hover:text-zinc-900 hover:bg-white transition-all inline-flex items-center justify-center">
+              <DropdownMenuTrigger className="h-9 w-9 rounded-full bg-background/50 backdrop-blur-sm shadow-sm border border-border/50 text-muted-foreground hover:text-foreground hover:bg-background transition-all inline-flex items-center justify-center">
                 <Languages className="h-4 w-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-32">
-                <DropdownMenuItem onClick={() => i18n.changeLanguage('zh')} className={i18n.language === 'zh' ? 'bg-zinc-100' : ''}>
+                <DropdownMenuItem onClick={() => i18n.changeLanguage('zh')} className={i18n.language === 'zh' ? 'bg-muted' : ''}>
                   简体中文
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => i18n.changeLanguage('en')} className={i18n.language === 'en' ? 'bg-zinc-100' : ''}>
+                <DropdownMenuItem onClick={() => i18n.changeLanguage('en')} className={i18n.language === 'en' ? 'bg-muted' : ''}>
                   English
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -102,8 +102,8 @@ export function Login() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl border border-zinc-100 p-8">
-          <h2 className="text-2xl font-bold text-zinc-800 mb-6 text-center">
+        <div className="bg-background rounded-2xl shadow-xl border border-border p-8">
+          <h2 className="text-2xl font-bold text-foreground/90 mb-6 text-center">
             {isLogin ? t("welcomeBack") : t("createAccount")}
           </h2>
 
@@ -158,7 +158,7 @@ export function Login() {
             <Button
               type="submit"
               disabled={isLoading || !formData.username || !formData.password || (!isLogin && !formData.email)}
-              className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-base rounded-xl transition-all shadow-md"
+              className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-primary-foreground font-medium text-base rounded-xl transition-all shadow-md"
             >
               {isLoading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -168,7 +168,7 @@ export function Login() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-zinc-500">
+          <div className="mt-6 text-center text-sm text-muted-foreground">
             {isLogin ? t("dontHaveAccount") : t("alreadyHaveAccount")}
             <button
               onClick={() => {

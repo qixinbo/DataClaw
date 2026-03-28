@@ -20,11 +20,11 @@ interface TableNodeData {
 
 export const TableNode = memo(({ data }: { data: TableNodeData }) => {
   return (
-    <Card className="min-w-[220px] max-w-[280px] shadow-md border-t-4 border-t-blue-500 text-xs bg-white">
+    <Card className="min-w-[220px] max-w-[280px] shadow-md border-t-4 border-t-blue-500 text-xs bg-background">
       <Handle type="target" position={Position.Top} className="!bg-blue-500" />
       
       <CardHeader 
-        className="py-2 px-3 bg-gray-50 border-b flex flex-row items-center justify-between cursor-pointer hover:bg-gray-100"
+        className="py-2 px-3 bg-muted/50 border-b flex flex-row items-center justify-between cursor-pointer hover:bg-muted"
         onClick={() => data.onDetailClick(data.name)}
       >
         <div className="font-semibold flex items-center gap-2 truncate" title={data.name}>
@@ -56,12 +56,12 @@ export const TableNode = memo(({ data }: { data: TableNodeData }) => {
                 return (
                   <tr 
                     key={col.name} 
-                    className="border-b last:border-0 hover:bg-gray-50"
+                    className="border-b last:border-0 hover:bg-muted/50"
                     title={`${col.name} (${col.type})`}
                   >
-                    <td className="py-1.5 px-3 w-16 text-gray-500 font-mono truncate border-r border-gray-100">{displayType}</td>
-                    <td className="py-1.5 px-3 font-medium truncate text-gray-800">{col.name}</td>
-                    <td className="py-1.5 px-3 w-10 text-center text-gray-500 font-semibold text-[10px] border-l border-gray-100">
+                    <td className="py-1.5 px-3 w-16 text-muted-foreground font-mono truncate border-r border-border">{displayType}</td>
+                    <td className="py-1.5 px-3 font-medium truncate text-foreground">{col.name}</td>
+                    <td className="py-1.5 px-3 w-10 text-center text-muted-foreground font-semibold text-[10px] border-l border-border">
                       {keyText}
                     </td>
                   </tr>

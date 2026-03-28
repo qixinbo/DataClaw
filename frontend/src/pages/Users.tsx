@@ -113,14 +113,14 @@ export function Users() {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-zinc-50/30 overflow-hidden">
-      <div className="h-14 px-6 flex items-center justify-between border-b border-zinc-100 bg-white">
-        <div className="flex items-center gap-2 text-zinc-700 font-medium">
+    <div className="flex-1 flex flex-col h-full bg-muted/50/30 overflow-hidden">
+      <div className="h-14 px-6 flex items-center justify-between border-b border-border bg-background">
+        <div className="flex items-center gap-2 text-foreground/80 font-medium">
           <UsersIcon className="h-5 w-5 text-indigo-500" />
           用户管理
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-8 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md px-3" onClick={() => handleOpenDialog()}>
+          <DialogTrigger className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-8 bg-indigo-600 hover:bg-indigo-700 text-primary-foreground rounded-md px-3" onClick={() => handleOpenDialog()}>
             <Plus className="h-4 w-4" />
             添加用户
           </DialogTrigger>
@@ -183,7 +183,7 @@ export function Users() {
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   {t('cancel')}
                 </Button>
-                <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-primary-foreground">
                   {t('save')}
                 </Button>
               </DialogFooter>
@@ -193,10 +193,10 @@ export function Users() {
       </div>
 
       <div className="flex-1 p-6 overflow-auto">
-        <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+        <div className="bg-background rounded-xl border border-border shadow-sm overflow-hidden">
           {isLoading ? (
             <div className="flex items-center justify-center h-40">
-              <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : (
             <Table>
@@ -214,7 +214,7 @@ export function Users() {
               <TableBody>
                 {users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center h-24 text-zinc-500">
+                    <TableCell colSpan={7} className="text-center h-24 text-muted-foreground">
                       暂无用户数据
                     </TableCell>
                   </TableRow>
@@ -225,7 +225,7 @@ export function Users() {
                       <TableCell>{user.username}</TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>
-                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${user.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-600'}`}>
+                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${user.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}>
                           {user.is_active ? t('normal') : t('disabled')}
                         </span>
                       </TableCell>
@@ -234,14 +234,14 @@ export function Users() {
                           {user.is_admin ? t('admin') : t('regularUser')}
                         </span>
                       </TableCell>
-                      <TableCell className="text-zinc-500">
+                      <TableCell className="text-muted-foreground">
                         {new Date(user.created_at).toLocaleDateString()}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-zinc-500 hover:text-indigo-600"
+                          className="h-8 w-8 text-muted-foreground hover:text-indigo-600"
                           onClick={() => handleOpenDialog(user)}
                         >
                           <Pencil className="h-4 w-4" />
@@ -249,7 +249,7 @@ export function Users() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-zinc-500 hover:text-red-600"
+                          className="h-8 w-8 text-muted-foreground hover:text-red-600"
                           onClick={() => handleDelete(user.id)}
                         >
                           <Trash2 className="h-4 w-4" />

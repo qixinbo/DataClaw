@@ -198,35 +198,35 @@ export function ModelConfigs() {
 
   if (!isAdmin) {
     return (
-      <div className="flex-1 flex flex-col h-full bg-zinc-50/30 overflow-hidden items-center justify-center">
-        <div className="text-zinc-500 text-lg">{t('noPermissionAdminOnly')}</div>
+      <div className="flex-1 flex flex-col h-full bg-muted/50/30 overflow-hidden items-center justify-center">
+        <div className="text-muted-foreground text-lg">{t('noPermissionAdminOnly')}</div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-zinc-50/30 overflow-hidden">
-      <div className="h-14 px-6 flex items-center justify-between border-b border-zinc-100 bg-white">
-        <div className="flex items-center gap-2 text-zinc-700 font-medium">
+    <div className="flex-1 flex flex-col h-full bg-muted/50/30 overflow-hidden">
+      <div className="h-14 px-6 flex items-center justify-between border-b border-border bg-background">
+        <div className="flex items-center gap-2 text-foreground/80 font-medium">
           <Brain className="h-5 w-5 text-indigo-500" />{t('modelConfig')}</div>
         <div className="flex items-center gap-3">
           <div className="relative">
-            <Search className="h-4 w-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
             <Input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder={t('searchModel')} className="w-[200px] pl-9 h-8 text-sm" />
           </div>
-          <Button variant="outline" size="icon" className="h-8 w-8 text-zinc-500" onClick={fetchConfigs}>
+          <Button variant="outline" size="icon" className="h-8 w-8 text-muted-foreground" onClick={fetchConfigs}>
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button className="h-8 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm" onClick={openCreate}>
+          <Button className="h-8 px-3 bg-indigo-600 hover:bg-indigo-700 text-primary-foreground text-sm" onClick={openCreate}>
             <Plus className="h-4 w-4 mr-1" />{t('addModel')}</Button>
         </div>
       </div>
 
       <div className="flex-1 p-6 overflow-auto">
-        <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+        <div className="bg-background rounded-xl border border-border shadow-sm overflow-hidden">
           {isLoading ? (
             <div className="flex items-center justify-center h-40">
-              <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : (
             <Table>
@@ -242,7 +242,7 @@ export function ModelConfigs() {
               <TableBody>
                 {filteredConfigs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center h-24 text-zinc-500">{t('noModelData')}</TableCell>
+                    <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">{t('noModelData')}</TableCell>
                   </TableRow>
                 ) : (
                   filteredConfigs.map((item) => (
@@ -251,11 +251,11 @@ export function ModelConfigs() {
                         {item.name || item.model}
                       </TableCell>
                       <TableCell className="capitalize">{item.provider}</TableCell>
-                      <TableCell className="text-zinc-500 font-mono text-xs">{item.model}</TableCell>
+                      <TableCell className="text-muted-foreground font-mono text-xs">{item.model}</TableCell>
                       <TableCell>
                         <span 
                           onClick={() => handleSetDefault(item)}
-                          className={`inline-flex px-2 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${item.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
+                          className={`inline-flex px-2 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${item.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
                           title={item.is_active ? t('currentDefaultModel') : t('clickToSetDefault')}
                         >
                           {item.is_active ? t('default') : t('setDefault')}
@@ -265,7 +265,7 @@ export function ModelConfigs() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-zinc-500 hover:text-indigo-600"
+                          className="h-8 w-8 text-muted-foreground hover:text-indigo-600"
                           onClick={() => openEdit(item)}
                         >
                           <Pencil className="h-4 w-4" />
@@ -273,7 +273,7 @@ export function ModelConfigs() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-zinc-500 hover:text-red-600"
+                          className="h-8 w-8 text-muted-foreground hover:text-red-600"
                           onClick={() => handleDelete(item.id)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -353,7 +353,7 @@ export function ModelConfigs() {
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground"
                     onClick={() => setShowApiKey((v) => !v)}
                   >
                     {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -373,7 +373,7 @@ export function ModelConfigs() {
               </Button>
               <div className="flex items-center gap-2">
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>{t('cancel')}</Button>
-                <Button type="submit" disabled={isSaving} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                <Button type="submit" disabled={isSaving} className="bg-indigo-600 hover:bg-indigo-700 text-primary-foreground">
                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   保存
                 </Button>

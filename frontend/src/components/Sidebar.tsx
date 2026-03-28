@@ -78,7 +78,7 @@ function SectionHeader({
   return (
     <div className="px-3 pt-4 pb-1">
       <div className="flex items-center justify-between px-1 group">
-        <div className="text-[14px] font-semibold text-zinc-500 flex items-center gap-1">
+        <div className="text-[14px] font-semibold text-muted-foreground flex items-center gap-1">
           {title}
           <span>({count})</span>
         </div>
@@ -88,14 +88,14 @@ function SectionHeader({
               <button
                 onClick={handleSelectAll}
                 title={t('selectAllOrCancel')}
-                className="p-1 hover:bg-zinc-200 rounded text-zinc-500 transition-colors"
+                className="p-1 hover:bg-muted/80 rounded text-muted-foreground transition-colors"
               >
                 <ListChecks className="h-3.5 w-3.5" />
               </button>
               <button
                 onClick={handleInvertSelection}
                 title={t('invertSelection')}
-                className="p-1 hover:bg-zinc-200 rounded text-zinc-500 transition-colors"
+                className="p-1 hover:bg-muted/80 rounded text-muted-foreground transition-colors"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
               </button>
@@ -106,14 +106,14 @@ function SectionHeader({
                 className={`p-1 rounded transition-colors ${
                   selectedKeys.length > 0 
                     ? "hover:bg-red-100 text-red-500" 
-                    : "text-zinc-300 cursor-not-allowed"
+                    : "text-muted-foreground/50 cursor-not-allowed"
                 }`}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
               <button
                 onClick={() => setIsSelectionMode(false)}
-                className="text-[10px] font-medium px-1.5 py-0.5 hover:bg-zinc-200 rounded text-zinc-500 transition-colors ml-1"
+                className="text-[10px] font-medium px-1.5 py-0.5 hover:bg-muted/80 rounded text-muted-foreground transition-colors ml-1"
               >
                 {t('cancel')}
               </button>
@@ -121,7 +121,7 @@ function SectionHeader({
           ) : (
             <button
               onClick={() => setIsSelectionMode(true)}
-              className="p-1 hover:bg-zinc-200 rounded text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity"
+              className="p-1 hover:bg-muted/80 rounded text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
               style={{ opacity: count > 0 ? undefined : 0 }}
             >
               <CheckSquare className="h-3.5 w-3.5" />
@@ -177,7 +177,7 @@ function Section({
             <div
               key={item.key}
               className={`w-full h-8 px-2 text-left rounded-md text-[14px] flex items-center justify-between group transition-colors cursor-pointer ${
-                isActive && !isSelectionMode ? 'bg-zinc-100 text-zinc-900 font-medium' : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'
+                isActive && !isSelectionMode ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
               } ${isSelected ? 'bg-indigo-50/50 text-indigo-700' : ''}`}
                 onClick={(e) => isSelectionMode ? toggleSelect(item.key, e) : onSelect(item.key)}
               >
@@ -190,12 +190,12 @@ function Section({
                     {isSelected ? (
                       <CheckSquare className="h-3.5 w-3.5 text-indigo-600" />
                     ) : (
-                      <Square className="h-3.5 w-3.5 text-zinc-300" />
+                      <Square className="h-3.5 w-3.5 text-muted-foreground/50" />
                     )}
                   </span>
                 ) : (
                   <span className="w-4 shrink-0 flex items-center justify-center">
-                    {item.pinned && <Pin className="h-3.5 w-3.5 text-zinc-500" />}
+                    {item.pinned && <Pin className="h-3.5 w-3.5 text-muted-foreground" />}
                   </span>
                 )}
                 <span className="truncate">{displayTitle}</span>
@@ -203,7 +203,7 @@ function Section({
               
               {!isSelectionMode && (
                 <DropdownMenu>
-                <DropdownMenuTrigger onClick={(e) => e.stopPropagation()} className="h-6 w-6 flex items-center justify-center rounded hover:bg-zinc-200 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity outline-none">
+                <DropdownMenuTrigger onClick={(e) => e.stopPropagation()} className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted/80 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity outline-none">
                   <MoreVertical className="h-4 w-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-32">
@@ -302,13 +302,13 @@ function DashboardSection({
   return (
     <div className="px-3 pt-4">
       <div className="flex items-center justify-between mb-1.5 px-1 group">
-        <div className="text-[14px] font-semibold text-zinc-500 flex items-center gap-1">
+        <div className="text-[14px] font-semibold text-muted-foreground flex items-center gap-1">
           {title}
           <span>({count})</span>
         </div>
         <button
           onClick={onCreate}
-          className="text-[10px] font-medium px-1.5 py-0.5 hover:bg-zinc-200 rounded text-zinc-500 transition-colors opacity-0 group-hover:opacity-100 flex items-center gap-0.5"
+          className="text-[10px] font-medium px-1.5 py-0.5 hover:bg-muted/80 rounded text-muted-foreground transition-colors opacity-0 group-hover:opacity-100 flex items-center gap-0.5"
         >
           <Plus className="h-3.5 w-3.5" />
           {t('new')}
@@ -321,18 +321,18 @@ function DashboardSection({
             <div
               key={item.id}
               className={`w-full h-8 px-2 text-left rounded-md text-[14px] flex items-center justify-between group transition-colors cursor-pointer ${
-                isActive ? 'bg-zinc-100 text-zinc-900 font-medium' : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'
+                isActive ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
               }`}
                 onClick={() => onSelect(item.id)}
               >
               <div className="truncate pr-2 flex-1 flex items-center gap-1.5 min-w-0">
                 <span className="w-4 shrink-0 flex items-center justify-center">
-                  <LayoutDashboard className="h-3.5 w-3.5 text-zinc-400" />
+                  <LayoutDashboard className="h-3.5 w-3.5 text-muted-foreground" />
                 </span>
                 <span className="truncate">{item.name}</span>
               </div>
               <DropdownMenu>
-                <DropdownMenuTrigger onClick={(e) => e.stopPropagation()} className="h-6 w-6 flex items-center justify-center rounded hover:bg-zinc-200 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity outline-none">
+                <DropdownMenuTrigger onClick={(e) => e.stopPropagation()} className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted/80 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity outline-none">
                   <MoreVertical className="h-4 w-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-32">
@@ -615,12 +615,12 @@ function SidebarBody() {
   });
 
   return (
-    <div className="h-full min-h-0 flex flex-col bg-zinc-50/30 border-r border-zinc-200 relative">
+    <div className="h-full min-h-0 flex flex-col bg-muted/50/30 border-r border-border relative">
       {/* Header */}
-      <div className="h-14 px-4 flex items-center justify-between border-b border-zinc-100">
-        <Link to="/" className="flex items-center gap-1.5 text-zinc-700 font-bold text-lg hover:opacity-80 transition-opacity">
+      <div className="h-14 px-4 flex items-center justify-between border-b border-border">
+        <Link to="/" className="flex items-center gap-1.5 text-foreground/80 font-bold text-lg hover:opacity-80 transition-opacity">
           <span className="text-xl leading-none mr-0.5">🦞</span>
-          <span className="bg-clip-text text-transparent bg-gradient-to-r from-zinc-800 to-zinc-600">
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-foreground to-muted-foreground">
             {t('lobsterDataQA')}
           </span>
         </Link>
@@ -642,7 +642,7 @@ function SidebarBody() {
         <div className="px-3 pt-4 mb-2">
           <Button 
             variant="outline" 
-            className="w-full justify-start h-10 px-3 rounded-lg border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-600 font-medium text-[14px]"
+            className="w-full justify-start h-10 px-3 rounded-lg border-border bg-background hover:bg-muted/50 text-muted-foreground font-medium text-[14px]"
             onClick={handleNewThread}
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -652,12 +652,12 @@ function SidebarBody() {
 
         <div className="px-3 pt-2">
           <div className="relative">
-            <Search className="h-4 w-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
             <Input
               value={sessionFilter}
               onChange={(e) => setSessionFilter(e.target.value)}
               placeholder={t('filterSessionName')}
-              className="pl-9 h-9 border-zinc-200 bg-white text-[14px]"
+              className="pl-9 h-9 border-border bg-background text-[14px]"
             />
           </div>
         </div>
@@ -692,7 +692,7 @@ function SidebarBody() {
         </div>
         
         {archivedSessions.length > 0 && (
-          <div className="h-[35%] min-h-[150px] shrink-0 border-t border-zinc-200 bg-zinc-50/50 flex flex-col">
+          <div className="h-[35%] min-h-[150px] shrink-0 border-t border-border bg-muted/50/50 flex flex-col">
             <SectionHeader
               title={t('archivedThreads')}
               count={archivedSessions.length}
@@ -741,7 +741,7 @@ function SidebarBody() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>{t('cancel')}</Button>
-            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleRename}>{t('save')}</Button>
+            <Button className="bg-indigo-600 hover:bg-indigo-700 text-primary-foreground" onClick={handleRename}>{t('save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -766,15 +766,15 @@ function SidebarBody() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDashboardRenameDialogOpen(false)}>{t('cancel')}</Button>
-            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleDashboardRename}>{t('save')}</Button>
+            <Button className="bg-indigo-600 hover:bg-indigo-700 text-primary-foreground" onClick={handleDashboardRename}>{t('save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <div className="p-4 border-t border-zinc-200 mt-auto relative" ref={menuRef}>
-        <div className="flex items-center justify-between text-zinc-600">
+      <div className="p-4 border-t border-border mt-auto relative" ref={menuRef}>
+        <div className="flex items-center justify-between text-muted-foreground">
           <button 
-            className="flex items-center gap-2 hover:text-zinc-900 transition-colors p-1 rounded-full hover:bg-zinc-100"
+            className="flex items-center gap-2 hover:text-foreground transition-colors p-1 rounded-full hover:bg-muted"
             onClick={() => setShowUserMenu(!showUserMenu)}
           >
             <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 border border-indigo-200 shadow-sm">
@@ -786,7 +786,7 @@ function SidebarBody() {
           </button>
           
           <button 
-            className="flex items-center gap-1.5 text-sm hover:text-zinc-900 transition-colors px-2 py-1.5 rounded-md hover:bg-zinc-100"
+            className="flex items-center gap-1.5 text-sm hover:text-foreground transition-colors px-2 py-1.5 rounded-md hover:bg-muted"
             onClick={() => navigate("/skills")}
           >
             <Wand2 className="h-4 w-4" />
@@ -796,25 +796,25 @@ function SidebarBody() {
 
         {/* User Settings Popover Menu */}
         {showUserMenu && (
-          <div className="absolute bottom-[72px] left-4 w-56 bg-white rounded-xl shadow-xl border border-zinc-200 py-1.5 z-50 overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="px-3 py-2 border-b border-zinc-100 mb-1">
-              <p className="text-sm font-medium text-zinc-900 truncate">{user?.username}</p>
-              <p className="text-xs text-zinc-500 truncate">{user?.email}</p>
+          <div className="absolute bottom-[72px] left-4 w-56 bg-background rounded-xl shadow-xl border border-border py-1.5 z-50 overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="px-3 py-2 border-b border-border mb-1">
+              <p className="text-sm font-medium text-foreground truncate">{user?.username}</p>
+              <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
             </div>
             
             <button 
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors"
               onClick={() => {
                 navigate("/projects");
                 setShowUserMenu(false);
               }}
             >
-              <Folder className="h-4 w-4 text-zinc-500" />
+              <Folder className="h-4 w-4 text-muted-foreground" />
               {t('projectManagement')}
             </button>
 
             <button 
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors"
               onClick={() => {
                 if (currentProject?.id) {
                   navigate(`/projects/${currentProject.id}/subagents`);
@@ -824,47 +824,47 @@ function SidebarBody() {
                 setShowUserMenu(false);
               }}
             >
-              <Bot className="h-4 w-4 text-zinc-500" />
+              <Bot className="h-4 w-4 text-muted-foreground" />
               {t('subagents', 'Subagents')}
             </button>
 
             <button 
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors"
               onClick={() => {
                 navigate("/datasources");
                 setShowUserMenu(false);
               }}
             >
-              <Database className="h-4 w-4 text-zinc-500" />
+              <Database className="h-4 w-4 text-muted-foreground" />
               {t('dataSourceManagement')}
             </button>
 
             <button 
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors"
               onClick={() => {
                 navigate("/settings");
                 setShowUserMenu(false);
               }}
             >
-              <Settings className="h-4 w-4 text-zinc-500" />
+              <Settings className="h-4 w-4 text-muted-foreground" />
               {t('personalSettings')}
             </button>
 
             {user?.is_admin && (
               <>
                 <button
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors"
                   onClick={() => {
                     navigate("/model-configs");
                     setShowUserMenu(false);
                   }}
                 >
-                  <Brain className="h-4 w-4 text-zinc-500" />
+                  <Brain className="h-4 w-4 text-muted-foreground" />
                   {t('modelConfig')}
                 </button>
                 
                 <button 
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors"
                   onClick={() => {
                     navigate("/users");
                     setShowUserMenu(false);
@@ -876,16 +876,16 @@ function SidebarBody() {
               </>
             )}
             
-            <div className="h-px bg-zinc-100 my-1 mx-2" />
+            <div className="h-px bg-muted my-1 mx-2" />
             
             <button 
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors"
               onClick={() => {
                 i18n.changeLanguage(i18n.language === 'zh' ? 'en' : 'zh');
                 setShowUserMenu(false);
               }}
             >
-              <Globe className="h-4 w-4 text-zinc-500" />
+              <Globe className="h-4 w-4 text-muted-foreground" />
               {i18n.language === 'zh' ? 'English' : '中文'}
             </button>
             
@@ -909,7 +909,7 @@ export function Sidebar() {
     <>
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetTrigger render={
-          <Button variant="ghost" size="icon" className="md:hidden fixed top-3 left-3 z-50 border border-zinc-200 bg-white">
+          <Button variant="ghost" size="icon" className="md:hidden fixed top-3 left-3 z-50 border border-border bg-background">
             <Menu className="h-5 w-5" />
           </Button>
         } />
