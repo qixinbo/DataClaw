@@ -204,10 +204,12 @@ class NanobotIntegration:
         from app.tools.nl2sql import NL2SQLTool
         from app.tools.visualization import VisualizationTool
         from app.tools.get_schema import GetDatabaseSchemaTool
+        from app.tools.knowledge_base import KnowledgeBaseRetrieveTool
         from app.tools.subagent import ListSubagentsTool, InvokeSubagentTool
         agent.tools.register(NL2SQLTool())
         agent.tools.register(VisualizationTool())
         agent.tools.register(GetDatabaseSchemaTool())
+        agent.tools.register(KnowledgeBaseRetrieveTool())
         agent.tools.register(ListSubagentsTool(project_id=project_id))
         agent.tools.register(InvokeSubagentTool(project_id=project_id))
 

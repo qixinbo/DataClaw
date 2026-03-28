@@ -31,6 +31,7 @@ interface Message {
     total_tokens: number;
   };
   artifacts?: MessageArtifact[];
+  kbCitations?: KnowledgeCitation[];
 }
 
 interface MessageViz {
@@ -49,6 +50,14 @@ interface MessageArtifact {
   download_url: string;
   previewable: boolean;
   preview_url?: string;
+}
+
+interface KnowledgeCitation {
+  doc_id: string;
+  title: string;
+  score: number;
+  chunk: string;
+  metadata?: Record<string, unknown>;
 }
 
 interface ArtifactPreviewTarget {
@@ -105,6 +114,11 @@ interface Skill {
   type: string;
 }
 
+interface KnowledgeBaseOption {
+  id: string;
+  name: string;
+}
+
 const dedupeSkillsById = (skills: Skill[]): Skill[] => {
   const map = new Map<string, Skill>();
   for (const skill of skills) {
@@ -120,6 +134,7 @@ interface SessionData {
   metadata?: {
     active_data_file?: DataFileContext | null;
     selected_data_source?: string | null;
+    selected_knowledge_base_id?: string | null;
     [key: string]: any;
   };
   messages: Array<{
@@ -179,12 +194,34 @@ const normalizeArtifacts = (raw: unknown): MessageArtifact[] => {
   }, []);
 };
 
+const normalizeKnowledgeCitations = (raw: unknown): KnowledgeCitation[] => {
+  if (!Array.isArray(raw)) return [];
+  return raw.reduce<KnowledgeCitation[]>((acc, item) => {
+    if (!item || typeof item !== "object") return acc;
+    const source = item as Record<string, unknown>;
+    const title = typeof source.title === "string" ? source.title : "";
+    const chunk = typeof source.chunk === "string" ? source.chunk : "";
+    const score = typeof source.score === "number" ? source.score : Number(source.score || 0);
+    if (!title || !chunk) return acc;
+    acc.push({
+      doc_id: typeof source.doc_id === "string" ? source.doc_id : "",
+      title,
+      score: Number.isFinite(score) ? score : 0,
+      chunk,
+      metadata: source.metadata && typeof source.metadata === "object" ? source.metadata as Record<string, unknown> : undefined,
+    });
+    return acc;
+  }, []);
+};
+
 export function ChatInterface() {
   const { t } = useTranslation();
   const [messagesBySession, setMessagesBySession] = useState<Record<string, Message[]>>({});
   const [input, setInput] = useState("");
   const [selectedDataSource, setSelectedDataSource] = useState<string>("");
+  const [selectedKnowledgeBaseId, setSelectedKnowledgeBaseId] = useState<string>("");
   const [availableSkills, setAvailableSkills] = useState<Skill[]>([]);
+  const [availableKnowledgeBases, setAvailableKnowledgeBases] = useState<KnowledgeBaseOption[]>([]);
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [artifactPreview, setArtifactPreview] = useState<ArtifactPreviewTarget | null>(null);
@@ -443,6 +480,10 @@ export function ChatInterface() {
   useEffect(() => {
     if (currentProject) {
       fetchDataSources();
+      fetchKnowledgeBases();
+    } else {
+      setAvailableKnowledgeBases([]);
+      setSelectedKnowledgeBaseId("");
     }
   }, [currentProject]);
 
@@ -461,15 +502,41 @@ export function ChatInterface() {
     }
   };
 
+  const fetchKnowledgeBases = async () => {
+    if (!currentProject) return;
+    try {
+      const data = await api.get<Array<{ id: string; name: string }>>(`/api/v1/knowledge-bases?project_id=${currentProject.id}`);
+      const projectKnowledgeBases = (data || []).map((item) => ({ id: item.id, name: item.name }));
+      setAvailableKnowledgeBases(projectKnowledgeBases);
+      if (selectedKnowledgeBaseId && !projectKnowledgeBases.find((item) => item.id === selectedKnowledgeBaseId)) {
+        setSelectedKnowledgeBaseId("");
+        void syncSessionContext({ selected_knowledge_base_id: null });
+      }
+    } catch (e) {
+      console.error("Failed to fetch knowledge bases", e);
+    }
+  };
+
   const syncSessionContext = async (payload: {
     active_data_file?: DataFileContext | null;
     selected_data_source?: string | null;
+    selected_knowledge_base_id?: string | null;
   }) => {
     try {
       await api.put(`/nanobot/sessions/${encodeURIComponent(activeSessionKey)}/context-file`, payload);
     } catch (e) {
       console.error("Failed to sync session context", e);
     }
+  };
+
+  const handleSelectKnowledgeBase = async (knowledgeBaseId: string) => {
+    setSelectedKnowledgeBaseId(knowledgeBaseId);
+    await syncSessionContext({ selected_knowledge_base_id: knowledgeBaseId });
+  };
+
+  const handleClearKnowledgeBase = async () => {
+    setSelectedKnowledgeBaseId("");
+    await syncSessionContext({ selected_knowledge_base_id: null });
   };
 
   const handleSelectDataSource = async (sourceId: string) => {
@@ -516,6 +583,7 @@ export function ChatInterface() {
                 reasoningContent: typeof m.reasoning_content === "string" ? m.reasoning_content : undefined,
                 usage: m.usage,
                 artifacts: normalizeArtifacts(m.artifacts),
+                kbCitations: normalizeKnowledgeCitations(m.kb_citations),
               };
             });
           setMessagesForSession(activeSessionKey, formattedMessages);
@@ -524,14 +592,17 @@ export function ChatInterface() {
         }
         const restoredFile = data.metadata?.active_data_file || null;
         const restoredSource = data.metadata?.selected_data_source || "";
+        const restoredKnowledgeBaseId = data.metadata?.selected_knowledge_base_id || "";
         setActiveDataFile(restoredFile);
         setSelectedDataSource(restoredSource);
+        setSelectedKnowledgeBaseId(restoredKnowledgeBaseId);
         setAttachedFile(null);
       } catch (e) {
         console.error("Failed to fetch session messages", e);
         setMessagesForSession(activeSessionKey, []);
         setActiveDataFile(null);
         setSelectedDataSource("");
+        setSelectedKnowledgeBaseId("");
         setAttachedFile(null);
       } finally {
         setIsLoadingForSession(activeSessionKey, false);
@@ -631,6 +702,7 @@ export function ChatInterface() {
   };
 
   const selectedDataSourceName = availableDataSources.find(ds => ds.id === selectedDataSource)?.name || "";
+  const selectedKnowledgeBaseName = availableKnowledgeBases.find((item) => item.id === selectedKnowledgeBaseId)?.name || "";
   const selectedSkills = availableSkills.filter(skill => selectedSkillIds.includes(skill.id));
   const isThinkingCollapsed = (messageId: string) => collapsedThinkingByMessage[messageId] ?? true;
   const toggleThinkingCollapsed = (messageId: string) => {
@@ -650,7 +722,7 @@ export function ChatInterface() {
   };
 
   const renderActiveSelections = () => {
-    if (!selectedDataSource && selectedSkills.length === 0) return null;
+    if (!selectedDataSource && !selectedKnowledgeBaseId && selectedSkills.length === 0) return null;
     return (
       <div className="px-2 pt-2">
         <div className="flex flex-wrap gap-2">
@@ -658,6 +730,12 @@ export function ChatInterface() {
             <div className="px-3 py-1.5 rounded-full text-xs border flex items-center gap-1.5 bg-blue-50 text-blue-700 border-blue-200">
               <Database className="h-3.5 w-3.5" />
               {`${t('dataSource')}：${selectedDataSourceName}`}
+            </div>
+          ) : null}
+          {selectedKnowledgeBaseId ? (
+            <div className="px-3 py-1.5 rounded-full text-xs border flex items-center gap-1.5 bg-violet-50 text-violet-700 border-violet-200">
+              <Database className="h-3.5 w-3.5" />
+              {`${t('knowledgeBase')}：${selectedKnowledgeBaseName || selectedKnowledgeBaseId}`}
             </div>
           ) : null}
           {selectedSkills.map((skill) => (
@@ -812,6 +890,7 @@ export function ChatInterface() {
              prefer_sql_chart: preferSqlChart,
              file_url: fileUrl,
              route_mode: "auto",
+             knowledge_base_id: selectedKnowledgeBaseId || undefined,
            }),
          signal: controller.signal,
        });
@@ -917,6 +996,7 @@ export function ChatInterface() {
               completion_tokens: number;
               total_tokens: number;
             };
+            kb_citations?: unknown;
           };
 
            if (payload.type === "delta" && payload.content) {
@@ -963,9 +1043,10 @@ export function ChatInterface() {
             flushAssistant(true);
             pushProgressLog(t('answerGenerationCompleted'));
             const messageArtifacts = normalizeArtifacts(payload.artifacts);
+            const messageCitations = normalizeKnowledgeCitations(payload.kb_citations);
              setMessagesForSession(targetSessionKey, (prev) =>
                prev.map((msg) =>
-                msg.id === assistantId ? { ...msg, content: typeof payload.content === "string" ? payload.content : msg.content || "", awaitingFirstToken: false, viz: streamedViz ?? msg.viz, usage: payload.usage, artifacts: messageArtifacts.length > 0 ? messageArtifacts : msg.artifacts } : msg
+                msg.id === assistantId ? { ...msg, content: typeof payload.content === "string" ? payload.content : msg.content || "", awaitingFirstToken: false, viz: streamedViz ?? msg.viz, usage: payload.usage, artifacts: messageArtifacts.length > 0 ? messageArtifacts : msg.artifacts, kbCitations: messageCitations.length > 0 ? messageCitations : msg.kbCitations } : msg
                )
              );
            }
@@ -1145,6 +1226,52 @@ export function ChatInterface() {
                                       </button>
                                     </div>
                                   )}
+                                </div>
+                                <div className="mt-3 pt-3 border-t border-border">
+                                  <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
+                                    <Database className="h-3 w-3" />
+                                    {t('knowledgeBase')}
+                                  </div>
+                                  <div className="space-y-0.5">
+                                    {availableKnowledgeBases.length > 0 ? (
+                                      availableKnowledgeBases.map((kb) => (
+                                        <button
+                                          key={kb.id}
+                                          onClick={() => {
+                                            void handleSelectKnowledgeBase(kb.id);
+                                          }}
+                                          className={cn(
+                                            "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
+                                            selectedKnowledgeBaseId === kb.id
+                                              ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                                              : "text-muted-foreground hover:bg-background hover:shadow-sm"
+                                          )}
+                                        >
+                                          <div className="flex items-center gap-2.5">
+                                            <Database className={cn("h-4 w-4", selectedKnowledgeBaseId === kb.id ? "text-violet-500" : "text-muted-foreground")} />
+                                            <span className="font-medium">{kb.name}</span>
+                                          </div>
+                                          {selectedKnowledgeBaseId === kb.id && <CheckCircle2 className="h-4 w-4 text-violet-500" />}
+                                        </button>
+                                      ))
+                                    ) : (
+                                      <div className="px-3 py-3 text-xs text-muted-foreground">
+                                        {t('noKnowledgeBases')}
+                                      </div>
+                                    )}
+                                    {selectedKnowledgeBaseId ? (
+                                      <div className="mt-2 pt-2 border-t border-border">
+                                        <button
+                                          onClick={() => {
+                                            void handleClearKnowledgeBase();
+                                          }}
+                                          className="w-full py-1.5 text-[11px] text-muted-foreground hover:text-muted-foreground transition-colors flex items-center justify-center gap-1"
+                                        >
+                                          {t('clearSelected')}
+                                        </button>
+                                      </div>
+                                    ) : null}
+                                  </div>
                                 </div>
                               </div>
 
@@ -1501,6 +1628,22 @@ export function ChatInterface() {
                                 ))}
                               </div>
                             ) : null}
+                            {msg.kbCitations && msg.kbCitations.length > 0 ? (
+                              <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50/60 p-3">
+                                <div className="text-xs font-semibold text-violet-700 uppercase tracking-wider mb-2">{t('knowledgeCitations')}</div>
+                                <div className="space-y-2">
+                                  {msg.kbCitations.map((citation, citationIndex) => (
+                                    <div key={`${msg.id}-citation-${citationIndex}`} className="rounded-lg border border-violet-200 bg-white/80 px-3 py-2">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <div className="text-sm font-medium text-violet-900 truncate">{citation.title}</div>
+                                        <div className="text-[11px] text-violet-700 shrink-0">{t('matchScore', { score: citation.score.toFixed(3) })}</div>
+                                      </div>
+                                      <div className="mt-1 text-xs text-violet-800 line-clamp-3 whitespace-pre-wrap break-words">{citation.chunk}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
                             {msg.viz ? (
                               <div className="mt-3 pt-3 border-t border-border">
                                 <InlineVisualizationCard viz={msg.viz} />
@@ -1580,6 +1723,52 @@ export function ChatInterface() {
                                 </button>
                               </div>
                             )}
+                          </div>
+                          <div className="mt-3 pt-3 border-t border-border">
+                            <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
+                              <Database className="h-3 w-3" />
+                              {t('knowledgeBase')}
+                            </div>
+                            <div className="space-y-0.5">
+                              {availableKnowledgeBases.length > 0 ? (
+                                availableKnowledgeBases.map((kb) => (
+                                  <button
+                                    key={kb.id}
+                                    onClick={() => {
+                                      void handleSelectKnowledgeBase(kb.id);
+                                    }}
+                                    className={cn(
+                                      "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
+                                      selectedKnowledgeBaseId === kb.id
+                                        ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                                        : "text-muted-foreground hover:bg-background hover:shadow-sm"
+                                    )}
+                                  >
+                                    <div className="flex items-center gap-2.5">
+                                      <Database className={cn("h-4 w-4", selectedKnowledgeBaseId === kb.id ? "text-violet-500" : "text-muted-foreground")} />
+                                      <span className="font-medium">{kb.name}</span>
+                                    </div>
+                                    {selectedKnowledgeBaseId === kb.id && <CheckCircle2 className="h-4 w-4 text-violet-500" />}
+                                  </button>
+                                ))
+                              ) : (
+                                <div className="px-3 py-3 text-xs text-muted-foreground">
+                                  {t('noKnowledgeBases')}
+                                </div>
+                              )}
+                              {selectedKnowledgeBaseId ? (
+                                <div className="mt-2 pt-2 border-t border-border">
+                                  <button
+                                    onClick={() => {
+                                      void handleClearKnowledgeBase();
+                                    }}
+                                    className="w-full py-1.5 text-[11px] text-muted-foreground hover:text-muted-foreground transition-colors flex items-center justify-center gap-1"
+                                  >
+                                    {t('clearSelected')}
+                                  </button>
+                                </div>
+                              ) : null}
+                            </div>
                           </div>
                         </div>
 

@@ -19,3 +19,5 @@ current_data_source: ContextVar[str] = ContextVar("current_data_source", default
 
 # Any file URL attached to the request
 current_file_url: ContextVar[Optional[str]] = ContextVar("current_file_url", default=None)
+
+current_knowledge_base_id: ContextVar[Optional[str]] = ContextVar("current_knowledge_base_id", default=None)
