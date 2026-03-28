@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { User, Loader2, ArrowUp, ChevronDown, Check, Square, Plus, Database, Wand2, Zap, CheckCircle2, Table, XCircle, Settings, ExternalLink, FileText, Download, Eye } from "lucide-react";
+import { User, Loader2, ArrowUp, ChevronDown, Check, Square, Plus, Database, Wand2, Zap, CheckCircle2, Table, XCircle, Settings, ExternalLink, FileText, Download, Eye, Copy } from "lucide-react";
 import { api } from "@/lib/api";
 import { type ChartSpec } from "@/store/visualizationStore";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -25,6 +25,11 @@ interface Message {
   progressLogs?: string[];
   routeInfo?: string;
   reasoningContent?: string;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
   artifacts?: MessageArtifact[];
 }
 
@@ -183,6 +188,8 @@ export function ChatInterface() {
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [artifactPreview, setArtifactPreview] = useState<ArtifactPreviewTarget | null>(null);
+  const [collapsedThinkingByMessage, setCollapsedThinkingByMessage] = useState<Record<string, boolean>>({});
+  const [thinkingCopiedByMessage, setThinkingCopiedByMessage] = useState<Record<string, boolean>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const { currentProject } = useProjectStore();
@@ -372,6 +379,8 @@ export function ChatInterface() {
                 role: m.role as 'user' | 'assistant',
                 content: cleanContent,
                 viz: m.viz ? buildMessageViz(m.viz) : undefined,
+                reasoningContent: typeof m.reasoning_content === "string" ? m.reasoning_content : undefined,
+                usage: m.usage,
                 artifacts: normalizeArtifacts(m.artifacts),
               };
             });
@@ -489,6 +498,22 @@ export function ChatInterface() {
 
   const selectedDataSourceName = availableDataSources.find(ds => ds.id === selectedDataSource)?.name || "";
   const selectedSkills = availableSkills.filter(skill => selectedSkillIds.includes(skill.id));
+  const isThinkingCollapsed = (messageId: string) => collapsedThinkingByMessage[messageId] ?? true;
+  const toggleThinkingCollapsed = (messageId: string) => {
+    setCollapsedThinkingByMessage((prev) => ({ ...prev, [messageId]: !(prev[messageId] ?? true) }));
+  };
+  const copyThinkingContent = async (messageId: string, content: string) => {
+    if (!content.trim()) return;
+    try {
+      await navigator.clipboard.writeText(content);
+      setThinkingCopiedByMessage((prev) => ({ ...prev, [messageId]: true }));
+      window.setTimeout(() => {
+        setThinkingCopiedByMessage((prev) => ({ ...prev, [messageId]: false }));
+      }, 1200);
+    } catch (e) {
+      console.error("Failed to copy thinking content", e);
+    }
+  };
 
   const renderActiveSelections = () => {
     if (!selectedDataSource && selectedSkills.length === 0) return null;
@@ -613,9 +638,7 @@ export function ChatInterface() {
           if (msg.id !== assistantId) return msg;
           
           if (isReasoningToken) {
-            // 对于流式推理内容，拼接而不是创建新条目
-            const currentReasoning = msg.reasoningContent || "";
-            return { ...msg, reasoningContent: currentReasoning + text };
+            return msg;
           } else {
             // 对于普通的阶段性日志，取消 8 条限制，允许滚动查看所有历史
             const current = msg.progressLogs || [];
@@ -673,6 +696,35 @@ export function ChatInterface() {
       let hasDonePayload = false;
       let rafPending = false;
       let renderedText = "";
+      let reasoningBuffer = "";
+      let reasoningRafPending = false;
+
+      const flushReasoning = (force = false) => {
+        if (!reasoningBuffer) return;
+        if (force) {
+          const content = reasoningBuffer;
+          reasoningBuffer = "";
+          setMessagesForSession(targetSessionKey, (prev) =>
+            prev.map((msg) =>
+              msg.id === assistantId ? { ...msg, reasoningContent: (msg.reasoningContent || "") + content } : msg
+            )
+          );
+          return;
+        }
+        if (reasoningRafPending) return;
+        reasoningRafPending = true;
+        requestAnimationFrame(() => {
+          reasoningRafPending = false;
+          if (!reasoningBuffer) return;
+          const content = reasoningBuffer;
+          reasoningBuffer = "";
+          setMessagesForSession(targetSessionKey, (prev) =>
+            prev.map((msg) =>
+              msg.id === assistantId ? { ...msg, reasoningContent: (msg.reasoningContent || "") + content } : msg
+            )
+          );
+        });
+      };
 
       const flushAssistant = (force = false) => {
         if (streamedText === renderedText && !force) return;
@@ -717,6 +769,7 @@ export function ChatInterface() {
             type: string;
             content?: string;
             is_reasoning?: boolean;
+            tool_hint?: boolean;
             sql?: string;
             result?: unknown;
             error?: string;
@@ -724,6 +777,12 @@ export function ChatInterface() {
             reason?: string;
             chart?: { chart_spec?: ChartSpec | null; reasoning?: string; can_visualize?: boolean; chart_type?: string } | null;
             artifacts?: unknown;
+            reasoning_content?: string;
+            usage?: {
+              prompt_tokens: number;
+              completion_tokens: number;
+              total_tokens: number;
+            };
           };
 
            if (payload.type === "delta" && payload.content) {
@@ -743,9 +802,13 @@ export function ChatInterface() {
           }
 
           if (payload.type === "progress" && payload.content) {
-            // 如果 progress 内容带有空格或者换行，并且不是典型的系统提示词，很可能这是 reasoning_content
-            // 为了安全起见，我们在后端应该加上 is_reasoning 标记，这里我们通过启发式或者统一拼接
-            pushProgressLog(payload.content, payload.is_reasoning || false);
+            if (payload.is_reasoning || payload.tool_hint) {
+              const nextLine = payload.content.endsWith("\n") ? payload.content : `${payload.content}\n`;
+              reasoningBuffer += nextLine;
+              flushReasoning(false);
+            } else {
+              pushProgressLog(payload.content, false);
+            }
           }
 
            if (payload.type === "final") {
@@ -753,12 +816,22 @@ export function ChatInterface() {
             if (typeof payload.content === "string") {
               streamedText = payload.content;
             }
+            if (typeof payload.reasoning_content === "string") {
+              reasoningBuffer = "";
+              setMessagesForSession(targetSessionKey, (prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantId ? { ...msg, reasoningContent: payload.reasoning_content } : msg
+                )
+              );
+            } else {
+              flushReasoning(true);
+            }
             flushAssistant(true);
             pushProgressLog(t('answerGenerationCompleted'));
             const messageArtifacts = normalizeArtifacts(payload.artifacts);
              setMessagesForSession(targetSessionKey, (prev) =>
                prev.map((msg) =>
-                msg.id === assistantId ? { ...msg, content: typeof payload.content === "string" ? payload.content : msg.content || "", awaitingFirstToken: false, viz: streamedViz ?? msg.viz, artifacts: messageArtifacts.length > 0 ? messageArtifacts : msg.artifacts } : msg
+                msg.id === assistantId ? { ...msg, content: typeof payload.content === "string" ? payload.content : msg.content || "", awaitingFirstToken: false, viz: streamedViz ?? msg.viz, usage: payload.usage, artifacts: messageArtifacts.length > 0 ? messageArtifacts : msg.artifacts } : msg
                )
              );
            }
@@ -783,6 +856,7 @@ export function ChatInterface() {
          }
        }
 
+      flushReasoning(true);
       flushAssistant(true);
       if (!streamedText && (hasFinalPayload || hasDonePayload)) {
         setMessagesForSession(targetSessionKey, (prev) =>
@@ -1046,6 +1120,14 @@ export function ChatInterface() {
                 const isMessageGenerating = isLoading && msgIdx === messages.length - 1;
                 const { markdown, reportHtml } = splitReportHtml(msg.content);
                 const externalReportUrl = extractExternalReport(msg.content);
+                const fallbackThinkingLines = Array.from(new Set(
+                  (msg.progressLogs || []).filter((log) =>
+                    log &&
+                    log !== t('requestSubmittedRouting') &&
+                    log !== t('answerGenerationCompleted')
+                  )
+                ));
+                const displayedThinkingContent = (msg.reasoningContent || "").trim() || fallbackThinkingLines.join("\n");
                 return (
                 <div
                   key={msg.id}
@@ -1065,13 +1147,53 @@ export function ChatInterface() {
                   >
                     {msg.role === "assistant" ? (
                       <>
-                        {msg.reasoningContent && (
-                          <div className="mb-3 rounded-xl border border-zinc-200 bg-zinc-50/50 p-3 text-sm text-zinc-600 font-mono whitespace-pre-wrap leading-relaxed shadow-inner max-h-[300px] overflow-y-auto">
-                            <div className="flex items-center gap-2 mb-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-                              <Settings className={`h-3.5 w-3.5 ${msg.awaitingFirstToken ? 'animate-spin' : ''}`} />
-                              {t('thinkingProcess')}
-                            </div>
-                            {msg.reasoningContent}
+                        {displayedThinkingContent && (
+                          <div className="mb-3 rounded-xl border border-zinc-200 bg-zinc-50/50 p-3 text-sm text-zinc-600 font-mono whitespace-pre-wrap leading-relaxed shadow-inner">
+                            <button
+                              type="button"
+                              onClick={() => toggleThinkingCollapsed(msg.id)}
+                              className="w-full flex items-center justify-between gap-2 mb-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider hover:text-zinc-700 transition-colors"
+                            >
+                              <span className="flex items-center gap-2">
+                                <Settings className={`h-3.5 w-3.5 ${msg.awaitingFirstToken ? 'animate-spin' : ''}`} />
+                                {t('thinkingProcess')}
+                              </span>
+                              <span className="flex items-center gap-2 normal-case text-[11px]">
+                                {msg.usage?.total_tokens ? (
+                                  <span>{t('thinkingTokens', { count: msg.usage.total_tokens })}</span>
+                                ) : msg.reasoningContent ? (
+                                  <span>{t('thinkingCharCount', { count: msg.reasoningContent.length })}</span>
+                                ) : null}
+                                <span
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void copyThinkingContent(msg.id, displayedThinkingContent);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      void copyThinkingContent(msg.id, displayedThinkingContent);
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 hover:bg-zinc-200/70 transition-colors"
+                                >
+                                  {thinkingCopiedByMessage[msg.id] ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                                  <span>{thinkingCopiedByMessage[msg.id] ? t('copied') : t('copy')}</span>
+                                </span>
+                                <span className="inline-flex items-center gap-1">
+                                  {isThinkingCollapsed(msg.id) ? t('expandThinking') : t('collapseThinking')}
+                                  <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isThinkingCollapsed(msg.id) ? "-rotate-90" : "rotate-0")} />
+                                </span>
+                              </span>
+                            </button>
+                            {!isThinkingCollapsed(msg.id) && (
+                              <div className="max-h-[280px] overflow-y-auto pr-1">
+                                {displayedThinkingContent}
+                              </div>
+                            )}
                           </div>
                         )}
                         {msg.progressLogs && msg.progressLogs.length > 0 ? (

@@ -9,7 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
-import { X, Type, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline } from "lucide-react";
+import { X, Type, Bold, Italic, Underline } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { VegaChart } from "@/components/VegaChart";
 import 'react-grid-layout/css/styles.css';

@@ -268,6 +268,7 @@ def _persist_assistant_enrichment(
     session_id: str,
     viz_payload: Optional[Dict[str, Any]] = None,
     artifacts: Optional[List[Dict[str, Any]]] = None,
+    usage: Optional[Dict[str, Any]] = None,
 ) -> None:
     if not nanobot_service.agent:
         return
@@ -281,8 +282,24 @@ def _persist_assistant_enrichment(
     if artifacts:
         session.messages[-1]["artifacts"] = artifacts
         changed = True
+    if usage:
+        session.messages[-1]["usage"] = usage
+        changed = True
     if changed:
         nanobot_service.agent.sessions.save(session)
+
+
+def _extract_reasoning_content(session_messages: List[Dict[str, Any]]) -> str:
+    for message in reversed(session_messages):
+        if not isinstance(message, dict):
+            continue
+        if message.get("role") != "assistant":
+            continue
+        reasoning_content = message.get("reasoning_content")
+        if isinstance(reasoning_content, str) and reasoning_content.strip():
+            return reasoning_content
+        break
+    return ""
 
 @app.post("/nanobot/chat")
 async def nanobot_chat(request: ChatRequest):
@@ -321,10 +338,12 @@ async def nanobot_chat(request: ChatRequest):
         artifacts = extract_artifacts(text, session_messages)
 
         viz_payload = current_viz_data.get()
+        usage = nanobot_service.get_last_usage(request.session_id)
         _persist_assistant_enrichment(
             session_id=request.session_id,
             viz_payload=viz_payload if isinstance(viz_payload, dict) else None,
             artifacts=artifacts,
+            usage=usage,
         )
 
         payload = {
@@ -334,6 +353,8 @@ async def nanobot_chat(request: ChatRequest):
         }
         if artifacts:
             payload["artifacts"] = artifacts
+        if usage:
+            payload["usage"] = usage
         return payload
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -356,7 +377,9 @@ async def nanobot_chat_stream(request: ChatRequest):
 
             async def _on_progress(content: str, **kwargs: Any) -> None:
                 if content:
-                    await progress_queue.put(content)
+                    payload: Dict[str, Any] = {"type": "progress", "content": content}
+                    payload.update(kwargs)
+                    await progress_queue.put(payload)
 
             async def _on_stream(delta: str) -> None:
                 if delta:
@@ -427,9 +450,10 @@ async def nanobot_chat_stream(request: ChatRequest):
                 session = nanobot_service.agent.sessions.get_or_create(request.session_id)
                 session_messages = session.messages
             artifacts = extract_artifacts(text, session_messages)
+            reasoning_content = _extract_reasoning_content(session_messages)
 
-            # Check again for viz payload after task completes if not sent yet
             viz_payload = current_viz_data.get()
+            usage = nanobot_service.get_last_usage(request.session_id)
             if viz_payload:
                 try:
                     current_hash = hash((
@@ -447,11 +471,16 @@ async def nanobot_chat_stream(request: ChatRequest):
                 session_id=request.session_id,
                 viz_payload=viz_payload if isinstance(viz_payload, dict) else None,
                 artifacts=artifacts,
+                usage=usage,
             )
             
             final_payload = {"type": "final", "content": text}
+            if reasoning_content:
+                final_payload["reasoning_content"] = reasoning_content
             if artifacts:
                 final_payload["artifacts"] = artifacts
+            if usage:
+                final_payload["usage"] = usage
             yield f"data: {json.dumps(final_payload, ensure_ascii=False)}\n\n"
             yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
         except asyncio.CancelledError:

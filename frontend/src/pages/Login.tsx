@@ -87,10 +87,8 @@ export function Login() {
           </h1>
           <div className="absolute right-0 bottom-0 translate-y-4">
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/50 backdrop-blur-sm shadow-sm border border-zinc-200/50 text-zinc-500 hover:text-zinc-900 hover:bg-white transition-all">
-                  <Languages className="h-4 w-4" />
-                </Button>
+              <DropdownMenuTrigger className="h-9 w-9 rounded-full bg-white/50 backdrop-blur-sm shadow-sm border border-zinc-200/50 text-zinc-500 hover:text-zinc-900 hover:bg-white transition-all inline-flex items-center justify-center">
+                <Languages className="h-4 w-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-32">
                 <DropdownMenuItem onClick={() => i18n.changeLanguage('zh')} className={i18n.language === 'zh' ? 'bg-zinc-100' : ''}>

@@ -140,10 +140,8 @@ function Section({
   onRename,
   onTogglePinned,
   onToggleArchived,
-  onBatchDelete,
   activeKey,
   isSelectionMode,
-  setIsSelectionMode,
   selectedKeys,
   setSelectedKeys
 }: {
@@ -153,10 +151,8 @@ function Section({
   onRename: (key: string, currentTitle: string) => void;
   onTogglePinned: (key: string, pinned: boolean) => void;
   onToggleArchived: (key: string, archived: boolean) => void;
-  onBatchDelete: (keys: string[]) => void;
   activeKey: string | null;
   isSelectionMode: boolean;
-  setIsSelectionMode: (val: boolean) => void;
   selectedKeys: string[];
   setSelectedKeys: (val: string[] | ((prev: string[]) => string[])) => void;
 }) {
@@ -684,13 +680,11 @@ function SidebarBody() {
               items={activeSessions} 
               onSelect={handleSelectSession}
               onDelete={handleDeleteSession}
-              onBatchDelete={handleBatchDelete}
               onRename={openRenameDialog}
               onTogglePinned={handleTogglePinned}
               onToggleArchived={handleToggleArchived}
               activeKey={activeSessionKey}
               isSelectionMode={activeSelectionMode}
-              setIsSelectionMode={setActiveSelectionMode}
               selectedKeys={activeSelectedKeys}
               setSelectedKeys={setActiveSelectedKeys}
             />
@@ -714,13 +708,11 @@ function SidebarBody() {
                 items={archivedSessions} 
                 onSelect={handleSelectSession}
                 onDelete={handleDeleteSession}
-                onBatchDelete={handleBatchDelete}
                 onRename={openRenameDialog}
                 onTogglePinned={handleTogglePinned}
                 onToggleArchived={handleToggleArchived}
                 activeKey={activeSessionKey}
                 isSelectionMode={archivedSelectionMode}
-                setIsSelectionMode={setArchivedSelectionMode}
                 selectedKeys={archivedSelectedKeys}
                 setSelectedKeys={setArchivedSelectedKeys}
               />

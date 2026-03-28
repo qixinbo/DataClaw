@@ -19,7 +19,6 @@ from nanobot.bus.events import OutboundMessage
 from nanobot.bus.queue import MessageBus
 from nanobot.config.loader import load_config
 from nanobot.cron.service import CronService
-from nanobot.providers.openai_compat_provider import OpenAICompatProvider
 from nanobot.providers.openai_codex_provider import OpenAICodexProvider
 from nanobot.providers.azure_openai_provider import AzureOpenAIProvider
 from nanobot.providers.base import GenerationSettings
@@ -32,6 +31,7 @@ from nanobot.config.schema import Config
 # or just import here if we are confident.
 # Given the structure, importing here should be fine as long as skills.py doesn't import nanobot.py.
 from app.api.skills import load_skills
+from app.core.patched_openai_compat_provider import PatchedOpenAICompatProvider
 from app.services.llm_cache import get_llm_configs, get_active_llm_config
 
 from app.core.data_root import get_workspace_root
@@ -45,6 +45,7 @@ class NanobotIntegration:
         self._started = False
         self._model_agent_cache: Dict[tuple[str | None, int | None], AgentLoop] = {}
         self._model_agent_lock = asyncio.Lock()
+        self._last_usage_by_session: Dict[str, Dict[str, Any]] = {}
 
     @staticmethod
     def _normalize_config_value(value: Any) -> Any:
@@ -79,6 +80,28 @@ class NanobotIntegration:
         if isinstance(content, str):
             return content
         return str(response)
+
+    @staticmethod
+    def _normalize_usage(usage: Any) -> Dict[str, int] | None:
+        if not isinstance(usage, dict):
+            return None
+        normalized: Dict[str, int] = {}
+        prompt = int(usage.get("prompt_tokens", 0) or 0)
+        completion = int(usage.get("completion_tokens", 0) or 0)
+        total = int(usage.get("total_tokens", 0) or 0)
+        
+        # If total_tokens is missing or zero, calculate it
+        if total == 0:
+            total = prompt + completion
+            
+        normalized["prompt_tokens"] = prompt
+        normalized["completion_tokens"] = completion
+        normalized["total_tokens"] = total
+        return normalized if (prompt > 0 or completion > 0) else None
+
+    def get_last_usage(self, session_id: str) -> Dict[str, int] | None:
+        usage = self._last_usage_by_session.get(session_id)
+        return dict(usage) if usage else None
 
     def _need_custom_agent_for_target(self, target_config: Dict[str, Any]) -> bool:
         if not self.agent:
@@ -220,7 +243,7 @@ class NanobotIntegration:
                 extra_headers=extra_headers,
             )
 
-        return OpenAICompatProvider(
+        return PatchedOpenAICompatProvider(
             api_key=api_key,
             api_base=api_base,
             default_model=model,
@@ -407,6 +430,9 @@ class NanobotIntegration:
             on_progress=on_progress,
             on_stream=on_stream,
         )
+        usage = self._normalize_usage(getattr(agent_to_use, "_last_usage", None))
+        if usage:
+            self._last_usage_by_session[session_id] = usage
         return self._extract_response_text(response)
 
     def _normalize_session_messages(self, messages: List[Any]) -> List[dict[str, Any]]:

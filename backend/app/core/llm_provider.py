@@ -2,8 +2,9 @@ from typing import Optional, Dict
 
 from nanobot.providers.azure_openai_provider import AzureOpenAIProvider
 from nanobot.providers.openai_codex_provider import OpenAICodexProvider
-from nanobot.providers.openai_compat_provider import OpenAICompatProvider
 from nanobot.providers.registry import find_by_name
+
+from app.core.patched_openai_compat_provider import PatchedOpenAICompatProvider
 
 
 def normalize_provider_name(provider: Optional[str]) -> Optional[str]:
@@ -51,7 +52,7 @@ def build_llm_provider(
             extra_headers=extra_headers,
         )
 
-    return OpenAICompatProvider(
+    return PatchedOpenAICompatProvider(
         api_key=api_key,
         api_base=api_base,
         default_model=model,
