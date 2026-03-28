@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { User, Loader2, ArrowUp, ChevronDown, Check, Square, Plus, Database, Wand2, Zap, CheckCircle2, Table, XCircle, Settings, ExternalLink, FileText, Download, Eye, Copy } from "lucide-react";
+import { User, Loader2, ArrowUp, ChevronDown, Check, Square, Plus, Database, Wand2, Zap, CheckCircle2, Table, XCircle, Settings, ExternalLink, FileText, Download, Eye, Copy, Mic, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { type ChartSpec } from "@/store/visualizationStore";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -14,7 +14,10 @@ import { useTranslation } from "react-i18next";
 import { InlineVisualizationCard } from "./InlineVisualizationCard";
 import { useProjectStore } from "@/store/projectStore";
 import { SlashCommandMenu } from "./SlashCommandMenu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface Message {
   id: string;
@@ -301,6 +304,145 @@ export function ChatInterface() {
   const [activeDataFile, setActiveDataFile] = useState<DataFileContext | null>(null);
   const [, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Speech Recognition State
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [recordingLevel, setRecordingLevel] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const shouldTranscribeRef = useRef(true);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioAnimationRef = useRef<number | null>(null);
+
+  // Local storage for whisper URL
+  const [whisperUrl, setWhisperUrl] = useState(() => localStorage.getItem("whisper_url") || "http://localhost:8001");
+  const [isVoiceSettingsOpen, setIsVoiceSettingsOpen] = useState(false);
+
+  const handleSaveWhisperUrl = (url: string) => {
+    setWhisperUrl(url);
+    localStorage.setItem("whisper_url", url);
+    setIsVoiceSettingsOpen(false);
+  };
+
+  const stopAudioMeter = () => {
+    if (audioAnimationRef.current) {
+      cancelAnimationFrame(audioAnimationRef.current);
+      audioAnimationRef.current = null;
+    }
+    if (audioContextRef.current) {
+      void audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    setRecordingLevel(0);
+  };
+
+  const startAudioMeter = (stream: MediaStream) => {
+    const audioContext = new AudioContext();
+    const source = audioContext.createMediaStreamSource(stream);
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 1024;
+    source.connect(analyser);
+    audioContextRef.current = audioContext;
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+    const tick = () => {
+      analyser.getByteTimeDomainData(dataArray);
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i += 1) {
+        const normalized = (dataArray[i] - 128) / 128;
+        sum += normalized * normalized;
+      }
+      const rms = Math.sqrt(sum / dataArray.length);
+      const level = Math.min(1, rms * 7);
+      setRecordingLevel(level);
+      audioAnimationRef.current = requestAnimationFrame(tick);
+    };
+
+    tick();
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      shouldTranscribeRef.current = true;
+      startAudioMeter(stream);
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        stopAudioMeter();
+        if (!shouldTranscribeRef.current) {
+          shouldTranscribeRef.current = true;
+          return;
+        }
+        setIsTranscribing(true);
+        try {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const formData = new FormData();
+          formData.append("file", audioBlob, "audio.webm");
+
+          const baseUrl = whisperUrl || "http://localhost:8001";
+          const response = await fetch(`${baseUrl.replace(/\/$/, '')}/transcribe`, {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const output = await response.json();
+          if (output && output.text) {
+            setInput((prev) => prev + (prev ? " " : "") + output.text.trim());
+          }
+        } catch (err) {
+          console.error("Transcription error:", err);
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Microphone access denied:", err);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+    }
+  };
+
+  const confirmRecording = () => {
+    shouldTranscribeRef.current = true;
+    stopRecording();
+  };
+
+  const cancelRecording = () => {
+    shouldTranscribeRef.current = false;
+    stopRecording();
+  };
+
+  useEffect(() => {
+    return () => {
+      stopAudioMeter();
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
 
   useEffect(() => {
     fetchModels();
@@ -1071,41 +1213,101 @@ export function ChatInterface() {
                         </Popover>
                       </div>
 
-                      <input
-                        type="text"
-                        value={input}
-                        onChange={handleInputChange}
-                        onKeyDown={handleInputKeyDown}
-                        placeholder={t('askAnything')}
-                        className="flex-1 bg-transparent border-none focus:ring-0 text-lg px-3 py-2 text-foreground placeholder:text-muted-foreground/50 outline-none"
-                        disabled={isLoading}
-                      />
-                      <SlashCommandMenu
-                        isOpen={slashQuery !== null}
-                        skills={filteredSlashSkills}
-                        selectedIndex={slashIndex}
-                        onSelect={handleSelectSlashSkill}
-                        onClose={() => setSlashQuery(null)}
-                      />
+                      {isRecording ? (
+                        <>
+                          <div className="flex-1 px-3">
+                            <div className="relative h-10 flex items-center">
+                              <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-dashed border-muted-foreground/40" />
+                              <div className="ml-auto flex items-center gap-[3px] pr-2">
+                                {Array.from({ length: 30 }).map((_, idx) => {
+                                  const dynamic = Math.abs(Math.sin(Date.now() / 180 + idx * 0.85));
+                                  const height = Math.max(4, Math.round((4 + dynamic * 18) * (0.45 + recordingLevel)));
+                                  return (
+                                    <span
+                                      key={`recording-wave-empty-${idx}`}
+                                      className="w-[3px] rounded-full bg-foreground/90 transition-all duration-75"
+                                      style={{ height: `${height}px` }}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={cancelRecording}
+                              className="flex items-center justify-center h-10 w-10 rounded-full text-foreground hover:bg-muted transition-colors"
+                              title={t('cancel', '取消')}
+                            >
+                              <X className="h-5 w-5" />
+                            </button>
+                            <button
+                              onClick={confirmRecording}
+                              className="flex items-center justify-center h-10 w-10 rounded-full text-foreground hover:bg-muted transition-colors"
+                              title={t('confirm', '确认')}
+                            >
+                              <Check className="h-5 w-5" />
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <input
+                            type="text"
+                            value={input}
+                            onChange={handleInputChange}
+                            onKeyDown={handleInputKeyDown}
+                            placeholder={isTranscribing ? t('transcribing', '正在识别...') : t('askAnything')}
+                            className="flex-1 bg-transparent border-none focus:ring-0 text-lg px-3 py-2 text-foreground placeholder:text-muted-foreground/50 outline-none"
+                            disabled={isLoading || isTranscribing}
+                          />
+                          <SlashCommandMenu
+                            isOpen={slashQuery !== null}
+                            skills={filteredSlashSkills}
+                            selectedIndex={slashIndex}
+                            onSelect={handleSelectSlashSkill}
+                            onClose={() => setSlashQuery(null)}
+                          />
 
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={handleSend}
-                          disabled={isLoading || !input.trim()}
-                          className={cn(
-                            "flex items-center justify-center h-10 w-10 rounded-full transition-all duration-200",
-                            (input.trim() || attachedFile || activeDataFile) && !isLoading
-                              ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
-                              : "bg-muted text-muted-foreground/50"
-                          )}
-                        >
-                          {isLoading ? (
-                            <Loader2 className="h-5 w-5 animate-spin" />
-                          ) : (
-                            <ArrowUp className="h-6 w-6" />
-                          )}
-                        </button>
-                      </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={startRecording}
+                              disabled={isLoading || isTranscribing}
+                              className="flex items-center justify-center h-10 w-10 rounded-full transition-all duration-200 bg-transparent text-muted-foreground hover:bg-muted"
+                              title={t('voiceInput', '语音输入')}
+                            >
+                              {isTranscribing ? (
+                                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                              ) : (
+                                <Mic className="h-5 w-5" />
+                              )}
+                            </button>
+                            <button
+                              onClick={() => setIsVoiceSettingsOpen(true)}
+                              className="flex items-center justify-center h-10 w-10 rounded-full bg-transparent text-muted-foreground hover:bg-muted transition-colors"
+                              title={t('voiceSettings', '语音输入配置')}
+                            >
+                              <Settings className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={handleSend}
+                              disabled={isLoading || !input.trim()}
+                              className={cn(
+                                "flex items-center justify-center h-10 w-10 rounded-full transition-all duration-200",
+                                (input.trim() || attachedFile || activeDataFile) && !isLoading
+                                  ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                                  : "bg-muted text-muted-foreground/50"
+                              )}
+                            >
+                              {isLoading ? (
+                                <Loader2 className="h-5 w-5 animate-spin" />
+                              ) : (
+                                <ArrowUp className="h-6 w-6" />
+                              )}
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="mt-4 flex flex-wrap justify-center gap-2">
@@ -1453,41 +1655,101 @@ export function ChatInterface() {
                   </Popover>
                 </div>
 
-                <input
-                  type="text"
-                  value={input}
-                  onChange={handleInputChange}
-                  onKeyDown={handleInputKeyDown}
-                  placeholder={t('askAnything')}
-                  className="flex-1 bg-transparent border-none focus:ring-0 text-lg px-3 py-2 text-foreground placeholder:text-muted-foreground/50 outline-none"
-                  disabled={isLoading}
-                />
-                <SlashCommandMenu
-                  isOpen={slashQuery !== null}
-                  skills={filteredSlashSkills}
-                  selectedIndex={slashIndex}
-                  onSelect={handleSelectSlashSkill}
-                  onClose={() => setSlashQuery(null)}
-                />
+                {isRecording ? (
+                  <>
+                    <div className="flex-1 px-3">
+                      <div className="relative h-10 flex items-center">
+                        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-dashed border-muted-foreground/40" />
+                        <div className="ml-auto flex items-center gap-[3px] pr-2">
+                          {Array.from({ length: 30 }).map((_, idx) => {
+                            const dynamic = Math.abs(Math.sin(Date.now() / 180 + idx * 0.85));
+                            const height = Math.max(4, Math.round((4 + dynamic * 18) * (0.45 + recordingLevel)));
+                            return (
+                              <span
+                                key={`recording-wave-chat-${idx}`}
+                                className="w-[3px] rounded-full bg-foreground/90 transition-all duration-75"
+                                style={{ height: `${height}px` }}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={cancelRecording}
+                        className="flex items-center justify-center h-10 w-10 rounded-full text-foreground hover:bg-muted transition-colors"
+                        title={t('cancel', '取消')}
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={confirmRecording}
+                        className="flex items-center justify-center h-10 w-10 rounded-full text-foreground hover:bg-muted transition-colors"
+                        title={t('confirm', '确认')}
+                      >
+                        <Check className="h-5 w-5" />
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      value={input}
+                      onChange={handleInputChange}
+                      onKeyDown={handleInputKeyDown}
+                      placeholder={isTranscribing ? t('transcribing', '正在识别...') : t('askAnything')}
+                      className="flex-1 bg-transparent border-none focus:ring-0 text-lg px-3 py-2 text-foreground placeholder:text-muted-foreground/50 outline-none"
+                      disabled={isLoading || isTranscribing}
+                    />
+                    <SlashCommandMenu
+                      isOpen={slashQuery !== null}
+                      skills={filteredSlashSkills}
+                      selectedIndex={slashIndex}
+                      onSelect={handleSelectSlashSkill}
+                      onClose={() => setSlashQuery(null)}
+                    />
 
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={isLoading ? handleForceStop : handleSend}
-                    disabled={isLoading ? false : !input.trim()}
-                    className={cn(
-                      "flex items-center justify-center h-10 w-10 rounded-full transition-all duration-200",
-                      (input.trim() || isLoading)
-                        ? (isLoading ? "bg-red-600 text-primary-foreground hover:bg-red-700" : "bg-primary text-primary-foreground hover:bg-primary/90")
-                        : "bg-muted text-muted-foreground/50"
-                    )}
-                  >
-                    {isLoading ? (
-                      <Square className="h-4 w-4" />
-                    ) : (
-                      <ArrowUp className="h-6 w-6" />
-                    )}
-                  </button>
-                </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={startRecording}
+                        disabled={isLoading || isTranscribing}
+                        className="flex items-center justify-center h-10 w-10 rounded-full transition-all duration-200 bg-transparent text-muted-foreground hover:bg-muted"
+                        title={t('voiceInput', '语音输入')}
+                      >
+                        {isTranscribing ? (
+                          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                        ) : (
+                          <Mic className="h-5 w-5" />
+                        )}
+                      </button>
+                      <button
+                        onClick={() => setIsVoiceSettingsOpen(true)}
+                        className="flex items-center justify-center h-10 w-10 rounded-full bg-transparent text-muted-foreground hover:bg-muted transition-colors"
+                        title={t('voiceSettings', '语音输入配置')}
+                      >
+                        <Settings className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={isLoading ? handleForceStop : handleSend}
+                        disabled={isLoading ? false : !input.trim()}
+                        className={cn(
+                          "flex items-center justify-center h-10 w-10 rounded-full transition-all duration-200",
+                          (input.trim() || isLoading)
+                            ? (isLoading ? "bg-red-600 text-primary-foreground hover:bg-red-700" : "bg-primary text-primary-foreground hover:bg-primary/90")
+                            : "bg-muted text-muted-foreground/50"
+                        )}
+                      >
+                        {isLoading ? (
+                          <Square className="h-4 w-4" />
+                        ) : (
+                          <ArrowUp className="h-6 w-6" />
+                        )}
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
             <div className="mt-2 flex justify-center">
@@ -1532,6 +1794,34 @@ export function ChatInterface() {
               />
             ) : null}
           </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isVoiceSettingsOpen} onOpenChange={setIsVoiceSettingsOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{t('voiceSettings', '语音输入配置')}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="whisperUrl" className="text-right">
+                {t('serviceUrl', '服务地址')}
+              </Label>
+              <Input
+                id="whisperUrl"
+                value={whisperUrl}
+                onChange={(e) => setWhisperUrl(e.target.value)}
+                className="col-span-3"
+                placeholder="http://localhost:8001"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground px-1">
+              请在此配置独立的 Whisper 语音识别服务地址。例如：http://localhost:8001
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsVoiceSettingsOpen(false)}>{t('cancel', '取消')}</Button>
+            <Button onClick={() => handleSaveWhisperUrl(whisperUrl)}>{t('save', '保存')}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
