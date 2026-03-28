@@ -97,7 +97,28 @@ npm install
 npm run dev
 ```
 
-### 3. Initial Account Setup 👤
+### 3. Optional Voice Service 🎙️
+
+If you want to use voice input in chat, run the standalone `whisper` service:
+
+```bash
+cd whisper
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+Default service URL: `http://localhost:8001`  
+Health endpoint: `GET /health`
+
+Frontend setup:
+1. Click the username in the bottom-left to open the user menu;
+2. Open `Voice Input Settings`;
+3. Fill in the service URL (e.g. `http://localhost:8001`);
+4. Click `Test Connection`, then `Save`.
+
+### 4. Initial Account Setup 👤
 The first user to register in the system will automatically be granted admin privileges. You can simply click the "Register" button on the login page to create your admin account (e.g., Username: `admin`, Password: `admin`), and then log in to manage projects, data sources, and users.
 
 ***

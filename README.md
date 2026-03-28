@@ -98,7 +98,28 @@ npm run dev
 ```
 
 
-### 3. 初始账号配置 👤
+### 3. 语音识别服务（可选）🎙️
+
+若你希望使用聊天输入框中的语音输入能力，请单独启动 `whisper` 服务：
+
+```bash
+cd whisper
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+默认服务地址：`http://localhost:8001`  
+健康检查接口：`GET /health`
+
+前端配置方式：
+1. 点击左下角用户名，打开菜单；
+2. 进入「语音输入配置」；
+3. 填写服务地址（例如 `http://localhost:8001`）；
+4. 点击「测试连接」通过后保存。
+
+### 4. 初始账号配置 👤
 系统首次注册的用户将自动成为管理员。您可以在登录页面直接点击“注册”按钮创建您的管理员账号（例如：用户名 `admin`，密码 `admin`），随后即可登录并管理项目、数据源和用户。
 
 ***

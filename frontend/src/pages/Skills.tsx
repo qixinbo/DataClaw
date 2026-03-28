@@ -286,7 +286,7 @@ export function Skills() {
 
   return (
     <div className="h-full flex flex-col bg-background overflow-hidden">
-      <div className="border-b border-border px-8 pt-5 bg-background shrink-0">
+      <div className="border-b border-border px-8 pt-5 pr-24 bg-background shrink-0">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
