@@ -1,10 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { User, Loader2, ArrowUp, ChevronDown, Check, Square, Plus, Database, Wand2, Zap, CheckCircle2, Table, XCircle, Settings, ExternalLink, FileText, Download, Eye, Copy, Mic, X } from "lucide-react";
+import { User, Loader2, ArrowUp, ChevronDown, Check, Square, Plus, Database, Wand2, CheckCircle2, Table, XCircle, Settings, ExternalLink, FileText, Download, Eye, Copy, Mic, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { type ChartSpec } from "@/store/visualizationStore";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -1628,34 +1627,88 @@ export function ChatInterface() {
                     </PopoverTrigger>
                     <PopoverContent side="top" align="start" className="w-[480px] p-0 mb-2 overflow-hidden rounded-2xl border-border shadow-xl">
                       <div className="flex divide-x divide-zinc-100">
-                        {/* Left Column: Data Source */}
                         <div className="flex-1 p-3 bg-muted/50/50">
+                          <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
+                            <Database className="h-3 w-3" />
+                            {t('knowledgeBase')}
+                          </div>
+                          <div className="space-y-0.5">
+                            {availableKnowledgeBases.length > 0 ? (
+                              availableKnowledgeBases.map((kb) => (
+                                <button
+                                  key={kb.id}
+                                  onClick={() => {
+                                    void handleSelectKnowledgeBase(kb.id);
+                                  }}
+                                  className={cn(
+                                    "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
+                                    selectedKnowledgeBaseId === kb.id
+                                      ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                                      : "text-muted-foreground hover:bg-background hover:shadow-sm"
+                                  )}
+                                >
+                                  <div className="flex items-center gap-2.5">
+                                    <Database className={cn("h-4 w-4", selectedKnowledgeBaseId === kb.id ? "text-violet-500" : "text-muted-foreground")} />
+                                    <span className="font-medium">{kb.name}</span>
+                                  </div>
+                                  {selectedKnowledgeBaseId === kb.id && <CheckCircle2 className="h-4 w-4 text-violet-500" />}
+                                </button>
+                              ))
+                            ) : (
+                              <div className="px-3 py-4 text-center">
+                                <Database className="h-6 w-6 text-zinc-200 mx-auto mb-1" />
+                                <p className="text-[11px] text-muted-foreground">{t('noKnowledgeBases')}</p>
+                              </div>
+                            )}
+                            {selectedKnowledgeBaseId ? (
+                              <div className="mt-2 pt-2 border-t border-border">
+                                <button
+                                  onClick={() => {
+                                    void handleClearKnowledgeBase();
+                                  }}
+                                  className="w-full py-1.5 text-[11px] text-muted-foreground hover:text-muted-foreground transition-colors flex items-center justify-center gap-1"
+                                >
+                                  {t('clearSelected')}
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className="flex-1 p-3 bg-background">
                           <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
                             <Database className="h-3 w-3" />
                             {t('dataSource')}
                           </div>
                           <div className="space-y-0.5">
-                            {availableDataSources.map((ds) => (
-                              <button
-                                key={ds.id}
-                                onClick={() => {
-                                  void handleSelectDataSource(ds.id);
-                                }}
-                                className={cn(
-                                  "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
-                                  selectedDataSource === ds.id 
-                                    ? "bg-background text-foreground shadow-sm ring-1 ring-border" 
-                                    : "text-muted-foreground hover:bg-background hover:shadow-sm"
-                                )}
-                              >
-                                <div className="flex items-center gap-2.5">
-                                  <Database className={cn("h-4 w-4", selectedDataSource === ds.id ? "text-blue-500" : "text-muted-foreground")} />
-                                  <span className="font-medium">{ds.name}</span>
-                                </div>
-                                {selectedDataSource === ds.id && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
-                              </button>
-                            ))}
-                            {selectedDataSource && (
+                            {availableDataSources.length > 0 ? (
+                              availableDataSources.map((ds) => (
+                                <button
+                                  key={ds.id}
+                                  onClick={() => {
+                                    void handleSelectDataSource(ds.id);
+                                  }}
+                                  className={cn(
+                                    "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
+                                    selectedDataSource === ds.id
+                                      ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                                      : "text-muted-foreground hover:bg-background hover:shadow-sm"
+                                  )}
+                                >
+                                  <div className="flex items-center gap-2.5">
+                                    <Database className={cn("h-4 w-4", selectedDataSource === ds.id ? "text-blue-500" : "text-muted-foreground")} />
+                                    <span className="font-medium">{ds.name}</span>
+                                  </div>
+                                  {selectedDataSource === ds.id && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
+                                </button>
+                              ))
+                            ) : (
+                              <div className="px-3 py-4 text-center">
+                                <Database className="h-6 w-6 text-zinc-200 mx-auto mb-1" />
+                                <p className="text-[11px] text-muted-foreground">{t('noDataSources')}</p>
+                              </div>
+                            )}
+                            {selectedDataSource ? (
                               <div className="mt-2 pt-2 border-t border-border">
                                 <button
                                   onClick={() => {
@@ -1666,107 +1719,8 @@ export function ChatInterface() {
                                   {t('clearSelected')}
                                 </button>
                               </div>
-                            )}
+                            ) : null}
                           </div>
-                          <div className="mt-3 pt-3 border-t border-border">
-                            <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
-                              <Database className="h-3 w-3" />
-                              {t('knowledgeBase')}
-                            </div>
-                            <div className="space-y-0.5">
-                              {availableKnowledgeBases.length > 0 ? (
-                                availableKnowledgeBases.map((kb) => (
-                                  <button
-                                    key={kb.id}
-                                    onClick={() => {
-                                      void handleSelectKnowledgeBase(kb.id);
-                                    }}
-                                    className={cn(
-                                      "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
-                                      selectedKnowledgeBaseId === kb.id
-                                        ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                                        : "text-muted-foreground hover:bg-background hover:shadow-sm"
-                                    )}
-                                  >
-                                    <div className="flex items-center gap-2.5">
-                                      <Database className={cn("h-4 w-4", selectedKnowledgeBaseId === kb.id ? "text-violet-500" : "text-muted-foreground")} />
-                                      <span className="font-medium">{kb.name}</span>
-                                    </div>
-                                    {selectedKnowledgeBaseId === kb.id && <CheckCircle2 className="h-4 w-4 text-violet-500" />}
-                                  </button>
-                                ))
-                              ) : (
-                                <div className="px-3 py-3 text-xs text-muted-foreground">
-                                  {t('noKnowledgeBases')}
-                                </div>
-                              )}
-                              {selectedKnowledgeBaseId ? (
-                                <div className="mt-2 pt-2 border-t border-border">
-                                  <button
-                                    onClick={() => {
-                                      void handleClearKnowledgeBase();
-                                    }}
-                                    className="w-full py-1.5 text-[11px] text-muted-foreground hover:text-muted-foreground transition-colors flex items-center justify-center gap-1"
-                                  >
-                                    {t('clearSelected')}
-                                  </button>
-                                </div>
-                              ) : null}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Right Column: Skills */}
-                        <div className="flex-1 p-3 bg-background">
-                          <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
-                            <Wand2 className="h-3 w-3" />
-                            Skills
-                          </div>
-                          <div className="space-y-0.5 max-h-[300px] overflow-y-auto pr-1">
-                            {availableSkills.length > 0 ? (
-                              availableSkills.map((skill) => {
-                                const isSelected = selectedSkillIds.includes(skill.id);
-                                return (
-                                  <button
-                                    key={skill.id}
-                                    onClick={() => {
-                                      setSelectedSkillIds((prev) =>
-                                        isSelected
-                                          ? prev.filter((id) => id !== skill.id)
-                                          : [...prev, skill.id]
-                                      );
-                                    }}
-                                    className={cn(
-                                      "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
-                                      isSelected 
-                                        ? "bg-background text-foreground shadow-sm ring-1 ring-border" 
-                                        : "text-muted-foreground hover:bg-background hover:shadow-sm"
-                                    )}
-                                  >
-                                    <div className="flex items-center text-left">
-                                      <span className="font-medium">{skill.name}</span>
-                                    </div>
-                                    {isSelected && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
-                                  </button>
-                                );
-                              })
-                            ) : (
-                              <div className="px-3 py-8 text-center">
-                                <Zap className="h-8 w-8 text-zinc-100 mx-auto mb-2" />
-                                <p className="text-xs text-muted-foreground">{t('noAvailableSkills')}</p>
-                              </div>
-                            )}
-                          </div>
-                          {selectedSkillIds.length > 0 && (
-                            <div className="mt-2 pt-2 border-t border-border">
-                              <button 
-                                onClick={() => setSelectedSkillIds([])}
-                                className="w-full py-1.5 text-[11px] text-muted-foreground hover:text-muted-foreground transition-colors flex items-center justify-center gap-1"
-                              >
-                                {t('clearSelectedWithCount', { count: selectedSkillIds.length })}
-                              </button>
-                            </div>
-                          )}
                         </div>
                       </div>
                     </PopoverContent>
