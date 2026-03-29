@@ -801,7 +801,7 @@ export function ChatInterface() {
     );
   };
 
-  const ChatInputPanel = ({
+  const renderInputPanel = ({
     menuSide,
     menuOffsetClass,
     recordingWaveKeyPrefix,
@@ -1382,11 +1382,11 @@ export function ChatInterface() {
 
               {/* Input Area */}
               <div className="w-full px-4">
-                <ChatInputPanel
-                  menuSide="bottom"
-                  menuOffsetClass="mt-2"
-                  recordingWaveKeyPrefix="empty"
-                />
+                {renderInputPanel({
+                  menuSide: "bottom",
+                  menuOffsetClass: "mt-2",
+                  recordingWaveKeyPrefix: "empty",
+                })}
                 <div className="mt-4 flex flex-wrap justify-center gap-2">
                   {/* Common Questions or suggestions could go here */}
                 </div>
@@ -1636,12 +1636,12 @@ export function ChatInterface() {
       {/* Floating Input for Chat State */}
       {messages.length > 0 && (
         <div className="px-4 pb-6 pt-3 border-t border-border bg-background">
-          <ChatInputPanel
-            menuSide="top"
-            menuOffsetClass="mb-2"
-            recordingWaveKeyPrefix="chat"
-            showDisclaimer
-          />
+          {renderInputPanel({
+            menuSide: "top",
+            menuOffsetClass: "mb-2",
+            recordingWaveKeyPrefix: "chat",
+            showDisclaimer: true,
+          })}
         </div>
       )}
       <Dialog open={Boolean(artifactPreview)} onOpenChange={(open) => {
