@@ -222,7 +222,7 @@
   "knowledgeDocumentDeleteFailed": "删除文档失败",
   "noKnowledgeDocuments": "当前知识库还没有文档",
   "knowledgeDocumentUploadTitle": "上传文档到知识库",
-  "knowledgeDocumentUploadHint": "支持 txt、md、json、yaml、xml、html、csv、xls、xlsx，单文件不超过 5MB。",
+  "knowledgeDocumentUploadHint": "支持 文本/Markdown/代码、Office (Word/Excel/PPT) 及 PDF 文件，单文件不超过 15MB。",
   "knowledgeDocumentUploadSelected": "已选择 {{count}} 个文件",
   "knowledgeDocumentUploadNone": "尚未选择文件",
   "knowledgeDocumentUploadAction": "上传并入库",

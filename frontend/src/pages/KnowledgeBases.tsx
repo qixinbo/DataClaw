@@ -499,7 +499,8 @@ export function KnowledgeBases() {
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
             {/* Upload Section */}
             <div className="rounded-lg border border-border p-4 bg-muted/30">
-              <div className="text-sm font-medium text-foreground mb-3">{t('knowledgeDocumentUploadTitle')}</div>
+              <div className="text-sm font-medium text-foreground mb-1">{t('knowledgeDocumentUploadTitle')}</div>
+              <div className="text-xs text-muted-foreground mb-3">{t('knowledgeDocumentUploadHint')}</div>
               <div className="flex items-center gap-3">
                 <Input
                   type="file"

@@ -574,10 +574,17 @@ export function ChatInterface() {
               let cleanContent = m.content || "";
               // Remove injected system prompt instructions from user messages if present
               if (m.role === 'user') {
-                cleanContent = cleanContent.replace(/^\[System:.*?\]\n?/i, '');
-                // Handle cases where there might be a runtime context block for skills
-                cleanContent = cleanContent.replace(/\[Runtime Context[\s\S]*?(?=\[System:|$)/i, '');
-                cleanContent = cleanContent.replace(/\[System:.*?\]\n?/i, ''); // clean again in case it follows context
+                if (cleanContent.startsWith("[Runtime Context")) {
+                  const splitIndex = cleanContent.indexOf("\n\n");
+                  if (splitIndex !== -1) {
+                    cleanContent = cleanContent.substring(splitIndex + 2);
+                  } else {
+                    cleanContent = "";
+                  }
+                } else if (cleanContent.startsWith("[System:")) {
+                  // Fallback for older messages containing [System: ...] wrapper
+                  cleanContent = cleanContent.replace(/^\[System:[\s\S]*?\]\n*/i, '');
+                }
                 cleanContent = cleanContent.trim();
               }
               return {

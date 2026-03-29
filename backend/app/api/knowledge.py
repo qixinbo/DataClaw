@@ -67,6 +67,33 @@ def _extract_upload_text(filename: str, content: bytes) -> str:
         except Exception as e:
             raise ValueError(f"Failed to parse PDF: {str(e)}")
             
+    # 增加对 Word 文档的文本提取支持
+    if lower.endswith((".doc", ".docx")):
+        try:
+            import docx
+            doc = docx.Document(io.BytesIO(content))
+            return "\n".join([para.text for para in doc.paragraphs])
+        except ImportError:
+            raise ValueError("python-docx is not installed. Cannot parse Word files.")
+        except Exception as e:
+            raise ValueError(f"Failed to parse Word document: {str(e)}")
+            
+    # 增加对 PPT 文档的文本提取支持
+    if lower.endswith((".ppt", ".pptx")):
+        try:
+            import pptx
+            prs = pptx.Presentation(io.BytesIO(content))
+            text = []
+            for slide in prs.slides:
+                for shape in slide.shapes:
+                    if hasattr(shape, "text"):
+                        text.append(shape.text)
+            return "\n".join(text)
+        except ImportError:
+            raise ValueError("python-pptx is not installed. Cannot parse PPT files.")
+        except Exception as e:
+            raise ValueError(f"Failed to parse PPT document: {str(e)}")
+            
     raise ValueError("Unsupported file type")
 
 

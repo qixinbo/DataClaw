@@ -208,7 +208,7 @@
   "knowledgeDocumentDeleteFailed": "Failed to delete document",
   "noKnowledgeDocuments": "No documents in this knowledge base",
   "knowledgeDocumentUploadTitle": "Upload Documents to Knowledge Base",
-  "knowledgeDocumentUploadHint": "Supports txt, md, json, yaml, xml, html, csv, xls, xlsx. Max 5MB per file.",
+  "knowledgeDocumentUploadHint": "Supports Text/Markdown/Code, Office(Word/Excel/PPT) and PDF. Max 15MB per file.",
   "knowledgeDocumentUploadSelected": "{{count}} file(s) selected",
   "knowledgeDocumentUploadNone": "No files selected",
   "knowledgeDocumentUploadAction": "Upload and Add",

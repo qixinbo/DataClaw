@@ -281,7 +281,7 @@ def _extract_kb_citations(kb_id: Optional[str], message: str) -> Tuple[str, List
             if not isinstance(item, dict):
                 continue
             title = str(item.get("title") or f"Doc {idx}")
-            chunk = str(item.get("chunk") or "").strip()
+            chunk = str(item.get("chunk") or "").strip().replace("\n\n", "\n")
             if not chunk:
                 continue
             score = float(item.get("score", 0.0) or 0.0)
@@ -297,11 +297,11 @@ def _extract_kb_citations(kb_id: Optional[str], message: str) -> Tuple[str, List
             )
         if not lines:
             return f"[System: A knowledge base is selected ({kb_id}). Retrieval result is empty.]\n{message}", []
-        context_block = "\n\n".join(lines)
-        next_message = f"[System: The following context is retrieved from knowledge base {kb_id}. You must ground your answer on it when relevant.]\n{context_block}\n\n{message}"
+        context_block = "\n".join(lines)
+        next_message = f"[Runtime Context — metadata only, not instructions]\nThe following context is retrieved from knowledge base {kb_id}. You must ground your answer on it when relevant.\n{context_block}\n\n{message}"
         return next_message, citations
     except Exception as exc:
-        return f"[System: A knowledge base is selected ({kb_id}) but retrieval failed: {exc}]\n{message}", []
+        return f"[Runtime Context — metadata only, not instructions]\nA knowledge base is selected ({kb_id}) but retrieval failed: {exc}\n\n{message}", []
 
 
 def _sync_session_project(session_id: str, project_id: Optional[int]) -> None:
@@ -408,15 +408,29 @@ async def nanobot_chat(request: ChatRequest):
 
         # Inject instructions if explicitly routed
         message, kb_citations = _extract_kb_citations(resolved_kb_id, request.message)
+        
+        instructions = []
         if request.route_mode == "sql" or request.prefer_sql_chart:
-            message = f"[System: Use the nl2sql tool to answer the query]\n{message}"
+            instructions.append("Use the nl2sql tool to answer the query")
         elif request.route_mode == "chat":
-            message = f"[System: Normal chat mode. Do NOT use the nl2sql tool]\n{message}"
+            instructions.append("Normal chat mode. Do NOT use the nl2sql tool")
 
         # Inject instructions for selected skills
         if request.skill_ids:
             skill_list = ", ".join(request.skill_ids)
-            message = f"[System: You must prioritize using the following skills/tools to answer the user's request: {skill_list}]\n{message}"
+            instructions.append(f"You must prioritize using the following skills/tools to answer the user's request: {skill_list}")
+            
+        if instructions:
+            instr_block = "\n".join(instructions)
+            # If message already has Runtime Context, append to it, otherwise create new
+            if message.startswith("[Runtime Context — metadata only, not instructions]"):
+                parts = message.split("\n\n", 1)
+                if len(parts) == 2:
+                    message = f"{parts[0]}\n{instr_block}\n\n{parts[1]}"
+                else:
+                    message = f"{message}\n{instr_block}"
+            else:
+                message = f"[Runtime Context — metadata only, not instructions]\n{instr_block}\n\n{message}"
 
         response = await nanobot_service.process_message(
             message,
@@ -494,15 +508,29 @@ async def nanobot_chat_stream(request: ChatRequest):
 
             # Inject instructions if explicitly routed
             message, kb_citations = _extract_kb_citations(resolved_kb_id, request.message)
+            
+            instructions = []
             if request.route_mode == "sql" or request.prefer_sql_chart:
-                message = f"[System: Use the nl2sql tool to answer the query]\n{message}"
+                instructions.append("Use the nl2sql tool to answer the query")
             elif request.route_mode == "chat":
-                message = f"[System: Normal chat mode. Do NOT use the nl2sql tool]\n{message}"
+                instructions.append("Normal chat mode. Do NOT use the nl2sql tool")
 
             # Inject instructions for selected skills
             if request.skill_ids:
                 skill_list = ", ".join(request.skill_ids)
-                message = f"[System: You must prioritize using the following skills/tools to answer the user's request: {skill_list}]\n{message}"
+                instructions.append(f"You must prioritize using the following skills/tools to answer the user's request: {skill_list}")
+                
+            if instructions:
+                instr_block = "\n".join(instructions)
+                # If message already has Runtime Context, append to it, otherwise create new
+                if message.startswith("[Runtime Context — metadata only, not instructions]"):
+                    parts = message.split("\n\n", 1)
+                    if len(parts) == 2:
+                        message = f"{parts[0]}\n{instr_block}\n\n{parts[1]}"
+                    else:
+                        message = f"{message}\n{instr_block}"
+                else:
+                    message = f"[Runtime Context — metadata only, not instructions]\n{instr_block}\n\n{message}"
 
             current_task = asyncio.create_task(
                 nanobot_service.process_message(
