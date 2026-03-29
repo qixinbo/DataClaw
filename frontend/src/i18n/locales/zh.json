@@ -145,6 +145,7 @@
   "failedToSaveSettings": "保存设置失败",
   "accountInfo": "账号信息",
   "modifyLoginEmailAndPassword": "修改您的登录邮箱和密码",
+  "avatar": "头像",
   "username": "用户名",
   "usernameCannotBeModified": "用户名不可修改",
   "emailAddress": "邮箱地址",

@@ -6,13 +6,14 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Pencil, Trash2, Plus, Users as UsersIcon, Loader2 } from "lucide-react";
+import { Pencil, Trash2, Plus, User as UserIcon, Users as UsersIcon, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
 
 interface User {
   id: number;
   username: string;
   email: string;
+  avatar?: string | null;
   is_active: boolean;
   is_admin: boolean;
   created_at: string;
@@ -117,12 +118,12 @@ export function Users() {
       <div className="h-14 px-6 flex items-center justify-between border-b border-border bg-background">
         <div className="flex items-center gap-2 text-foreground/80 font-medium">
           <UsersIcon className="h-5 w-5 text-indigo-500" />
-          用户管理
+          {t('userManagement')}
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-8 bg-indigo-600 hover:bg-indigo-700 text-primary-foreground rounded-md px-3" onClick={() => handleOpenDialog()}>
             <Plus className="h-4 w-4" />
-            添加用户
+            {t('addUser')}
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]">
             <form onSubmit={handleSubmit}>
@@ -202,27 +203,38 @@ export function Users() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t('id')}</TableHead>
-                  <TableHead>{t('username')}</TableHead>
-                  <TableHead>{t('email')}</TableHead>
-                  <TableHead>{t('status')}</TableHead>
-                  <TableHead>{t('role')}</TableHead>
-                  <TableHead>{t('createdAt')}</TableHead>
-                  <TableHead className="text-right">{t('actions')}</TableHead>
+                  <TableHead>{t('id', 'ID')}</TableHead>
+                  <TableHead>{t('username', 'Username')}</TableHead>
+                  <TableHead>{t('email', 'Email')}</TableHead>
+                  <TableHead>{t('status', 'Status')}</TableHead>
+                  <TableHead>{t('role', 'Role')}</TableHead>
+                  <TableHead>{t('createdAt', 'Created At')}</TableHead>
+                  <TableHead className="text-right">{t('actions', 'Actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {users.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center h-24 text-muted-foreground">
-                      暂无用户数据
+                      {t('noUserData', 'No User Data')}
                     </TableCell>
                   </TableRow>
                 ) : (
                   users.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell className="font-medium">{user.id}</TableCell>
-                      <TableCell>{user.username}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {user.avatar ? (
+                            <img src={user.avatar} alt="avatar" className="w-6 h-6 rounded-full object-cover border border-border" />
+                          ) : (
+                            <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 border border-indigo-200">
+                              <UserIcon className="h-3 w-3" />
+                            </div>
+                          )}
+                          {user.username}
+                        </div>
+                      </TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>
                         <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${user.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}>
