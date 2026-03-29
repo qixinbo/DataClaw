@@ -358,7 +358,7 @@ class NanobotIntegration:
             if project_id is not None:
                 from app.api.mcp import list_mcp_servers
                 from nanobot.config.schema import MCPServerConfig
-                servers = list_mcp_servers(project_id=project_id)
+                servers = await list_mcp_servers(project_id=project_id)
                 for s in servers:
                     cfg = MCPServerConfig(
                         type=s.get("type"),

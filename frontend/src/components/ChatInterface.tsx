@@ -747,11 +747,12 @@ export function ChatInterface() {
   };
 
   const renderActiveSelections = () => {
-    if (!selectedDataSource && !selectedKnowledgeBaseId) return null;
+    const hasValidDataSourceSelection = Boolean(selectedDataSource && selectedDataSourceName);
+    if (!hasValidDataSourceSelection && !selectedKnowledgeBaseId) return null;
     return (
       <div className="px-2 pt-2">
         <div className="flex flex-wrap gap-2">
-          {selectedDataSource ? (
+          {hasValidDataSourceSelection ? (
             <div className="px-3 py-1.5 rounded-full text-xs border flex items-center gap-1.5 bg-blue-50 text-blue-700 border-blue-200">
               <Database className="h-3.5 w-3.5" />
               {`${t('dataSource')}：${selectedDataSourceName}`}
