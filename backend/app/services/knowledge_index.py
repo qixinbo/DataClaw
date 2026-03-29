@@ -124,10 +124,27 @@ class KnowledgeIndexService:
 
     @staticmethod
     def _build_embed_model(kb: Dict[str, Any]) -> Any:
-        global_config = knowledge_global_config_store.get()
-        api_base = global_config.get("api_base")
-        api_key = global_config.get("api_key")
-        model_name = kb.get("embedding_model") or global_config.get("default_embedding_model")
+        from app.services.embedding_model_store import embedding_model_store
+        models = embedding_model_store.list_models()
+        if not models:
+            return None
+        
+        target_model = None
+        kb_model_val = kb.get("embedding_model")
+        if kb_model_val:
+            # Try matching by ID first, then by model name
+            target_model = next((m for m in models if m.get("id") == kb_model_val), None)
+            if not target_model:
+                target_model = next((m for m in models if m.get("model") == kb_model_val), None)
+        
+        if not target_model:
+            # Fallback to the first model
+            target_model = models[0]
+            
+        api_base = target_model.get("api_base")
+        api_key = target_model.get("api_key")
+        model_name = target_model.get("model")
+        
         if not api_base or not api_key or not model_name:
             return None
         api_base = _normalize_embedding_api_base(api_base)

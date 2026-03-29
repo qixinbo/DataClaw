@@ -9,6 +9,8 @@ import { Users } from "./pages/Users";
 import { Projects } from "./pages/Projects";
 import { Login } from "./pages/Login";
 import { ModelConfigs } from "./pages/ModelConfigs";
+import { EmbeddingModels } from "./pages/EmbeddingModels";
+import { KnowledgeBases } from "./pages/KnowledgeBases";
 import { DataSources } from "./pages/DataSources";
 import { Modeling } from "./pages/Modeling";
 import { Subagents } from "./pages/Subagents";
@@ -124,6 +126,22 @@ function App() {
           <ProtectedRoute>
             <MainLayout>
               <ModelConfigs />
+            </MainLayout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/embedding-models" element={
+          <ProtectedRoute>
+            <MainLayout>
+              <EmbeddingModels />
+            </MainLayout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/knowledge-bases" element={
+          <ProtectedRoute>
+            <MainLayout>
+              <KnowledgeBases />
             </MainLayout>
           </ProtectedRoute>
         } />

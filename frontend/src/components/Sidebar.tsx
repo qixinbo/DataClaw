@@ -922,6 +922,17 @@ function SidebarBody() {
             <button 
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors"
               onClick={() => {
+                navigate("/knowledge-bases");
+                setShowUserMenu(false);
+              }}
+            >
+              <Database className="h-4 w-4 text-muted-foreground" />
+              {t('knowledgeBaseManagement', 'Knowledge Bases')}
+            </button>
+
+            <button 
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors"
+              onClick={() => {
                 navigate("/settings");
                 setShowUserMenu(false);
               }}
@@ -952,6 +963,17 @@ function SidebarBody() {
                 >
                   <Brain className="h-4 w-4 text-muted-foreground" />
                   {t('modelConfig')}
+                </button>
+                
+                <button
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors"
+                  onClick={() => {
+                    navigate("/embedding-models");
+                    setShowUserMenu(false);
+                  }}
+                >
+                  <Brain className="h-4 w-4 text-muted-foreground" />
+                  {t('embeddingModelConfig', 'Embedding Models')}
                 </button>
                 
                 <button 
