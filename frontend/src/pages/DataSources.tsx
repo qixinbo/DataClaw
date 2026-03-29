@@ -3,10 +3,27 @@ import { useTranslation } from 'react-i18next';
 import { api } from "@/lib/api";
 import { DataSourceForm, type DataSourceConfig } from "@/components/DataSourceForm";
 import { Button } from "@/components/ui/button";
-import { Plus, Database, Pencil, Trash2, Loader2, Info, ChevronLeft, FileText, Search, Network } from "lucide-react";
+import { Plus, Database, Pencil, Trash2, Loader2, Info, ChevronLeft, FileText, Search, Network, GripVertical } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useProjectStore } from "@/store/projectStore";
 import { useNavigate } from "react-router-dom";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors
+} from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const SOURCE_TYPES = [
   { id: "csv", name: "CSV Upload", icon: <FileText className="h-6 w-6 text-green-600" /> },
@@ -51,6 +68,24 @@ export function DataSources() {
     setIsLoading(true);
     try {
       const data = await api.get<DataSourceConfig[]>(`/api/v1/datasources?project_id=${currentProject.id}`);
+      // 从 localStorage 中恢复顺序
+      const savedOrderStr = localStorage.getItem(`datasources_order_${currentProject.id}`);
+      if (savedOrderStr) {
+        try {
+          const savedOrder = JSON.parse(savedOrderStr) as string[];
+          // 按照保存的 ID 顺序重新排列，同时把新添加的数据源放在末尾
+          data.sort((a, b) => {
+            const indexA = savedOrder.indexOf(a.id as unknown as string);
+            const indexB = savedOrder.indexOf(b.id as unknown as string);
+            if (indexA === -1 && indexB === -1) return 0;
+            if (indexA === -1) return 1;
+            if (indexB === -1) return -1;
+            return indexA - indexB;
+          });
+        } catch (e) {
+          console.error("Failed to parse saved datasource order", e);
+        }
+      }
       setDatasources(data);
     } catch (e) {
       console.error("Failed to fetch data sources", e);
@@ -202,6 +237,113 @@ export function DataSources() {
     }
   };
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Require 8px movement before drag starts to avoid accidental drags
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setDatasources((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        
+        const newItems = arrayMove(items, oldIndex, newIndex);
+        
+        // 保存新的顺序到 localStorage
+        if (currentProject) {
+          localStorage.setItem(
+            `datasources_order_${currentProject.id}`, 
+            JSON.stringify(newItems.map(i => i.id))
+          );
+        }
+        
+        return newItems;
+      });
+    }
+  };
+
+  // Sortable Item Component
+  const SortableDataSourceCard = ({ ds }: { ds: DataSourceConfig }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging
+    } = useSortable({ id: ds.id! });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+    };
+
+    return (
+      <div 
+        ref={setNodeRef}
+        style={style}
+        className={`group relative bg-background border border-border rounded-xl p-5 hover:shadow-md transition-all hover:border-border
+          ${isDragging ? 'opacity-50 z-50 ring-2 ring-indigo-500 shadow-xl' : ''}
+        `}
+      >
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div 
+              {...attributes} 
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing p-1 -ml-2 text-muted-foreground/50 hover:text-foreground/80 transition-colors"
+              title="Drag to reorder"
+            >
+              <GripVertical className="h-5 w-5" />
+            </div>
+            <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+              <Database className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground">{ds.name}</h3>
+              <p className="text-xs text-muted-foreground font-mono mt-0.5 uppercase">{ds.type}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-blue-600" onClick={() => navigate(`/modeling/${ds.id}`)} title="Data Modeling">
+              <Network className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-muted-foreground" onClick={() => handleEdit(ds)}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(ds.id!)}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+        
+        <div className="space-y-2 ml-8">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Host</span>
+            <span className="font-medium text-foreground/80 truncate max-w-[150px]" title={ds.config.host || ds.config.connection_string || "Local / File"}>
+              {ds.config.host || parseConnectionString(ds.config.connection_string, 'host') || "Local / File"}
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Database</span>
+            <span className="font-medium text-foreground/80 truncate max-w-[150px]" title={ds.config.database || (ds.config.file_path ? ds.config.file_path.split('/').pop() : ds.config.connection_string || "-")}>
+              {ds.config.database || parseConnectionString(ds.config.connection_string, 'database') || (ds.config.file_path ? ds.config.file_path.split('/').pop() : "-")}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="h-full flex flex-col bg-background">
       <div className="border-b border-border px-8 py-5 flex items-center justify-between">
@@ -227,52 +369,22 @@ export function DataSources() {
             <p className="text-muted-foreground text-sm mt-1">{t('clickTopRightToAddFirstDataSource')}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {datasources.map((ds) => (
-              <div 
-                key={ds.id} 
-                className="group relative bg-background border border-border rounded-xl p-5 hover:shadow-md transition-all hover:border-border"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
-                      <Database className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-foreground">{ds.name}</h3>
-                      <p className="text-xs text-muted-foreground font-mono mt-0.5 uppercase">{ds.type}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-blue-600" onClick={() => navigate(`/modeling/${ds.id}`)} title="Data Modeling">
-                    <Network className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-muted-foreground" onClick={() => handleEdit(ds)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(ds.id!)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Host</span>
-                    <span className="font-medium text-foreground/80 truncate max-w-[150px]" title={ds.config.host || ds.config.connection_string || "Local / File"}>
-                      {ds.config.host || parseConnectionString(ds.config.connection_string, 'host') || "Local / File"}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Database</span>
-                    <span className="font-medium text-foreground/80 truncate max-w-[150px]" title={ds.config.database || (ds.config.file_path ? ds.config.file_path.split('/').pop() : ds.config.connection_string || "-")}>
-                      {ds.config.database || parseConnectionString(ds.config.connection_string, 'database') || (ds.config.file_path ? ds.config.file_path.split('/').pop() : "-")}
-                    </span>
-                  </div>
-                </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext 
+              items={datasources.map(ds => ds.id!)}
+              strategy={rectSortingStrategy}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {datasources.map((ds) => (
+                  <SortableDataSourceCard key={ds.id} ds={ds} />
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
         )}
       </div>
 

@@ -4,11 +4,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Save, Loader2, RefreshCw, Pencil, Trash2, FileText, Plus, BookOpen } from "lucide-react";
+import { Save, Loader2, RefreshCw, Pencil, Trash2, FileText, Plus, BookOpen, GripVertical } from "lucide-react";
 import { api } from "@/lib/api";
 import { useProjectStore } from "@/store/projectStore";
 import { Textarea } from "@/components/ui/textarea";
 import { KnowledgeBaseForm, type KnowledgeBaseFormValues } from "@/components/KnowledgeBaseForm";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors
+} from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface KnowledgeBase {
   id: string;
@@ -76,6 +93,25 @@ export function KnowledgeBases() {
     setIsLoading(true);
     try {
       const data = await api.get<KnowledgeBase[]>(`/api/v1/knowledge-bases?project_id=${currentProject.id}`);
+      
+      // 从 localStorage 中恢复顺序
+      const savedOrderStr = localStorage.getItem(`knowledge_bases_order_${currentProject.id}`);
+      if (savedOrderStr) {
+        try {
+          const savedOrder = JSON.parse(savedOrderStr) as string[];
+          data.sort((a, b) => {
+            const indexA = savedOrder.indexOf(a.id);
+            const indexB = savedOrder.indexOf(b.id);
+            if (indexA === -1 && indexB === -1) return 0;
+            if (indexA === -1) return 1;
+            if (indexB === -1) return -1;
+            return indexA - indexB;
+          });
+        } catch (e) {
+          console.error("Failed to parse saved kb order", e);
+        }
+      }
+      
       setKnowledgeBases(data);
     } catch (err: any) {
       console.error(err);
@@ -247,6 +283,127 @@ export function KnowledgeBases() {
     }
   };
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setKnowledgeBases((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        
+        const newItems = arrayMove(items, oldIndex, newIndex);
+        
+        // 保存新的顺序到 localStorage
+        if (currentProject) {
+          localStorage.setItem(
+            `knowledge_bases_order_${currentProject.id}`, 
+            JSON.stringify(newItems.map(i => i.id))
+          );
+        }
+        
+        return newItems;
+      });
+    }
+  };
+
+  const SortableKbCard = ({ kb }: { kb: KnowledgeBase }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging
+    } = useSortable({ id: kb.id });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+    };
+
+    return (
+      <div 
+        ref={setNodeRef}
+        style={style}
+        className={`group relative bg-background border border-border rounded-xl p-5 hover:shadow-md transition-all hover:border-border
+          ${isDragging ? 'opacity-50 z-50 ring-2 ring-indigo-500 shadow-xl' : ''}
+        `}
+      >
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div 
+              {...attributes} 
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing p-1 -ml-2 text-muted-foreground/50 hover:text-foreground/80 transition-colors"
+              title="Drag to reorder"
+            >
+              <GripVertical className="h-5 w-5" />
+            </div>
+            <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+              <BookOpen className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground flex items-center gap-2">
+                {kb.name}
+                {!kb.is_active && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground">Inactive</span>
+                )}
+              </h3>
+              <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                {kb.documents?.length || 0} Documents
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-blue-600" onClick={() => handleManageDocs(kb)} title={t('manageKnowledgeDocuments')}>
+              <FileText className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-green-600" onClick={() => handleReindexKb(kb.id)} disabled={reindexingKbId === kb.id} title={t('reindexKnowledgeBase')}>
+              {reindexingKbId === kb.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-muted-foreground" onClick={() => handleEditKb(kb)} title={t('editKnowledgeBase')}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50" onClick={() => handleDeleteKb(kb.id)} title={t('deleteKnowledgeBase')}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+        
+        <div className="space-y-2 ml-8">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Model</span>
+            <span className="font-medium text-foreground/80 truncate max-w-[150px]" title={kb.embedding_model || 'Default'}>
+              {kb.embedding_model ? kb.embedding_model.substring(0, 15) + (kb.embedding_model.length > 15 ? '...' : '') : 'Default'}
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Chunking</span>
+            <span className="font-medium text-foreground/80">
+              {kb.chunk_size} / {kb.chunk_overlap}
+            </span>
+          </div>
+          {kb.description && (
+            <p className="text-xs text-muted-foreground mt-3 line-clamp-2" title={kb.description}>
+              {kb.description}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="h-full flex flex-col bg-background">
       <div className="border-b border-border px-8 py-5 flex items-center justify-between">
@@ -277,67 +434,22 @@ export function KnowledgeBases() {
             <p className="text-muted-foreground font-medium">{t('noKnowledgeBases')}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {knowledgeBases.map((kb) => (
-              <div 
-                key={kb.id} 
-                className="group relative bg-background border border-border rounded-xl p-5 hover:shadow-md transition-all hover:border-border"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
-                      <BookOpen className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-foreground flex items-center gap-2">
-                        {kb.name}
-                        {!kb.is_active && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground">Inactive</span>
-                        )}
-                      </h3>
-                      <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                        {kb.documents?.length || 0} Documents
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-blue-600" onClick={() => handleManageDocs(kb)} title={t('manageKnowledgeDocuments')}>
-                      <FileText className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-green-600" onClick={() => handleReindexKb(kb.id)} disabled={reindexingKbId === kb.id} title={t('reindexKnowledgeBase')}>
-                      {reindexingKbId === kb.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-muted-foreground" onClick={() => handleEditKb(kb)} title={t('editKnowledgeBase')}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50" onClick={() => handleDeleteKb(kb.id)} title={t('deleteKnowledgeBase')}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Model</span>
-                    <span className="font-medium text-foreground/80 truncate max-w-[150px]" title={kb.embedding_model || 'Default'}>
-                      {kb.embedding_model ? kb.embedding_model.substring(0, 15) + (kb.embedding_model.length > 15 ? '...' : '') : 'Default'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Chunking</span>
-                    <span className="font-medium text-foreground/80">
-                      {kb.chunk_size} / {kb.chunk_overlap}
-                    </span>
-                  </div>
-                  {kb.description && (
-                    <p className="text-xs text-muted-foreground mt-3 line-clamp-2" title={kb.description}>
-                      {kb.description}
-                    </p>
-                  )}
-                </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext 
+              items={knowledgeBases.map(kb => kb.id)}
+              strategy={rectSortingStrategy}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {knowledgeBases.map((kb) => (
+                  <SortableKbCard key={kb.id} kb={kb} />
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
         )}
       </div>
 
