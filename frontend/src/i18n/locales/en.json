@@ -369,5 +369,9 @@
   "moreGroup": "More",
   "knowledgeBases": "Knowledge Bases",
   "voiceSettings": "Voice Input Settings",
+  "enableVoiceInput": "Enable Voice Input",
+  "voiceSettingsDisabledHint": "Enable voice input first, then configure server URL",
+  "voiceInputDisabledHint": "Please enable voice input first",
+  "voiceInputNotEnabled": "Voice input is disabled. Enable it from profile menu -> More -> Voice Input Settings first.",
   "embeddingModels": "Embedding Models"
 }

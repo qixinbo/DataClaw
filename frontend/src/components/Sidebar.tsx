@@ -12,6 +12,7 @@ import { api } from "@/lib/api";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 
 interface SessionInfo {
   key: string;
@@ -377,6 +378,7 @@ function SidebarBody() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [voiceSettingsOpen, setVoiceSettingsOpen] = useState(false);
+  const [voiceEnabledDraft, setVoiceEnabledDraft] = useState(false);
   const [showKnowledgeSubmenu, setShowKnowledgeSubmenu] = useState(false);
   const [showMoreSubmenu, setShowMoreSubmenu] = useState(false);
   const [whisperUrlDraft, setWhisperUrlDraft] = useState("");
@@ -453,7 +455,9 @@ function SidebarBody() {
   };
 
   const openVoiceSettings = () => {
+    const enabled = localStorage.getItem("whisper_enabled") === "true";
     const saved = (localStorage.getItem("whisper_url") || "").trim();
+    setVoiceEnabledDraft(enabled);
     setWhisperUrlDraft(saved);
     setVoiceTestStatus(null);
     setVoiceTestMessage("");
@@ -461,6 +465,11 @@ function SidebarBody() {
   };
 
   const handleSaveVoiceSettings = () => {
+    localStorage.setItem("whisper_enabled", String(voiceEnabledDraft));
+    if (!voiceEnabledDraft) {
+      setVoiceSettingsOpen(false);
+      return;
+    }
     const normalized = whisperUrlDraft.trim();
     if (!normalized) {
       alert(t('voiceServerRequired', '请填写语音识别服务地址'));
@@ -471,6 +480,10 @@ function SidebarBody() {
   };
 
   const handleTestVoiceConnection = async () => {
+    if (!voiceEnabledDraft) {
+      alert(t('voiceInputDisabledHint', '请先开启语音输入'));
+      return;
+    }
     const normalized = whisperUrlDraft.trim();
     if (!normalized) {
       alert(t('voiceServerRequired', '请填写语音识别服务地址'));
@@ -828,13 +841,20 @@ function SidebarBody() {
             <DialogTitle>{t('voiceSettings', '语音输入配置')}</DialogTitle>
           </DialogHeader>
           <div className="py-4 space-y-3">
+            <div className="flex items-center justify-between rounded-md border border-border p-3">
+              <span className="text-sm text-foreground">{t('enableVoiceInput', '启用语音输入')}</span>
+              <Switch checked={voiceEnabledDraft} onCheckedChange={setVoiceEnabledDraft} />
+            </div>
             <Input
               value={whisperUrlDraft}
               onChange={(e) => setWhisperUrlDraft(e.target.value)}
               placeholder="http://localhost:8001"
+              disabled={!voiceEnabledDraft}
             />
             <p className="text-xs text-muted-foreground">
-              {t('voiceSettingsHint', '请输入语音识别服务地址，例如：http://localhost:8001')}
+              {voiceEnabledDraft
+                ? t('voiceSettingsHint', '请输入语音识别服务地址，例如：http://localhost:8001')
+                : t('voiceSettingsDisabledHint', '请先开启语音输入，再配置服务地址')}
             </p>
             {voiceTestStatus && (
               <div className={`flex items-center gap-2 text-xs ${voiceTestStatus === "success" ? "text-emerald-600" : "text-red-600"}`}>

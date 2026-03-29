@@ -369,5 +369,9 @@
   "moreGroup": "更多",
   "knowledgeBases": "知识库管理",
   "voiceSettings": "语音输入配置",
+  "enableVoiceInput": "启用语音输入",
+  "voiceSettingsDisabledHint": "请先开启语音输入，再配置服务地址",
+  "voiceInputDisabledHint": "请先开启语音输入",
+  "voiceInputNotEnabled": "语音输入未开启，请先到左下角用户名 -> 更多 -> 语音输入配置中开启",
   "embeddingModels": "Embedding 模型"
 }

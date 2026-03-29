@@ -388,9 +388,14 @@ export function ChatInterface() {
 
   const startRecording = async () => {
     try {
+      const voiceEnabled = localStorage.getItem("whisper_enabled") === "true";
+      if (!voiceEnabled) {
+        alert(t('voiceInputNotEnabled', '语音输入未开启，请先到左下角用户名 -> 更多 -> 语音输入配置中开启'));
+        return;
+      }
       const configuredWhisperUrl = (localStorage.getItem("whisper_url") || "").trim();
       if (!configuredWhisperUrl) {
-        alert(t('voiceServerNotConfigured', '请先配置语音识别服务地址：点击左下角用户名 -> 语音输入配置'));
+        alert(t('voiceServerNotConfigured', '请先配置语音识别服务地址：点击左下角用户名 -> 更多 -> 语音输入配置'));
         return;
       }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
