@@ -403,13 +403,14 @@ export function KnowledgeBases() {
   };
 
   const selectedKnowledgeBase = knowledgeBases.find((item) => item.id === selectedKnowledgeBaseId) || null;
+  const selectedEmbeddingModel = embeddingModels.find(m => m.id === knowledgeBaseForm.embedding_model);
 
   return (
     <div className="flex-1 flex flex-col h-full bg-muted/50/30 overflow-hidden">
       <div className="h-14 px-6 flex items-center justify-between border-b border-border bg-background">
         <div className="flex items-center gap-2 text-foreground/80 font-medium">
           <Database className="h-5 w-5 text-indigo-500" />
-          {t('knowledgeBaseManagement', 'Knowledge Base Management')}
+          {t('knowledgeBases')}
         </div>
       </div>
 
@@ -464,7 +465,11 @@ export function KnowledgeBases() {
                     disabled={!currentProject}
                   >
                     <SelectTrigger id="knowledge-base-embedding-model">
-                      <SelectValue placeholder={t('knowledgeBaseEmbeddingModelPlaceholder', 'Select an embedding model')} />
+                      <SelectValue placeholder={t('knowledgeBaseEmbeddingModelPlaceholder')}>
+                        {selectedEmbeddingModel 
+                          ? `${selectedEmbeddingModel.name || selectedEmbeddingModel.model} (${selectedEmbeddingModel.provider})`
+                          : knowledgeBaseForm.embedding_model || undefined}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {embeddingModels.map((model) => (

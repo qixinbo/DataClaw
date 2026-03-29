@@ -173,7 +173,7 @@
   "knowledgeBaseNamePlaceholder": "Enter knowledge base name",
   "knowledgeBaseDescriptionPlaceholder": "Enter knowledge base description (optional)",
   "knowledgeBaseEmbeddingModel": "Embedding Model",
-  "knowledgeBaseEmbeddingModelPlaceholder": "e.g. text-embedding-3-large",
+  "knowledgeBaseEmbeddingModelPlaceholder": "Select an embedding model",
   "knowledgeBaseChunkSize": "Chunk Size",
   "knowledgeBaseChunkOverlap": "Chunk Overlap",
   "knowledgeBaseTopK": "Top K",
@@ -364,5 +364,8 @@
   "selectModel": "Select a model",
   "noSubagents": "No subagents configured",
   "confirmDeleteSubagent": "Are you sure you want to delete this subagent?",
-  "selectProjectToManageSubagents": "Please select a project to manage subagents"
+  "selectProjectToManageSubagents": "Please select a project to manage subagents",
+  "knowledgeBases": "Knowledge Bases",
+  "voiceSettings": "Voice Input Settings",
+  "embeddingModels": "Embedding Models"
 }

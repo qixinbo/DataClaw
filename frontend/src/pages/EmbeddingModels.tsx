@@ -154,7 +154,7 @@ export function EmbeddingModels() {
     <div className="flex-1 flex flex-col h-full bg-muted/50/30 overflow-hidden">
       <div className="h-14 px-6 flex items-center justify-between border-b border-border bg-background">
         <div className="flex items-center gap-2 text-foreground/80 font-medium">
-          <Brain className="h-5 w-5 text-indigo-500" />{t('embeddingModelConfig', 'Embedding Model Configuration')}</div>
+          <Brain className="h-5 w-5 text-indigo-500" />{t('embeddingModels')}</div>
         <div className="flex items-center gap-3">
           <div className="relative">
             <Search className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />

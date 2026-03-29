@@ -186,7 +186,7 @@
   "knowledgeBaseNamePlaceholder": "请输入知识库名称",
   "knowledgeBaseDescriptionPlaceholder": "请输入知识库描述（可选）",
   "knowledgeBaseEmbeddingModel": "Embedding 模型",
-  "knowledgeBaseEmbeddingModelPlaceholder": "例如：text-embedding-3-large",
+  "knowledgeBaseEmbeddingModelPlaceholder": "请选择一个嵌入模型",
   "knowledgeBaseChunkSize": "Chunk Size",
   "knowledgeBaseChunkOverlap": "Chunk Overlap",
   "knowledgeBaseTopK": "Top K",
@@ -364,5 +364,8 @@
   "systemInstructionsPlaceholder": "你是一个有用的 AI 助手...",
   "noSubagents": "暂无配置的子智能体",
   "confirmDeleteSubagent": "确定要删除这个子智能体吗？",
-  "selectProjectToManageSubagents": "请先选择一个项目以管理其子智能体"
+  "selectProjectToManageSubagents": "请先选择一个项目以管理其子智能体",
+  "knowledgeBases": "知识库管理",
+  "voiceSettings": "语音输入配置",
+  "embeddingModels": "Embedding 模型"
 }

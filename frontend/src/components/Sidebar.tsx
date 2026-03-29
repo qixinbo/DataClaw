@@ -927,7 +927,7 @@ function SidebarBody() {
               }}
             >
               <Database className="h-4 w-4 text-muted-foreground" />
-              {t('knowledgeBaseManagement', 'Knowledge Bases')}
+              {t('knowledgeBases')}
             </button>
 
             <button 
@@ -949,7 +949,7 @@ function SidebarBody() {
               }}
             >
               <Mic className="h-4 w-4 text-muted-foreground" />
-              {t('voiceSettings', '语音输入配置')}
+              {t('voiceSettings')}
             </button>
 
             {user?.is_admin && (
@@ -973,7 +973,7 @@ function SidebarBody() {
                   }}
                 >
                   <Brain className="h-4 w-4 text-muted-foreground" />
-                  {t('embeddingModelConfig', 'Embedding Models')}
+                  {t('embeddingModels')}
                 </button>
                 
                 <button 
