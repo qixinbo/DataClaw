@@ -415,11 +415,6 @@ async def nanobot_chat(request: ChatRequest):
         elif request.route_mode == "chat":
             instructions.append("Normal chat mode. Do NOT use the nl2sql tool")
 
-        # Inject instructions for selected skills
-        if request.skill_ids:
-            skill_list = ", ".join(request.skill_ids)
-            instructions.append(f"You must prioritize using the following skills/tools to answer the user's request: {skill_list}")
-            
         if instructions:
             instr_block = "\n".join(instructions)
             # If message already has Runtime Context, append to it, otherwise create new
@@ -515,11 +510,6 @@ async def nanobot_chat_stream(request: ChatRequest):
             elif request.route_mode == "chat":
                 instructions.append("Normal chat mode. Do NOT use the nl2sql tool")
 
-            # Inject instructions for selected skills
-            if request.skill_ids:
-                skill_list = ", ".join(request.skill_ids)
-                instructions.append(f"You must prioritize using the following skills/tools to answer the user's request: {skill_list}")
-                
             if instructions:
                 instr_block = "\n".join(instructions)
                 # If message already has Runtime Context, append to it, otherwise create new

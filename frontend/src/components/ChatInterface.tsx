@@ -220,9 +220,7 @@ export function ChatInterface() {
   const [input, setInput] = useState("");
   const [selectedDataSource, setSelectedDataSource] = useState<string>("");
   const [selectedKnowledgeBaseId, setSelectedKnowledgeBaseId] = useState<string>("");
-  const [availableSkills, setAvailableSkills] = useState<Skill[]>([]);
   const [availableKnowledgeBases, setAvailableKnowledgeBases] = useState<KnowledgeBaseOption[]>([]);
-  const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [artifactPreview, setArtifactPreview] = useState<ArtifactPreviewTarget | null>(null);
   const [collapsedThinkingByMessage, setCollapsedThinkingByMessage] = useState<Record<string, boolean>>({});
@@ -235,10 +233,12 @@ export function ChatInterface() {
   const [slashQuery, setSlashQuery] = useState<string | null>(null);
   const [slashIndex, setSlashIndex] = useState(0);
 
+  const [availableSkills, setAvailableSkills] = useState<Skill[]>([]);
+  const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
   const filteredSlashSkills = slashQuery !== null 
     ? availableSkills.filter(s => s.name.toLowerCase().includes(slashQuery.toLowerCase()))
     : [];
-  
+
   const handleSelectSlashSkill = (skill: Skill) => {
     if (!selectedSkillIds.includes(skill.id)) {
       setSelectedSkillIds(prev => [...prev, skill.id]);
@@ -747,7 +747,7 @@ export function ChatInterface() {
   };
 
   const renderActiveSelections = () => {
-    if (!selectedDataSource && !selectedKnowledgeBaseId && selectedSkills.length === 0) return null;
+    if (!selectedDataSource && !selectedKnowledgeBaseId) return null;
     return (
       <div className="px-2 pt-2">
         <div className="flex flex-wrap gap-2">
@@ -1169,47 +1169,9 @@ export function ChatInterface() {
                           </PopoverTrigger>
                           <PopoverContent side="bottom" align="start" className="w-[480px] p-0 mt-2 overflow-hidden rounded-2xl border-border shadow-xl">
                             <div className="flex divide-x divide-zinc-100">
-                              {/* Left Column: Data Source */}
-                              <div className="flex-1 p-3 bg-muted/50/50">
-                                <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
-                                  <Database className="h-3 w-3" />
-                                  {t('dataSource')}
-                                </div>
-                                <div className="space-y-0.5">
-                                  {availableDataSources.map((ds) => (
-                                    <button
-                                      key={ds.id}
-                                      onClick={() => {
-                                        void handleSelectDataSource(ds.id);
-                                      }}
-                                      className={cn(
-                                        "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
-                                        selectedDataSource === ds.id 
-                                          ? "bg-background text-foreground shadow-sm ring-1 ring-border" 
-                                          : "text-muted-foreground hover:bg-background hover:shadow-sm"
-                                      )}
-                                    >
-                                      <div className="flex items-center gap-2.5">
-                                        <Database className={cn("h-4 w-4", selectedDataSource === ds.id ? "text-blue-500" : "text-muted-foreground")} />
-                                        <span className="font-medium">{ds.name}</span>
-                                      </div>
-                                      {selectedDataSource === ds.id && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
-                                    </button>
-                                  ))}
-                                  {selectedDataSource && (
-                                    <div className="mt-2 pt-2 border-t border-border">
-                                      <button
-                                        onClick={() => {
-                                          void handleClearDataSource();
-                                        }}
-                                        className="w-full py-1.5 text-[11px] text-muted-foreground hover:text-muted-foreground transition-colors flex items-center justify-center gap-1"
-                                      >
-                                        {t('clearSelected')}
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="mt-3 pt-3 border-t border-border">
+                              {/* Left Column: Knowledge Base */}
+                              <div className="flex-1 p-3 bg-muted/50/50 flex flex-col gap-4 border-r border-border/50">
+                                <div>
                                   <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
                                     <Database className="h-3 w-3" />
                                     {t('knowledgeBase')}
@@ -1237,8 +1199,9 @@ export function ChatInterface() {
                                         </button>
                                       ))
                                     ) : (
-                                      <div className="px-3 py-3 text-xs text-muted-foreground">
-                                        {t('noKnowledgeBases')}
+                                      <div className="px-3 py-4 text-center">
+                                        <Database className="h-6 w-6 text-zinc-200 mx-auto mb-1" />
+                                        <p className="text-[11px] text-muted-foreground">{t('noKnowledgeBases')}</p>
                                       </div>
                                     )}
                                     {selectedKnowledgeBaseId ? (
@@ -1257,57 +1220,55 @@ export function ChatInterface() {
                                 </div>
                               </div>
 
-                              {/* Right Column: Skills */}
-                              <div className="flex-1 p-3 bg-background">
-                                <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
-                                  <Wand2 className="h-3 w-3" />
-                                  Skills
-                                </div>
-                                <div className="space-y-0.5 max-h-[300px] overflow-y-auto pr-1">
-                                  {availableSkills.length > 0 ? (
-                                    availableSkills.map((skill) => {
-                                      const isSelected = selectedSkillIds.includes(skill.id);
-                                      return (
+                              {/* Right Column: Data Source */}
+                              <div className="flex-1 p-3 bg-muted/50/50 flex flex-col gap-4">
+                                <div>
+                                  <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
+                                    <Database className="h-3 w-3" />
+                                    {t('dataSource')}
+                                  </div>
+                                  <div className="space-y-0.5">
+                                    {availableDataSources.length > 0 ? (
+                                      availableDataSources.map((ds) => (
                                         <button
-                                          key={skill.id}
+                                          key={ds.id}
                                           onClick={() => {
-                                            setSelectedSkillIds((prev) =>
-                                              isSelected
-                                                ? prev.filter((id) => id !== skill.id)
-                                                : [...prev, skill.id]
-                                            );
+                                            void handleSelectDataSource(ds.id);
                                           }}
                                           className={cn(
                                             "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
-                                            isSelected 
+                                            selectedDataSource === ds.id 
                                               ? "bg-background text-foreground shadow-sm ring-1 ring-border" 
                                               : "text-muted-foreground hover:bg-background hover:shadow-sm"
                                           )}
                                         >
-                                          <div className="flex items-center text-left">
-                                            <span className="font-medium">{skill.name}</span>
+                                          <div className="flex items-center gap-2.5">
+                                            <Database className={cn("h-4 w-4", selectedDataSource === ds.id ? "text-blue-500" : "text-muted-foreground")} />
+                                            <span className="font-medium">{ds.name}</span>
                                           </div>
-                                          {isSelected && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
+                                          {selectedDataSource === ds.id && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
                                         </button>
-                                      );
-                                    })
-                                  ) : (
-                                    <div className="px-3 py-8 text-center">
-                                      <Zap className="h-8 w-8 text-zinc-100 mx-auto mb-2" />
-                                      <p className="text-xs text-muted-foreground">{t('noAvailableSkills')}</p>
-                                    </div>
-                                  )}
-                                </div>
-                                {selectedSkillIds.length > 0 && (
-                                  <div className="mt-2 pt-2 border-t border-border">
-                                    <button 
-                                      onClick={() => setSelectedSkillIds([])}
-                                      className="w-full py-1.5 text-[11px] text-muted-foreground hover:text-muted-foreground transition-colors flex items-center justify-center gap-1"
-                                    >
-                                      {t('clearSelectedWithCount', { count: selectedSkillIds.length })}
-                                    </button>
+                                      ))
+                                    ) : (
+                                      <div className="px-3 py-4 text-center">
+                                        <Database className="h-6 w-6 text-zinc-200 mx-auto mb-1" />
+                                        <p className="text-[11px] text-muted-foreground">{t('noDataSources')}</p>
+                                      </div>
+                                    )}
+                                    {selectedDataSource && (
+                                      <div className="mt-2 pt-2 border-t border-border">
+                                        <button
+                                          onClick={() => {
+                                            void handleClearDataSource();
+                                          }}
+                                          className="w-full py-1.5 text-[11px] text-muted-foreground hover:text-muted-foreground transition-colors flex items-center justify-center gap-1"
+                                        >
+                                          {t('clearSelected')}
+                                        </button>
+                                      </div>
+                                    )}
                                   </div>
-                                )}
+                                </div>
                               </div>
                             </div>
                           </PopoverContent>

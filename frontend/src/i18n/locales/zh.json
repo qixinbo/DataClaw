@@ -251,6 +251,7 @@
   "knowledgeBaseReindexFailed": "知识库重建索引失败",
   "selectProjectBeforeManageKnowledgeBase": "请先选择一个项目，再进行知识库管理",
   "noKnowledgeBases": "当前项目暂无知识库，请先在设置中创建",
+  "noDataSources": "当前项目暂无数据源，请先在设置中创建",
   "confirmDeleteUser": "确认删除该用户吗？",
   "newUserMustHavePassword": "新建用户必须填写密码",
   "anErrorOccurred": "发生错误",
