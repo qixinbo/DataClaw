@@ -16,6 +16,7 @@
 ## 🌟 核心特性
 
 - **🗣️ 自然语言转 SQL**: 用大白话提问！它能理解你的数据表结构，生成准确的 SQL，甚至在报错时进行自我纠正 (Self-correction)。
+- **📚 智能知识库检索 (RAG)**: 支持上传 Word、PPT、PDF 等多种格式文档，通过向量检索增强回答，让你的私有文档“开口说话”。
 - **📈 即时数据可视化**: 拒绝枯燥的生肉表格，根据数据特征自动生成交互式图表。
 - **🗂️ 动态多数据源**: 无缝连接 PostgreSQL、Supabase，以及本地 CSV/Excel 文件上传解析。
 - **🧠 灵活的模型接入**: 原生集成 LiteLLM，支持随插随用 OpenAI、DeepSeek、智谱、通义千问 (DashScope)、火山引擎或任何兼容的 LLM 提供商。
@@ -27,17 +28,21 @@
 
 ## 📸 界面预览
 
-<div align="center">
-  <h3>对话式分析界面</h3>
-  <img src="./examples/index.png" width="80%" />
+<div align="left">
+  <h3>💬 对话式分析界面</h3>
+  <img src="./docs/index.png" width="80%" />
   <br />
   <br />
-  <h3>可定制仪表盘</h3>
-  <img src="./examples/dashboard.png" width="80%" />
+  <h3>📊 可定制仪表盘</h3>
+  <img src="./docs/dashboard.png" width="80%" />
   <br />
   <br />
-  <h3>智能产物预览 (Artifact)</h3>
-  <img src="./examples/artifact.png" width="80%" />
+  <h3>📚 智能知识库问答</h3>
+  <img src="./docs/kb.png" width="80%" />
+  <br />
+  <br />
+  <h3>📦 智能产物预览 (Artifact)</h3>
+  <img src="./docs/artifact.png" width="80%" />
 </div>
 
 <br />

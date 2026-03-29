@@ -328,7 +328,20 @@ export function ChatInterface() {
   // Model selection state
   const [models, setModels] = useState<ModelConfig[]>([]);
   const [selectedModelId, setSelectedModelId] = useState<string>("");
-  const [modelOpen, setModelOpen] = useState(false);
+
+  // Listen for model changes from the ProjectSwitcher
+  useEffect(() => {
+    const handleModelChange = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      if (customEvent.detail) {
+        setSelectedModelId(customEvent.detail);
+      }
+    };
+    window.addEventListener('nanobot:model-changed', handleModelChange);
+    return () => {
+      window.removeEventListener('nanobot:model-changed', handleModelChange);
+    };
+  }, []);
   
   // Data Source selection state
   const [availableDataSources, setAvailableDataSources] = useState<{id: string, name: string}[]>([]);
@@ -1120,49 +1133,6 @@ export function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full bg-background relative">
-      {/* Header with Model Selection */}
-      <div className="px-4 py-3 flex items-center justify-between border-b border-border bg-background/50 backdrop-blur-md sticky top-0 z-20">
-        <Popover open={modelOpen} onOpenChange={setModelOpen}>
-          <PopoverTrigger className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-muted transition-colors group">
-            <span className="font-semibold text-foreground">
-              {selectedModelId ? models.find(m => m.id === selectedModelId)?.name || 'DataClaw' : 'DataClaw'}
-            </span>
-            <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-muted-foreground transition-colors" />
-          </PopoverTrigger>
-          <PopoverContent className="w-[280px] p-0" align="start">
-            <Command>
-              <CommandInput placeholder={t('searchModel')} />
-              <CommandList className="max-h-[300px]">
-                <CommandEmpty>{t('modelNotFound')}</CommandEmpty>
-                <CommandGroup heading={t('availableModels')}>
-                  {models.map((model) => (
-                    <CommandItem
-                      key={model.id}
-                      onSelect={() => {
-                        setSelectedModelId(model.id);
-                        setModelOpen(false);
-                      }}
-                      className="flex items-center gap-2 py-2.5 cursor-pointer"
-                    >
-                      <div className="flex flex-col">
-                        <span className="font-medium text-foreground">{model.name || model.model}</span>
-                        <span className="text-xs text-muted-foreground">{model.provider}</span>
-                      </div>
-                      <Check
-                        className={cn(
-                          "ml-auto h-4 w-4",
-                          selectedModelId === model.id ? "opacity-100" : "opacity-0"
-                        )}
-                      />
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-      </div>
-
       <ScrollArea className="flex-1 min-h-0">
         {/* Hidden file input available in all states */}
         <input

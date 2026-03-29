@@ -16,6 +16,7 @@ Whether you're querying a massive Supabase/PostgreSQL database or just tossing i
 ## 🌟 Key Features
 
 - **🗣️ Chat to SQL**: Ask questions in plain English (or Chinese!). DataClaw understands your schema, generates accurate SQL, and self-corrects if things go sideways.
+- **📚 Smart Knowledge Base (RAG)**: Support uploading Word, PPT, PDF and other document formats. Enhance answers through vector retrieval, making your private documents "speak".
 - **📈 Instant Visualizations**: Returns not just raw tables, but auto-generated interactive charts tailored to your data's shape.
 - **🗂️ Multi-Source Ready**: Connects seamlessly to PostgreSQL, Supabase, and local CSV/Excel uploads.
 - **🧠 Bring Your Own LLM**: Native integration with LiteLLM. Plug in OpenAI, DeepSeek, Zhipu, DashScope, Volcengine, or any compatible provider.
@@ -27,17 +28,21 @@ Whether you're querying a massive Supabase/PostgreSQL database or just tossing i
 
 ## 📸 Screenshots
 
-<div align="center">
-  <h3>Chat Interface</h3>
-  <img src="./examples/index.png" width="80%" />
+<div align="left">
+  <h3>💬 Chat Interface</h3>
+  <img src="./docs/index.png" width="80%" />
   <br />
   <br />
-  <h3>Customizable Dashboard</h3>
-  <img src="./examples/dashboard.png" width="80%" />
+  <h3>📊 Customizable Dashboard</h3>
+  <img src="./docs/dashboard.png" width="80%" />
   <br />
   <br />
-  <h3>Artifact Preview</h3>
-  <img src="./examples/artifact.png" width="80%" />
+  <h3>📚 Smart Knowledge Base</h3>
+  <img src="./docs/kb.png" width="80%" />
+  <br />
+  <br />
+  <h3>📦 Artifact Preview</h3>
+  <img src="./docs/artifact.png" width="80%" />
 </div>
 
 <br />

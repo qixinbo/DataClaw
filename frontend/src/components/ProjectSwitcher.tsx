@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, Plus, Folder } from 'lucide-react';
+import { ChevronDown, Plus, Folder, Check } from 'lucide-react';
 import { useProjectStore } from '@/store/projectStore';
+import { useTranslation } from "react-i18next";
+import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,16 +17,50 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+
+interface ModelConfig {
+  id: string;
+  name: string;
+  model: string;
+  provider: string;
+  is_active: boolean;
+}
 
 export function ProjectSwitcher() {
+  const { t } = useTranslation();
   const { projects, currentProject, fetchProjects, setCurrentProject, addProject } = useProjectStore();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Model Selection State
+  const [models, setModels] = useState<ModelConfig[]>([]);
+  const [selectedModelId, setSelectedModelId] = useState<string>("");
+  const [modelOpen, setModelOpen] = useState(false);
+
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
+
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const data = await api.get<ModelConfig[]>("/api/v1/llm");
+        setModels(data);
+        const active = data.find(m => m.is_active);
+        if (active) {
+          setSelectedModelId(active.id);
+        } else if (data.length > 0) {
+          setSelectedModelId(data[0].id);
+        }
+      } catch (e) {
+        console.error("Failed to fetch models", e);
+      }
+    };
+    fetchModels();
+  }, []);
 
   const handleCreateProject = async () => {
     if (!newProjectName.trim()) return;
@@ -87,6 +124,50 @@ export function ProjectSwitcher() {
           </div>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <div className="h-4 w-px bg-border mx-1" />
+
+      <Popover open={modelOpen} onOpenChange={setModelOpen}>
+        <PopoverTrigger className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors group">
+          <span className="font-semibold text-[14px]">
+            {selectedModelId ? (models.find(m => m.id === selectedModelId)?.name || models.find(m => m.id === selectedModelId)?.model || 'DataClaw') : 'DataClaw'}
+          </span>
+          <ChevronDown className="h-4 w-4 opacity-50 group-hover:opacity-100 transition-colors" />
+        </PopoverTrigger>
+        <PopoverContent className="w-[280px] p-0" align="start">
+          <Command>
+            <CommandInput placeholder={t('searchModel')} />
+            <CommandList className="max-h-[300px]">
+              <CommandEmpty>{t('modelNotFound')}</CommandEmpty>
+              <CommandGroup heading={t('availableModels')}>
+                {models.map((model) => (
+                  <CommandItem
+                    key={model.id}
+                    onSelect={() => {
+                      setSelectedModelId(model.id);
+                      setModelOpen(false);
+                      // Fire custom event to notify ChatInterface if needed
+                      window.dispatchEvent(new CustomEvent("nanobot:model-changed", { detail: model.id }));
+                    }}
+                    className="flex items-center gap-2 py-2.5 cursor-pointer"
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-medium text-foreground">{model.name || model.model}</span>
+                      <span className="text-xs text-muted-foreground">{model.provider}</span>
+                    </div>
+                    <Check
+                      className={cn(
+                        "ml-auto h-4 w-4",
+                        selectedModelId === model.id ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
 
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent>
