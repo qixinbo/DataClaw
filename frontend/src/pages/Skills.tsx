@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Trash2, Terminal, Loader2, FolderOpen, Eye, ShieldCheck, AlertCircle, Wand2, Upload, Plus } from "lucide-react";
+import { Trash2, Terminal, Loader2, FolderOpen, Eye, ShieldCheck, AlertCircle, Wand2, Upload, Plus, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api";
 import { useProjectStore } from "@/store/projectStore";
+import { useMcpHealthStore } from "@/store/mcpHealthStore";
 import { useRef } from 'react';
 
 interface Skill {
@@ -69,8 +70,10 @@ export function Skills() {
   const [mcpArgsStr, setMcpArgsStr] = useState('');
   const [mcpEnvStr, setMcpEnvStr] = useState('');
   const [mcpHeadersStr, setMcpHeadersStr] = useState('');
+  const [isRefreshingMcpHealth, setIsRefreshingMcpHealth] = useState(false);
 
   const { currentProject } = useProjectStore();
+  const { hasMcpError, refresh: refreshMcpHealth } = useMcpHealthStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -101,13 +104,14 @@ export function Skills() {
     };
 
     if (currentProject) {
+      void refreshMcpHealth(currentProject.id);
       if (activeTab === 'skills') {
-        fetchSkills();
+        void fetchSkills();
       } else {
-        fetchMcpServers();
+        void fetchMcpServers();
       }
     }
-  }, [currentProject, activeTab]);
+  }, [currentProject?.id, activeTab, refreshMcpHealth]);
 
   const fetchSkills = async () => {
     if (!currentProject) return;
@@ -128,10 +132,24 @@ export function Skills() {
     try {
         const data = await api.get<MCPServer[]>(`/api/v1/mcp?project_id=${currentProject.id}`);
         setMcpServers(data);
+        void refreshMcpHealth(currentProject.id);
     } catch (error) {
         console.error("Failed to fetch MCP servers", error);
     } finally {
         setIsMcpLoading(false);
+    }
+  };
+
+  const handleRefreshMcpHealth = async () => {
+    if (!currentProject) return;
+    setIsRefreshingMcpHealth(true);
+    try {
+      await refreshMcpHealth(currentProject.id);
+      if (activeTab === 'mcp') {
+        await fetchMcpServers();
+      }
+    } finally {
+      setIsRefreshingMcpHealth(false);
     }
   };
 
@@ -300,10 +318,13 @@ export function Skills() {
               {t('skills')}
             </button>
             <button 
-              className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${activeTab === 'mcp' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground/80'}`}
+              className={`relative px-3 py-1 text-sm font-medium rounded-md transition-colors ${activeTab === 'mcp' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground/80'}`}
               onClick={() => setActiveTab('mcp')}
             >
               {t('mcpConfig')}
+              {hasMcpError && (
+                <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" title="MCP Server Error" />
+              )}
             </button>
           </div>
           {activeTab === 'skills' ? (
@@ -323,12 +344,27 @@ export function Skills() {
               </Button>
             </>
           ) : (
-            <Button 
-              className="h-9 bg-[#ff4d29] hover:bg-[#ff4d29]/90 text-white gap-2 rounded-md px-3"
-              onClick={() => setIsMcpDialogOpen(true)}
-            >
-              <Plus className="h-4 w-4" />{t('addMcpServer')}
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                className="h-9 gap-2 rounded-md px-3"
+                onClick={handleRefreshMcpHealth}
+                disabled={isRefreshingMcpHealth}
+              >
+                {isRefreshingMcpHealth ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                {t('refresh')}
+              </Button>
+              <Button 
+                className="h-9 bg-[#ff4d29] hover:bg-[#ff4d29]/90 text-white gap-2 rounded-md px-3"
+                onClick={() => setIsMcpDialogOpen(true)}
+              >
+                <Plus className="h-4 w-4" />{t('addMcpServer')}
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -483,14 +519,18 @@ export function Skills() {
                           <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] md:text-xs font-medium whitespace-nowrap ${
                             mcp.status === 'connected' 
                             ? 'bg-green-50 text-green-700 border border-green-100' 
+                            : mcp.status.startsWith('error')
+                            ? 'bg-red-50 text-red-700 border border-red-100'
                             : 'bg-muted/50 text-foreground/80 border border-border'
-                          }`}>
+                          }`}
+                          title={mcp.status}
+                          >
                             {mcp.status === 'connected' ? (
                               <ShieldCheck className="h-3 w-3" />
                             ) : (
                               <AlertCircle className="h-3 w-3" />
                             )}
-                            {mcp.status}
+                            <span className="truncate max-w-[150px]">{mcp.status}</span>
                           </div>
                         </TableCell>
                         <TableCell className="py-4 px-4 text-right">

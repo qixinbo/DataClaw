@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/store/authStore";
 import { useProjectStore } from "@/store/projectStore";
 import { useDashboardStore } from "@/store/dashboardStore";
+import { useMcpHealthStore } from "@/store/mcpHealthStore";
 import { api } from "@/lib/api";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -406,11 +407,20 @@ function SidebarBody() {
   const queryParams = new URLSearchParams(location.search);
   const activeSessionKey = queryParams.get("session") || "api:default";
 
+  const { hasMcpError, startPolling, stopPolling } = useMcpHealthStore();
+
   useEffect(() => {
     if (currentProject) {
       loadDashboards(currentProject.id);
     }
   }, [currentProject, loadDashboards]);
+
+  useEffect(() => {
+    startPolling(currentProject?.id ?? null);
+    return () => {
+      stopPolling();
+    };
+  }, [currentProject?.id, startPolling, stopPolling]);
 
   const fetchSessions = async () => {
     try {
@@ -898,11 +908,14 @@ function SidebarBody() {
           </button>
           
           <button 
-            className="flex items-center gap-1.5 text-sm hover:text-foreground transition-colors px-2 py-1.5 rounded-md hover:bg-muted"
+            className="flex items-center gap-1.5 text-sm hover:text-foreground transition-colors px-2 py-1.5 rounded-md hover:bg-muted relative"
             onClick={() => navigate("/skills")}
           >
             <Wand2 className="h-4 w-4" />
             {t('skillCenter')}
+            {hasMcpError && (
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-background animate-pulse" title="MCP Server Error" />
+            )}
           </button>
         </div>
 
