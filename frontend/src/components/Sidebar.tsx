@@ -885,8 +885,12 @@ function SidebarBody() {
               }
             }}
           >
-            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 border border-indigo-200 shadow-sm">
-              <User className="h-4.5 w-4.5" />
+            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 border border-indigo-200 shadow-sm overflow-hidden">
+              {user?.avatar ? (
+                <img src={user.avatar} alt="avatar" className="w-full h-full object-cover" />
+              ) : (
+                <User className="h-4.5 w-4.5" />
+              )}
             </div>
             <div className="text-sm font-medium truncate max-w-[100px] text-left">
               {user?.username || t('defaultUser')}

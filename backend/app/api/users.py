@@ -49,6 +49,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
             "id": user.id,
             "username": user.username,
             "email": user.email,
+            "avatar": user.avatar,
             "is_admin": user.is_admin
         }
     }
@@ -73,6 +74,7 @@ def register_user(user: UserCreate, background_tasks: BackgroundTasks, db: Sessi
     db_user = User(
         username=user.username,
         email=user.email,
+        avatar=user.avatar,
         hashed_password=hashed_password,
         is_active=is_active,
         is_admin=is_admin
@@ -178,6 +180,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db_user = User(
         username=user.username,
         email=user.email,
+        avatar=user.avatar,
         hashed_password=get_password_hash(user.password),
         is_active=user.is_active,
         is_admin=user.is_admin
