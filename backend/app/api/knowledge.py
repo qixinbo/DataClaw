@@ -50,6 +50,23 @@ def _extract_upload_text(filename: str, content: bytes) -> str:
     if lower.endswith((".xls", ".xlsx")):
         df = pd.read_excel(io.BytesIO(content))
         return df.to_csv(index=False)
+    
+    # 增加对 PDF 的文本提取支持
+    if lower.endswith(".pdf"):
+        try:
+            import PyPDF2
+            pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
+            text = []
+            for page in pdf_reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text.append(page_text)
+            return "\n".join(text)
+        except ImportError:
+            raise ValueError("PyPDF2 is not installed. Cannot parse PDF files.")
+        except Exception as e:
+            raise ValueError(f"Failed to parse PDF: {str(e)}")
+            
     raise ValueError("Unsupported file type")
 
 
@@ -238,8 +255,9 @@ async def upload_knowledge_documents(
         content = await file.read()
         if not content:
             continue
-        if len(content) > 5 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail=f"文件过大: {filename}")
+        # 将大小限制从 5MB 放宽到 15MB，以更好地支持带有图片的 PDF 文件
+        if len(content) > 15 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail=f"文件过大 (超过 15MB): {filename}")
         try:
             text = _extract_upload_text(filename, content)
         except Exception:
