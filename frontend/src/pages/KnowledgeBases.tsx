@@ -406,12 +406,12 @@ export function KnowledgeBases() {
 
   return (
     <div className="h-full flex flex-col bg-background">
-      <div className="border-b border-border px-8 py-5 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">{t('knowledgeBases')}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{t('knowledgeBaseSettingsDesc', 'Manage knowledge bases and their documents')}</p>
+      <div className="h-14 px-6 flex items-center justify-between border-b border-border bg-background">
+        <div className="flex items-center gap-2 text-foreground/80 font-medium">
+          <BookOpen className="h-5 w-5 text-indigo-500" />
+          {t('knowledgeBases')}
         </div>
-        <Button onClick={handleCreateKb} className="bg-indigo-600 hover:bg-indigo-700 text-primary-foreground gap-2" disabled={!currentProject}>
+        <Button onClick={handleCreateKb} className="h-9 bg-[#ff4d29] hover:bg-[#ff4d29]/90 text-white gap-2 rounded-md px-3" disabled={!currentProject}>
           <Plus className="h-4 w-4" />
           {t('createKnowledgeBase', 'New Knowledge Base')}
         </Button>

@@ -366,6 +366,7 @@
   "subagents": "Subagents",
   "subagentManagement": "Subagent Management",
   "manageSubagentsDesc": "Manage subagents for this project",
+  "createSubagent": "New Subagent",
   "addSubagent": "Add Subagent",
   "editSubagent": "Edit Subagent",
   "subagentName": "Subagent Name",

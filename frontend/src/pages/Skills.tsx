@@ -286,53 +286,50 @@ export function Skills() {
 
   return (
     <div className="h-full flex flex-col bg-background overflow-hidden">
-      <div className="border-b border-border px-8 pt-5 pr-24 bg-background shrink-0">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              < Wand2 className="h-6 w-6 text-indigo-500" />{t('skillsRepository')}</h1>
-            <p className="text-sm text-muted-foreground mt-1">{t('manageAiSkillsDesc')}</p>
-          </div>
-          <div className="flex gap-3">
-            {activeTab === 'skills' ? (
-              <>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  accept=".md,.zip,.tar.gz,.tgz"
-                />
-                <Button 
-                  className="bg-indigo-600 hover:bg-indigo-700 text-primary-foreground gap-2"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="h-4 w-4" />{t('uploadSkill')}
-                </Button>
-              </>
-            ) : (
-              <Button 
-                className="bg-indigo-600 hover:bg-indigo-700 text-primary-foreground gap-2"
-                onClick={() => setIsMcpDialogOpen(true)}
-              >
-                <Plus className="h-4 w-4" />{t('addMcpServer')}
-              </Button>
-            )}
-          </div>
+      <div className="h-14 px-6 flex items-center justify-between border-b border-border bg-background">
+        <div className="flex items-center gap-2 text-foreground/80 font-medium">
+          <Wand2 className="h-5 w-5 text-indigo-500" />
+          {t('skillsRepository')}
         </div>
-        <div className="flex gap-6">
-          <button 
-            className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'skills' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-muted-foreground hover:text-foreground/80'}`}
-            onClick={() => setActiveTab('skills')}
-          >
-            {t('skills')}
-          </button>
-          <button 
-            className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'mcp' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-muted-foreground hover:text-foreground/80'}`}
-            onClick={() => setActiveTab('mcp')}
-          >
-            {t('mcpConfig')}
-          </button>
+        <div className="flex items-center gap-3">
+          <div className="flex bg-muted/50 rounded-lg p-1">
+            <button 
+              className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${activeTab === 'skills' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground/80'}`}
+              onClick={() => setActiveTab('skills')}
+            >
+              {t('skills')}
+            </button>
+            <button 
+              className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${activeTab === 'mcp' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground/80'}`}
+              onClick={() => setActiveTab('mcp')}
+            >
+              {t('mcpConfig')}
+            </button>
+          </div>
+          {activeTab === 'skills' ? (
+            <>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                className="hidden"
+                accept=".md,.zip,.tar.gz,.tgz"
+              />
+              <Button 
+                className="h-9 bg-[#ff4d29] hover:bg-[#ff4d29]/90 text-white gap-2 rounded-md px-3"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="h-4 w-4" />{t('uploadSkill')}
+              </Button>
+            </>
+          ) : (
+            <Button 
+              className="h-9 bg-[#ff4d29] hover:bg-[#ff4d29]/90 text-white gap-2 rounded-md px-3"
+              onClick={() => setIsMcpDialogOpen(true)}
+            >
+              <Plus className="h-4 w-4" />{t('addMcpServer')}
+            </Button>
+          )}
         </div>
       </div>
 

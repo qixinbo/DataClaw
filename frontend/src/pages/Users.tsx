@@ -121,7 +121,7 @@ export function Users() {
           {t('userManagement')}
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-8 bg-indigo-600 hover:bg-indigo-700 text-primary-foreground rounded-md px-3" onClick={() => handleOpenDialog()}>
+          <DialogTrigger className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 bg-[#ff4d29] hover:bg-[#ff4d29]/90 text-white rounded-md px-3" onClick={() => handleOpenDialog()}>
             <Plus className="h-4 w-4" />
             {t('addUser')}
           </DialogTrigger>

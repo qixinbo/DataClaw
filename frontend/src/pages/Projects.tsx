@@ -82,8 +82,9 @@ export function Projects() {
         <Button onClick={() => {
           setFormData({ name: '', description: '' });
           setIsCreateDialogOpen(true);
-        }} size="sm" className="gap-2">
-          <Plus className="h-4 w-4" />{t('newProject')}</Button>
+        }} className="h-9 gap-2 bg-[#ff4d29] hover:bg-[#ff4d29]/90 text-white rounded-md px-3">
+          <Plus className="h-4 w-4" />{t('newProject')}
+        </Button>
       </div>
 
       <div className="flex-1 p-6 overflow-auto">

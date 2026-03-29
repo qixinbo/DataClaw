@@ -130,22 +130,20 @@ export function Subagents() {
 
   return (
     <div className="h-full flex flex-col bg-background overflow-hidden">
-      <div className="border-b border-border px-8 pt-5 pb-5 bg-background shrink-0 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Bot className="h-6 w-6 text-indigo-500" />{t('subagentManagement', 'Subagent Management')}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">{t('manageSubagentsDesc', 'Manage subagents for this project')}</p>
+      <div className="h-14 px-6 flex items-center justify-between border-b border-border bg-background shrink-0">
+        <div className="flex items-center gap-2 text-foreground/80 font-medium">
+          <Bot className="h-5 w-5 text-indigo-500" />
+          {t('subagentManagement', 'Subagent Management')}
         </div>
         <Button 
-          className="bg-indigo-600 hover:bg-indigo-700 text-primary-foreground gap-2"
+          className="h-9 bg-[#ff4d29] hover:bg-[#ff4d29]/90 text-white gap-2 rounded-md px-3"
           onClick={() => {
             setEditingSubagent(null);
             setNewSubagent({ name: '', description: '', model: '', instructions: '', status: 'active' });
             setIsDialogOpen(true);
           }}
         >
-          <Plus className="h-4 w-4" />{t('addSubagent', 'Add Subagent')}
+          <Plus className="h-4 w-4" />{t('createSubagent', 'New Subagent')}
         </Button>
       </div>
 

@@ -217,7 +217,7 @@ export function ModelConfigs() {
           <Button variant="outline" size="icon" className="h-8 w-8 text-muted-foreground" onClick={fetchConfigs}>
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button className="h-8 px-3 bg-indigo-600 hover:bg-indigo-700 text-primary-foreground text-sm" onClick={openCreate}>
+          <Button className="h-9 px-3 bg-[#ff4d29] hover:bg-[#ff4d29]/90 text-white text-sm rounded-md" onClick={openCreate}>
             <Plus className="h-4 w-4 mr-1" />{t('addModel')}</Button>
         </div>
       </div>

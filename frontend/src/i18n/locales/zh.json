@@ -367,6 +367,7 @@
   "subagents": "智能体编排",
   "subagentManagement": "智能体编排",
   "manageSubagentsDesc": "管理该项目的子智能体",
+  "createSubagent": "新建子智能体",
   "addSubagent": "添加子智能体",
   "editSubagent": "编辑子智能体",
   "subagentName": "子智能体名称",
