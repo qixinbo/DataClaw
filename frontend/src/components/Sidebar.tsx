@@ -1,7 +1,7 @@
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Menu, LayoutDashboard, Plus, MoreVertical, User, Search, Settings, Brain, Trash2, Pencil, Pin, Archive, Database, CheckSquare, Square, ListChecks, RotateCcw, Wand2, Folder, Globe, Bot, Mic, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Menu, LayoutDashboard, Plus, MoreVertical, User, Search, Brain, Trash2, Pencil, Pin, Archive, Database, CheckSquare, Square, ListChecks, RotateCcw, Wand2, Folder, Globe, Bot, Loader2, CheckCircle2, XCircle, ChevronRight } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -377,6 +377,8 @@ function SidebarBody() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [voiceSettingsOpen, setVoiceSettingsOpen] = useState(false);
+  const [showKnowledgeSubmenu, setShowKnowledgeSubmenu] = useState(false);
+  const [showMoreSubmenu, setShowMoreSubmenu] = useState(false);
   const [whisperUrlDraft, setWhisperUrlDraft] = useState("");
   const [isTestingVoice, setIsTestingVoice] = useState(false);
   const [voiceTestStatus, setVoiceTestStatus] = useState<"success" | "error" | null>(null);
@@ -855,7 +857,13 @@ function SidebarBody() {
         <div className="flex items-center justify-between text-muted-foreground">
           <button 
             className="flex items-center gap-2 hover:text-foreground transition-colors p-1 rounded-full hover:bg-muted"
-            onClick={() => setShowUserMenu(!showUserMenu)}
+            onClick={() => {
+              setShowUserMenu(!showUserMenu);
+              if (showUserMenu) {
+                setShowKnowledgeSubmenu(false);
+                setShowMoreSubmenu(false);
+              }
+            }}
           >
             <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 border border-indigo-200 shadow-sm">
               <User className="h-4.5 w-4.5" />
@@ -876,7 +884,7 @@ function SidebarBody() {
 
         {/* User Settings Popover Menu */}
         {showUserMenu && (
-          <div className="absolute bottom-[72px] left-4 w-56 bg-background rounded-xl shadow-xl border border-border py-1.5 z-50 overflow-hidden animate-in fade-in zoom-in duration-200">
+          <div className="absolute bottom-[72px] left-4 w-56 bg-background rounded-xl shadow-xl border border-border py-1.5 z-50 overflow-visible animate-in fade-in zoom-in duration-200">
             <div className="px-3 py-2 border-b border-border mb-1">
               <p className="text-sm font-medium text-foreground truncate">{user?.username}</p>
               <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
@@ -892,6 +900,18 @@ function SidebarBody() {
               <Folder className="h-4 w-4 text-muted-foreground" />
               {t('projectManagement')}
             </button>
+            {user?.is_admin && (
+              <button
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors"
+                onClick={() => {
+                  navigate("/model-configs");
+                  setShowUserMenu(false);
+                }}
+              >
+                <Brain className="h-4 w-4 text-muted-foreground" />
+                {t('modelConfig')}
+              </button>
+            )}
 
             <button 
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors"
@@ -919,75 +939,119 @@ function SidebarBody() {
               {t('dataSourceManagement')}
             </button>
 
-            <button 
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors"
-              onClick={() => {
-                navigate("/knowledge-bases");
-                setShowUserMenu(false);
-              }}
+            <div 
+              className="relative group/kb"
+              onMouseEnter={() => setShowKnowledgeSubmenu(true)}
+              onMouseLeave={() => setShowKnowledgeSubmenu(false)}
             >
-              <Database className="h-4 w-4 text-muted-foreground" />
-              {t('knowledgeBases')}
-            </button>
+              <button 
+                className="w-full flex items-center justify-between px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setShowKnowledgeSubmenu(!showKnowledgeSubmenu);
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  <Database className="h-4 w-4 text-muted-foreground" />
+                  {t('knowledgeBaseGroup', 'Knowledge Base')}
+                </div>
+                <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${showKnowledgeSubmenu ? 'translate-x-0.5' : ''}`} />
+              </button>
 
-            <button 
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors"
-              onClick={() => {
-                navigate("/settings");
-                setShowUserMenu(false);
-              }}
+              {showKnowledgeSubmenu && (
+                <div 
+                  className="absolute left-[calc(100%-8px)] top-0 w-48 bg-background border border-border rounded-md shadow-lg py-1 z-[60] animate-in fade-in zoom-in-95 duration-200"
+                  style={{ minWidth: 'max-content' }}
+                >
+                  <div className="absolute -left-3 top-0 bottom-0 w-4" />
+                  
+                  <button 
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors relative z-10"
+                    onClick={() => {
+                      navigate("/knowledge-bases");
+                      setShowUserMenu(false);
+                      setShowKnowledgeSubmenu(false);
+                    }}
+                  >
+                    {t('knowledgeBases')}
+                  </button>
+                  
+                  {user?.is_admin && (
+                    <button
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors relative z-10"
+                      onClick={() => {
+                        navigate("/embedding-models");
+                        setShowUserMenu(false);
+                        setShowKnowledgeSubmenu(false);
+                      }}
+                    >
+                      {t('embeddingModels')}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div 
+              className="relative"
+              onMouseEnter={() => setShowMoreSubmenu(true)}
+              onMouseLeave={() => setShowMoreSubmenu(false)}
             >
-              <Settings className="h-4 w-4 text-muted-foreground" />
-              {t('personalSettings')}
-            </button>
+              <button 
+                className="w-full flex items-center justify-between px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setShowMoreSubmenu(!showMoreSubmenu);
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                  {t('moreGroup')}
+                </div>
+                <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${showMoreSubmenu ? 'translate-x-0.5' : ''}`} />
+              </button>
 
-            <button 
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors"
-              onClick={() => {
-                openVoiceSettings();
-                setShowUserMenu(false);
-              }}
-            >
-              <Mic className="h-4 w-4 text-muted-foreground" />
-              {t('voiceSettings')}
-            </button>
-
-            {user?.is_admin && (
-              <>
-                <button
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors"
-                  onClick={() => {
-                    navigate("/model-configs");
-                    setShowUserMenu(false);
-                  }}
+              {showMoreSubmenu && (
+                <div 
+                  className="absolute left-[calc(100%-8px)] top-0 w-48 bg-background border border-border rounded-md shadow-lg py-1 z-[60] animate-in fade-in zoom-in-95 duration-200"
+                  style={{ minWidth: 'max-content' }}
                 >
-                  <Brain className="h-4 w-4 text-muted-foreground" />
-                  {t('modelConfig')}
-                </button>
-                
-                <button
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors"
-                  onClick={() => {
-                    navigate("/embedding-models");
-                    setShowUserMenu(false);
-                  }}
-                >
-                  <Brain className="h-4 w-4 text-muted-foreground" />
-                  {t('embeddingModels')}
-                </button>
-                
-                <button 
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors"
-                  onClick={() => {
-                    navigate("/users");
-                    setShowUserMenu(false);
-                  }}
-                >
-                  <User className="h-4 w-4" />
-                  {t('userManagement')}
-                </button>
-              </>
-            )}
+                  <div className="absolute -left-3 top-0 bottom-0 w-4" />
+                  <button 
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors relative z-10"
+                    onClick={() => {
+                      navigate("/settings");
+                      setShowUserMenu(false);
+                      setShowMoreSubmenu(false);
+                    }}
+                  >
+                    {t('personalSettings')}
+                  </button>
+                  {user?.is_admin && (
+                    <button 
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors relative z-10"
+                      onClick={() => {
+                        navigate("/users");
+                        setShowUserMenu(false);
+                        setShowMoreSubmenu(false);
+                      }}
+                    >
+                      {t('userManagement')}
+                    </button>
+                  )}
+                  <button 
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors relative z-10"
+                    onClick={() => {
+                      openVoiceSettings();
+                      setShowUserMenu(false);
+                      setShowMoreSubmenu(false);
+                    }}
+                  >
+                    {t('voiceSettings')}
+                  </button>
+                </div>
+              )}
+            </div>
             
             <div className="h-px bg-muted my-1 mx-2" />
             

@@ -365,6 +365,8 @@
   "noSubagents": "No subagents configured",
   "confirmDeleteSubagent": "Are you sure you want to delete this subagent?",
   "selectProjectToManageSubagents": "Please select a project to manage subagents",
+  "knowledgeBaseGroup": "Knowledge Base",
+  "moreGroup": "More",
   "knowledgeBases": "Knowledge Bases",
   "voiceSettings": "Voice Input Settings",
   "embeddingModels": "Embedding Models"
