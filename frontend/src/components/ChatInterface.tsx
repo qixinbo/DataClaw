@@ -801,6 +801,231 @@ export function ChatInterface() {
     );
   };
 
+  const ChatInputPanel = ({
+    menuSide,
+    menuOffsetClass,
+    recordingWaveKeyPrefix,
+    showDisclaimer = false,
+  }: {
+    menuSide: "top" | "bottom";
+    menuOffsetClass: string;
+    recordingWaveKeyPrefix: string;
+    showDisclaimer?: boolean;
+  }) => {
+    return (
+      <div className="relative group max-w-4xl mx-auto">
+        <div className="flex flex-col bg-background rounded-[26px] border border-border shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-all duration-200">
+          {renderFileCard()}
+          {renderActiveSelections()}
+          <div className="flex items-center pl-2 pr-2 py-2">
+            <div className="flex items-center">
+              <Popover open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+                <PopoverTrigger className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted transition-colors text-muted-foreground">
+                  <Plus className="h-5 w-5" />
+                </PopoverTrigger>
+                <PopoverContent side={menuSide} align="start" className={`w-[480px] p-0 ${menuOffsetClass} overflow-hidden rounded-2xl border-border shadow-xl`}>
+                  <div className="flex divide-x divide-zinc-100">
+                    <div className="flex-1 p-3 bg-muted/50/50">
+                      <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
+                        <Database className="h-3 w-3" />
+                        {t('knowledgeBase')}
+                      </div>
+                      <div className="space-y-0.5">
+                        {availableKnowledgeBases.length > 0 ? (
+                          availableKnowledgeBases.map((kb) => (
+                            <button
+                              key={kb.id}
+                              onClick={() => {
+                                void handleSelectKnowledgeBase(kb.id);
+                              }}
+                              className={cn(
+                                "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
+                                selectedKnowledgeBaseId === kb.id
+                                  ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                                  : "text-muted-foreground hover:bg-background hover:shadow-sm"
+                              )}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <Database className={cn("h-4 w-4", selectedKnowledgeBaseId === kb.id ? "text-violet-500" : "text-muted-foreground")} />
+                                <span className="font-medium">{kb.name}</span>
+                              </div>
+                              {selectedKnowledgeBaseId === kb.id && <CheckCircle2 className="h-4 w-4 text-violet-500" />}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-3 py-4 text-center">
+                            <Database className="h-6 w-6 text-zinc-200 mx-auto mb-1" />
+                            <p className="text-[11px] text-muted-foreground">{t('noKnowledgeBases')}</p>
+                          </div>
+                        )}
+                        {selectedKnowledgeBaseId ? (
+                          <div className="mt-2 pt-2 border-t border-border">
+                            <button
+                              onClick={() => {
+                                void handleClearKnowledgeBase();
+                              }}
+                              className="w-full py-1.5 text-[11px] text-muted-foreground hover:text-muted-foreground transition-colors flex items-center justify-center gap-1"
+                            >
+                              {t('clearSelected')}
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="flex-1 p-3 bg-background">
+                      <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
+                        <Database className="h-3 w-3" />
+                        {t('dataSource')}
+                      </div>
+                      <div className="space-y-0.5">
+                        {availableDataSources.length > 0 ? (
+                          availableDataSources.map((ds) => (
+                            <button
+                              key={ds.id}
+                              onClick={() => {
+                                void handleSelectDataSource(ds.id);
+                              }}
+                              className={cn(
+                                "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
+                                selectedDataSource === ds.id
+                                  ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                                  : "text-muted-foreground hover:bg-background hover:shadow-sm"
+                              )}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <Database className={cn("h-4 w-4", selectedDataSource === ds.id ? "text-blue-500" : "text-muted-foreground")} />
+                                <span className="font-medium">{ds.name}</span>
+                              </div>
+                              {selectedDataSource === ds.id && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-3 py-4 text-center">
+                            <Database className="h-6 w-6 text-zinc-200 mx-auto mb-1" />
+                            <p className="text-[11px] text-muted-foreground">{t('noDataSources')}</p>
+                          </div>
+                        )}
+                        {selectedDataSource ? (
+                          <div className="mt-2 pt-2 border-t border-border">
+                            <button
+                              onClick={() => {
+                                void handleClearDataSource();
+                              }}
+                              className="w-full py-1.5 text-[11px] text-muted-foreground hover:text-muted-foreground transition-colors flex items-center justify-center gap-1"
+                            >
+                              {t('clearSelected')}
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {isRecording ? (
+              <>
+                <div className="flex-1 px-3">
+                  <div className="relative h-10 flex items-center">
+                    <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-dashed border-muted-foreground/40" />
+                    <div className="ml-auto flex items-center gap-[3px] pr-2">
+                      {Array.from({ length: 30 }).map((_, idx) => {
+                        const dynamic = Math.abs(Math.sin(Date.now() / 180 + idx * 0.85));
+                        const height = Math.max(4, Math.round((4 + dynamic * 18) * (0.45 + recordingLevel)));
+                        return (
+                          <span
+                            key={`recording-wave-${recordingWaveKeyPrefix}-${idx}`}
+                            className="w-[3px] rounded-full bg-foreground/90 transition-all duration-75"
+                            style={{ height: `${height}px` }}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={cancelRecording}
+                    className="flex items-center justify-center h-10 w-10 rounded-full text-foreground hover:bg-muted transition-colors"
+                    title={t('cancel', '取消')}
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                  <button
+                    onClick={confirmRecording}
+                    className="flex items-center justify-center h-10 w-10 rounded-full text-foreground hover:bg-muted transition-colors"
+                    title={t('confirm', '确认')}
+                  >
+                    <Check className="h-5 w-5" />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={input}
+                  onChange={handleInputChange}
+                  onKeyDown={handleInputKeyDown}
+                  placeholder={isTranscribing ? t('transcribing', '正在识别...') : t('askAnything')}
+                  className="flex-1 bg-transparent border-none focus:ring-0 text-lg px-3 py-2 text-foreground placeholder:text-muted-foreground/50 outline-none"
+                  disabled={isLoading || isTranscribing}
+                />
+                <SlashCommandMenu
+                  isOpen={slashQuery !== null}
+                  skills={filteredSlashSkills}
+                  selectedIndex={slashIndex}
+                  onSelect={handleSelectSlashSkill}
+                  onClose={() => setSlashQuery(null)}
+                />
+
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={startRecording}
+                    disabled={isLoading || isTranscribing}
+                    className="flex items-center justify-center h-10 w-10 rounded-full transition-all duration-200 bg-transparent text-muted-foreground hover:bg-muted"
+                    title={t('voiceInput', '语音输入')}
+                  >
+                    {isTranscribing ? (
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    ) : (
+                      <Mic className="h-5 w-5" />
+                    )}
+                  </button>
+                  <button
+                    onClick={isLoading ? handleForceStop : handleSend}
+                    disabled={isLoading ? false : !input.trim()}
+                    className={cn(
+                      "flex items-center justify-center h-10 w-10 rounded-full transition-all duration-200",
+                      (input.trim() || isLoading)
+                        ? (isLoading ? "bg-red-600 text-primary-foreground hover:bg-red-700" : "bg-primary text-primary-foreground hover:bg-primary/90")
+                        : "bg-muted text-muted-foreground/50"
+                    )}
+                  >
+                    {isLoading ? (
+                      <Square className="h-4 w-4" />
+                    ) : (
+                      <ArrowUp className="h-6 w-6" />
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+        {showDisclaimer && (
+          <div className="mt-2 flex justify-center">
+            <p className="text-[11px] text-muted-foreground">
+              {t('dataClawDisclaimer')}
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   useEffect(() => {
     const fetchSkills = async () => {
       try {
@@ -1156,218 +1381,14 @@ export function ChatInterface() {
               </div>
 
               {/* Input Area */}
-              <div className="w-full max-w-4xl px-4">
-                <div className="relative group">
-                  <div className="flex flex-col bg-background rounded-[26px] border border-border shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-all duration-200">
-                    {renderFileCard()}
-                    {renderActiveSelections()}
-                    <div className="flex items-center pl-2 pr-2 py-2">
-                      <div className="flex items-center">
-                        <Popover open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-                          <PopoverTrigger className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted transition-colors text-muted-foreground">
-                            <Plus className="h-5 w-5" />
-                          </PopoverTrigger>
-                          <PopoverContent side="bottom" align="start" className="w-[480px] p-0 mt-2 overflow-hidden rounded-2xl border-border shadow-xl">
-                            <div className="flex divide-x divide-zinc-100">
-                              {/* Left Column: Knowledge Base */}
-                              <div className="flex-1 p-3 bg-muted/50/50 flex flex-col gap-4 border-r border-border/50">
-                                <div>
-                                  <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
-                                    <Database className="h-3 w-3" />
-                                    {t('knowledgeBase')}
-                                  </div>
-                                  <div className="space-y-0.5">
-                                    {availableKnowledgeBases.length > 0 ? (
-                                      availableKnowledgeBases.map((kb) => (
-                                        <button
-                                          key={kb.id}
-                                          onClick={() => {
-                                            void handleSelectKnowledgeBase(kb.id);
-                                          }}
-                                          className={cn(
-                                            "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
-                                            selectedKnowledgeBaseId === kb.id
-                                              ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                                              : "text-muted-foreground hover:bg-background hover:shadow-sm"
-                                          )}
-                                        >
-                                          <div className="flex items-center gap-2.5">
-                                            <Database className={cn("h-4 w-4", selectedKnowledgeBaseId === kb.id ? "text-violet-500" : "text-muted-foreground")} />
-                                            <span className="font-medium">{kb.name}</span>
-                                          </div>
-                                          {selectedKnowledgeBaseId === kb.id && <CheckCircle2 className="h-4 w-4 text-violet-500" />}
-                                        </button>
-                                      ))
-                                    ) : (
-                                      <div className="px-3 py-4 text-center">
-                                        <Database className="h-6 w-6 text-zinc-200 mx-auto mb-1" />
-                                        <p className="text-[11px] text-muted-foreground">{t('noKnowledgeBases')}</p>
-                                      </div>
-                                    )}
-                                    {selectedKnowledgeBaseId ? (
-                                      <div className="mt-2 pt-2 border-t border-border">
-                                        <button
-                                          onClick={() => {
-                                            void handleClearKnowledgeBase();
-                                          }}
-                                          className="w-full py-1.5 text-[11px] text-muted-foreground hover:text-muted-foreground transition-colors flex items-center justify-center gap-1"
-                                        >
-                                          {t('clearSelected')}
-                                        </button>
-                                      </div>
-                                    ) : null}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Right Column: Data Source */}
-                              <div className="flex-1 p-3 bg-muted/50/50 flex flex-col gap-4">
-                                <div>
-                                  <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
-                                    <Database className="h-3 w-3" />
-                                    {t('dataSource')}
-                                  </div>
-                                  <div className="space-y-0.5">
-                                    {availableDataSources.length > 0 ? (
-                                      availableDataSources.map((ds) => (
-                                        <button
-                                          key={ds.id}
-                                          onClick={() => {
-                                            void handleSelectDataSource(ds.id);
-                                          }}
-                                          className={cn(
-                                            "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
-                                            selectedDataSource === ds.id 
-                                              ? "bg-background text-foreground shadow-sm ring-1 ring-border" 
-                                              : "text-muted-foreground hover:bg-background hover:shadow-sm"
-                                          )}
-                                        >
-                                          <div className="flex items-center gap-2.5">
-                                            <Database className={cn("h-4 w-4", selectedDataSource === ds.id ? "text-blue-500" : "text-muted-foreground")} />
-                                            <span className="font-medium">{ds.name}</span>
-                                          </div>
-                                          {selectedDataSource === ds.id && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
-                                        </button>
-                                      ))
-                                    ) : (
-                                      <div className="px-3 py-4 text-center">
-                                        <Database className="h-6 w-6 text-zinc-200 mx-auto mb-1" />
-                                        <p className="text-[11px] text-muted-foreground">{t('noDataSources')}</p>
-                                      </div>
-                                    )}
-                                    {selectedDataSource && (
-                                      <div className="mt-2 pt-2 border-t border-border">
-                                        <button
-                                          onClick={() => {
-                                            void handleClearDataSource();
-                                          }}
-                                          className="w-full py-1.5 text-[11px] text-muted-foreground hover:text-muted-foreground transition-colors flex items-center justify-center gap-1"
-                                        >
-                                          {t('clearSelected')}
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-
-                      {isRecording ? (
-                        <>
-                          <div className="flex-1 px-3">
-                            <div className="relative h-10 flex items-center">
-                              <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-dashed border-muted-foreground/40" />
-                              <div className="ml-auto flex items-center gap-[3px] pr-2">
-                                {Array.from({ length: 30 }).map((_, idx) => {
-                                  const dynamic = Math.abs(Math.sin(Date.now() / 180 + idx * 0.85));
-                                  const height = Math.max(4, Math.round((4 + dynamic * 18) * (0.45 + recordingLevel)));
-                                  return (
-                                    <span
-                                      key={`recording-wave-empty-${idx}`}
-                                      className="w-[3px] rounded-full bg-foreground/90 transition-all duration-75"
-                                      style={{ height: `${height}px` }}
-                                    />
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={cancelRecording}
-                              className="flex items-center justify-center h-10 w-10 rounded-full text-foreground hover:bg-muted transition-colors"
-                              title={t('cancel', '取消')}
-                            >
-                              <X className="h-5 w-5" />
-                            </button>
-                            <button
-                              onClick={confirmRecording}
-                              className="flex items-center justify-center h-10 w-10 rounded-full text-foreground hover:bg-muted transition-colors"
-                              title={t('confirm', '确认')}
-                            >
-                              <Check className="h-5 w-5" />
-                            </button>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <input
-                            type="text"
-                            value={input}
-                            onChange={handleInputChange}
-                            onKeyDown={handleInputKeyDown}
-                            placeholder={isTranscribing ? t('transcribing', '正在识别...') : t('askAnything')}
-                            className="flex-1 bg-transparent border-none focus:ring-0 text-lg px-3 py-2 text-foreground placeholder:text-muted-foreground/50 outline-none"
-                            disabled={isLoading || isTranscribing}
-                          />
-                          <SlashCommandMenu
-                            isOpen={slashQuery !== null}
-                            skills={filteredSlashSkills}
-                            selectedIndex={slashIndex}
-                            onSelect={handleSelectSlashSkill}
-                            onClose={() => setSlashQuery(null)}
-                          />
-
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={startRecording}
-                              disabled={isLoading || isTranscribing}
-                              className="flex items-center justify-center h-10 w-10 rounded-full transition-all duration-200 bg-transparent text-muted-foreground hover:bg-muted"
-                              title={t('voiceInput', '语音输入')}
-                            >
-                              {isTranscribing ? (
-                                <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                              ) : (
-                                <Mic className="h-5 w-5" />
-                              )}
-                            </button>
-                            <button
-                              onClick={handleSend}
-                              disabled={isLoading || !input.trim()}
-                              className={cn(
-                                "flex items-center justify-center h-10 w-10 rounded-full transition-all duration-200",
-                                (input.trim() || attachedFile || activeDataFile) && !isLoading
-                                  ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
-                                  : "bg-muted text-muted-foreground/50"
-                              )}
-                            >
-                              {isLoading ? (
-                                <Loader2 className="h-5 w-5 animate-spin" />
-                              ) : (
-                                <ArrowUp className="h-6 w-6" />
-                              )}
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-4 flex flex-wrap justify-center gap-2">
-                    {/* Common Questions or suggestions could go here */}
-                  </div>
+              <div className="w-full px-4">
+                <ChatInputPanel
+                  menuSide="bottom"
+                  menuOffsetClass="mt-2"
+                  recordingWaveKeyPrefix="empty"
+                />
+                <div className="mt-4 flex flex-wrap justify-center gap-2">
+                  {/* Common Questions or suggestions could go here */}
                 </div>
               </div>
             </div>
@@ -1615,214 +1636,12 @@ export function ChatInterface() {
       {/* Floating Input for Chat State */}
       {messages.length > 0 && (
         <div className="px-4 pb-6 pt-3 border-t border-border bg-background">
-          <div className="relative group max-w-4xl mx-auto">
-            <div className="flex flex-col bg-background rounded-[26px] border border-border shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-all duration-200">
-              {renderFileCard()}
-              {renderActiveSelections()}
-              <div className="flex items-center pl-2 pr-2 py-2">
-                <div className="flex items-center">
-                  <Popover open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-                    <PopoverTrigger className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted transition-colors text-muted-foreground">
-                      <Plus className="h-5 w-5" />
-                    </PopoverTrigger>
-                    <PopoverContent side="top" align="start" className="w-[480px] p-0 mb-2 overflow-hidden rounded-2xl border-border shadow-xl">
-                      <div className="flex divide-x divide-zinc-100">
-                        <div className="flex-1 p-3 bg-muted/50/50">
-                          <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
-                            <Database className="h-3 w-3" />
-                            {t('knowledgeBase')}
-                          </div>
-                          <div className="space-y-0.5">
-                            {availableKnowledgeBases.length > 0 ? (
-                              availableKnowledgeBases.map((kb) => (
-                                <button
-                                  key={kb.id}
-                                  onClick={() => {
-                                    void handleSelectKnowledgeBase(kb.id);
-                                  }}
-                                  className={cn(
-                                    "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
-                                    selectedKnowledgeBaseId === kb.id
-                                      ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                                      : "text-muted-foreground hover:bg-background hover:shadow-sm"
-                                  )}
-                                >
-                                  <div className="flex items-center gap-2.5">
-                                    <Database className={cn("h-4 w-4", selectedKnowledgeBaseId === kb.id ? "text-violet-500" : "text-muted-foreground")} />
-                                    <span className="font-medium">{kb.name}</span>
-                                  </div>
-                                  {selectedKnowledgeBaseId === kb.id && <CheckCircle2 className="h-4 w-4 text-violet-500" />}
-                                </button>
-                              ))
-                            ) : (
-                              <div className="px-3 py-4 text-center">
-                                <Database className="h-6 w-6 text-zinc-200 mx-auto mb-1" />
-                                <p className="text-[11px] text-muted-foreground">{t('noKnowledgeBases')}</p>
-                              </div>
-                            )}
-                            {selectedKnowledgeBaseId ? (
-                              <div className="mt-2 pt-2 border-t border-border">
-                                <button
-                                  onClick={() => {
-                                    void handleClearKnowledgeBase();
-                                  }}
-                                  className="w-full py-1.5 text-[11px] text-muted-foreground hover:text-muted-foreground transition-colors flex items-center justify-center gap-1"
-                                >
-                                  {t('clearSelected')}
-                                </button>
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        <div className="flex-1 p-3 bg-background">
-                          <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
-                            <Database className="h-3 w-3" />
-                            {t('dataSource')}
-                          </div>
-                          <div className="space-y-0.5">
-                            {availableDataSources.length > 0 ? (
-                              availableDataSources.map((ds) => (
-                                <button
-                                  key={ds.id}
-                                  onClick={() => {
-                                    void handleSelectDataSource(ds.id);
-                                  }}
-                                  className={cn(
-                                    "w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
-                                    selectedDataSource === ds.id
-                                      ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                                      : "text-muted-foreground hover:bg-background hover:shadow-sm"
-                                  )}
-                                >
-                                  <div className="flex items-center gap-2.5">
-                                    <Database className={cn("h-4 w-4", selectedDataSource === ds.id ? "text-blue-500" : "text-muted-foreground")} />
-                                    <span className="font-medium">{ds.name}</span>
-                                  </div>
-                                  {selectedDataSource === ds.id && <CheckCircle2 className="h-4 w-4 text-blue-500" />}
-                                </button>
-                              ))
-                            ) : (
-                              <div className="px-3 py-4 text-center">
-                                <Database className="h-6 w-6 text-zinc-200 mx-auto mb-1" />
-                                <p className="text-[11px] text-muted-foreground">{t('noDataSources')}</p>
-                              </div>
-                            )}
-                            {selectedDataSource ? (
-                              <div className="mt-2 pt-2 border-t border-border">
-                                <button
-                                  onClick={() => {
-                                    void handleClearDataSource();
-                                  }}
-                                  className="w-full py-1.5 text-[11px] text-muted-foreground hover:text-muted-foreground transition-colors flex items-center justify-center gap-1"
-                                >
-                                  {t('clearSelected')}
-                                </button>
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                {isRecording ? (
-                  <>
-                    <div className="flex-1 px-3">
-                      <div className="relative h-10 flex items-center">
-                        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-dashed border-muted-foreground/40" />
-                        <div className="ml-auto flex items-center gap-[3px] pr-2">
-                          {Array.from({ length: 30 }).map((_, idx) => {
-                            const dynamic = Math.abs(Math.sin(Date.now() / 180 + idx * 0.85));
-                            const height = Math.max(4, Math.round((4 + dynamic * 18) * (0.45 + recordingLevel)));
-                            return (
-                              <span
-                                key={`recording-wave-chat-${idx}`}
-                                className="w-[3px] rounded-full bg-foreground/90 transition-all duration-75"
-                                style={{ height: `${height}px` }}
-                              />
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={cancelRecording}
-                        className="flex items-center justify-center h-10 w-10 rounded-full text-foreground hover:bg-muted transition-colors"
-                        title={t('cancel', '取消')}
-                      >
-                        <X className="h-5 w-5" />
-                      </button>
-                      <button
-                        onClick={confirmRecording}
-                        className="flex items-center justify-center h-10 w-10 rounded-full text-foreground hover:bg-muted transition-colors"
-                        title={t('confirm', '确认')}
-                      >
-                        <Check className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <input
-                      type="text"
-                      value={input}
-                      onChange={handleInputChange}
-                      onKeyDown={handleInputKeyDown}
-                      placeholder={isTranscribing ? t('transcribing', '正在识别...') : t('askAnything')}
-                      className="flex-1 bg-transparent border-none focus:ring-0 text-lg px-3 py-2 text-foreground placeholder:text-muted-foreground/50 outline-none"
-                      disabled={isLoading || isTranscribing}
-                    />
-                    <SlashCommandMenu
-                      isOpen={slashQuery !== null}
-                      skills={filteredSlashSkills}
-                      selectedIndex={slashIndex}
-                      onSelect={handleSelectSlashSkill}
-                      onClose={() => setSlashQuery(null)}
-                    />
-
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={startRecording}
-                        disabled={isLoading || isTranscribing}
-                        className="flex items-center justify-center h-10 w-10 rounded-full transition-all duration-200 bg-transparent text-muted-foreground hover:bg-muted"
-                        title={t('voiceInput', '语音输入')}
-                      >
-                        {isTranscribing ? (
-                          <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                        ) : (
-                          <Mic className="h-5 w-5" />
-                        )}
-                      </button>
-                      <button
-                        onClick={isLoading ? handleForceStop : handleSend}
-                        disabled={isLoading ? false : !input.trim()}
-                        className={cn(
-                          "flex items-center justify-center h-10 w-10 rounded-full transition-all duration-200",
-                          (input.trim() || isLoading)
-                            ? (isLoading ? "bg-red-600 text-primary-foreground hover:bg-red-700" : "bg-primary text-primary-foreground hover:bg-primary/90")
-                            : "bg-muted text-muted-foreground/50"
-                        )}
-                      >
-                        {isLoading ? (
-                          <Square className="h-4 w-4" />
-                        ) : (
-                          <ArrowUp className="h-6 w-6" />
-                        )}
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-            <div className="mt-2 flex justify-center">
-              <p className="text-[11px] text-muted-foreground">
-                {t('dataClawDisclaimer')}
-              </p>
-            </div>
-          </div>
+          <ChatInputPanel
+            menuSide="top"
+            menuOffsetClass="mb-2"
+            recordingWaveKeyPrefix="chat"
+            showDisclaimer
+          />
         </div>
       )}
       <Dialog open={Boolean(artifactPreview)} onOpenChange={(open) => {
