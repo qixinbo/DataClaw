@@ -35,19 +35,19 @@ function MainLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
       <Sidebar />
-      <main className="flex-1 flex flex-col overflow-hidden h-screen relative">
-        <div className="absolute top-0 left-0 right-0 h-14 flex items-center justify-between pointer-events-none z-30 px-4">
-          <div className="flex-1 pointer-events-auto">
+      <main className="flex-1 flex flex-col overflow-hidden h-screen">
+        <div className="h-14 shrink-0 flex items-center justify-between z-30 px-4">
+          <div className="flex-1">
             {/* Left side empty for balance */}
           </div>
-          <div className="flex-1 flex justify-center pointer-events-auto">
+          <div className="flex-1 flex justify-center">
             <ProjectSwitcher />
           </div>
-          <div className="flex-1 flex justify-end pointer-events-auto">
+          <div className="flex-1 flex justify-end">
             <ThemeToggle />
           </div>
         </div>
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-hidden">
           {children}
         </div>
       </main>
