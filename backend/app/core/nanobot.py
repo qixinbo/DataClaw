@@ -33,6 +33,7 @@ from nanobot.config.schema import Config
 from app.api.skills import load_skills
 from app.core.patched_openai_compat_provider import PatchedOpenAICompatProvider
 from app.services.llm_cache import get_llm_configs, get_active_llm_config
+from app.services.web_search_config_store import get_web_search_config
 
 from app.core.data_root import get_workspace_root
 
@@ -102,6 +103,16 @@ class NanobotIntegration:
     def get_last_usage(self, session_id: str) -> Dict[str, int] | None:
         usage = self._last_usage_by_session.get(session_id)
         return dict(usage) if usage else None
+
+    def _get_web_search_config(self) -> Any:
+        from nanobot.config.schema import WebSearchConfig
+        ws_dict = get_web_search_config()
+        return WebSearchConfig(
+            provider=ws_dict.get("provider", "duckduckgo"),
+            api_key=ws_dict.get("api_key", ""),
+            base_url=ws_dict.get("base_url", ""),
+            max_results=ws_dict.get("max_results", 5)
+        )
 
     def _need_custom_agent_for_target(self, target_config: Dict[str, Any]) -> bool:
         if not self.agent:
@@ -173,7 +184,7 @@ class NanobotIntegration:
             model=initial_model,
             max_iterations=self.config.agents.defaults.max_tool_iterations,
             context_window_tokens=self.config.agents.defaults.context_window_tokens,
-            web_search_config=self.config.tools.web.search,
+            web_search_config=self._get_web_search_config(),
             web_proxy=self.config.tools.web.proxy or None,
             exec_config=self.config.tools.exec,
             cron_service=self.cron,
@@ -319,7 +330,7 @@ class NanobotIntegration:
             model=provider.default_model,
             max_iterations=self.config.agents.defaults.max_tool_iterations,
             context_window_tokens=self.config.agents.defaults.context_window_tokens,
-            web_search_config=self.config.tools.web.search,
+            web_search_config=self._get_web_search_config(),
             web_proxy=self.config.tools.web.proxy or None,
             exec_config=self.config.tools.exec,
             cron_service=self.cron,

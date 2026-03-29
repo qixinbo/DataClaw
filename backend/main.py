@@ -21,7 +21,7 @@ import re
 import os
 from datetime import datetime
 
-from app.api import upload, llm, skills, users, datasources, projects, semantic, mcp, subagents, knowledge, embedding_models
+from app.api import upload, llm, skills, users, datasources, projects, semantic, mcp, subagents, knowledge, embedding_models, web_search
 from app.connectors.postgres import postgres_connector
 from app.connectors.clickhouse import clickhouse_connector
 from app.core.artifacts import extract_artifacts
@@ -77,6 +77,7 @@ app.include_router(mcp.router, prefix="/api/v1")
 app.include_router(subagents.router, prefix="/api/v1")
 app.include_router(knowledge.router, prefix="/api/v1")
 app.include_router(embedding_models.router, prefix="/api/v1")
+app.include_router(web_search.router, prefix="/api/v1")
 
 STREAM_DELTA_CHUNK_SIZE = 48
 PREVIEWABLE_TEXT_EXTENSIONS = {

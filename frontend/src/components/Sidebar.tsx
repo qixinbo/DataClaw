@@ -1073,6 +1073,18 @@ function SidebarBody() {
                   >
                     {t('voiceSettings')}
                   </button>
+                  {user?.is_admin && (
+                    <button 
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted transition-colors relative z-10"
+                      onClick={() => {
+                        navigate("/web-search-config");
+                        setShowUserMenu(false);
+                        setShowMoreSubmenu(false);
+                      }}
+                    >
+                      {t('webSearchConfig', 'Web Search Config')}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

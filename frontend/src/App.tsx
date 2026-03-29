@@ -14,6 +14,7 @@ import { KnowledgeBases } from "./pages/KnowledgeBases";
 import { DataSources } from "./pages/DataSources";
 import { Modeling } from "./pages/Modeling";
 import { Subagents } from "./pages/Subagents";
+import { WebSearchConfig } from "./pages/WebSearchConfig";
 import { VerifyEmail } from "./pages/VerifyEmail";
 import { useAuthStore } from "./store/authStore";
 
@@ -136,6 +137,14 @@ function App() {
           <ProtectedRoute>
             <MainLayout>
               <EmbeddingModels />
+            </MainLayout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/web-search-config" element={
+          <ProtectedRoute requireAdmin={true}>
+            <MainLayout>
+              <WebSearchConfig />
             </MainLayout>
           </ProtectedRoute>
         } />

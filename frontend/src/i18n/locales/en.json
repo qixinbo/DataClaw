@@ -383,5 +383,17 @@
   "voiceSettingsDisabledHint": "Enable voice input first, then configure server URL",
   "voiceInputDisabledHint": "Please enable voice input first",
   "voiceInputNotEnabled": "Voice input is disabled. Enable it from profile menu -> More -> Voice Input Settings first.",
-  "embeddingModels": "Embedding Models"
+  "embeddingModels": "Embedding Models",
+  "webSearchConfig": "Web Search Config",
+  "configureWebSearchProvider": "Configure the default web search provider and settings for the AI agent.",
+  "selectProvider": "Select a provider",
+  "enterApiKey": "Enter API Key",
+  "apiKeyRequiredFor": "An API Key is required for {{provider}}",
+  "baseUrl": "Base URL",
+  "baseUrlRequiredFor": "A Base URL is required for {{provider}}",
+  "maxResults": "Max Results",
+  "maxResultsDescription": "Maximum number of search results to return (1-20)",
+  "failedToLoadConfig": "Failed to load configuration",
+  "failedToSaveConfig": "Failed to save configuration",
+  "configSaved": "Configuration saved successfully. Note: Active agents may require a restart to pick up the new configuration."
 }
