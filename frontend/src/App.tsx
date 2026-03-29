@@ -14,6 +14,7 @@ import { KnowledgeBases } from "./pages/KnowledgeBases";
 import { DataSources } from "./pages/DataSources";
 import { Modeling } from "./pages/Modeling";
 import { Subagents } from "./pages/Subagents";
+import { VerifyEmail } from "./pages/VerifyEmail";
 import { useAuthStore } from "./store/authStore";
 
 import { ThemeToggle } from "./components/ThemeToggle";
@@ -62,6 +63,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
         
         {/* Protected Routes */}
         <Route path="/" element={

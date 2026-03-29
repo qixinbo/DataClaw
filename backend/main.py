@@ -4,6 +4,11 @@ import binascii
 from typing import Any, Dict, List, Optional, Literal, Tuple
 import mimetypes
 from pathlib import Path
+from dotenv import load_dotenv
+
+# 加载项目根目录下的 .env 文件
+env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
@@ -35,7 +40,7 @@ from app.context import (
 from app.services.knowledge_index import knowledge_index_service
 from app.database import engine, Base
 # Import all models to ensure they are registered
-from app.models.user import User
+from app.models.user import User, EmailVerification
 from app.models.project import Project
 from app.models.datasource import DataSource
 from app.models.subagent import Subagent

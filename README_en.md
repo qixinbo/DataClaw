@@ -57,7 +57,25 @@ DataClaw is divided into three main claws (components):
 
 Ready to dive in? Let's get DataClaw running on your local machine!
 
-### 1. Backend Setup 🐍
+### 1. Configure Environment Variables 🔧
+
+In the root directory of the project, copy and rename the environment template:
+
+```bash
+cp .env.example .env
+```
+
+Please edit the `.env` file in the root directory and fill in your actual configurations (e.g., QQ Mail SMTP Auth Code).
+
+> **Guide to getting QQ Mail SMTP Auth Code:**
+> 1. Log in to QQ Mail web version (mail.qq.com)
+> 2. Click "Settings" (设置) at the top of the page -> "Account" (账号) tab
+> 3. Scroll down to find the "POP3/IMAP/SMTP/Exchange/CardDAV/CalDAV Service" section
+> 4. Ensure "POP3/SMTP Service" is toggled to "On" (开启)
+> 5. Click "Generate Authorization Code" (生成授权码) below it, scan the QR code with mobile QQ or send an SMS as prompted
+> 6. After verification, you will get a **16-digit random letter combination**. Copy and paste it into the `SMTP_PASSWORD` field in your `.env` file
+
+### 2. Backend Setup 🐍
 
 Ensure you have Python 3.10+ installed.
 

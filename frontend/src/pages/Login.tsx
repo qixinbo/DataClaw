@@ -19,6 +19,9 @@ export function Login() {
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isInactiveError, setIsInactiveError] = useState(false);
+  const [resendStatus, setResendStatus] = useState("");
+  const [isResending, setIsResending] = useState(false);
   const navigate = useNavigate();
   const login = useAuthStore((state) => state.login);
 
@@ -28,9 +31,26 @@ export function Login() {
     password: "",
   });
 
+  const handleResendVerification = async () => {
+    setIsResending(true);
+    setResendStatus("");
+    try {
+      await api.post("/api/v1/auth/resend-verification", {
+        username: formData.username,
+      });
+      setResendStatus(t("verificationSent"));
+    } catch (err: any) {
+      setResendStatus(err.message || t("errorOccurred"));
+    } finally {
+      setIsResending(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setIsInactiveError(false);
+    setResendStatus("");
     setIsLoading(true);
 
     try {
@@ -66,10 +86,17 @@ export function Login() {
         
         // Auto login after successful registration
         setIsLogin(true);
-        setError(t("registrationSuccess"));
+        // Assuming backend returns is_active=false for users requiring verification
+        // For now, we will show the verification prompt based on the translation
+        setError(t("registrationSuccessWithVerification"));
       }
     } catch (err: any) {
-      setError(err.message || t("errorOccurred"));
+      if (err.message && err.message.toLowerCase().includes("inactive user")) {
+        setError(t("inactiveUserError"));
+        setIsInactiveError(true);
+      } else {
+        setError(err.message || t("errorOccurred"));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -108,8 +135,27 @@ export function Login() {
           </h2>
 
           {error && (
-            <div className={`p-3 rounded-lg mb-6 text-sm ${error.includes(t("registrationSuccess")) ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"}`}>
-              {error}
+            <div className={`p-3 rounded-lg mb-6 text-sm flex flex-col gap-2 ${error.includes(t("registrationSuccessWithVerification")) ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"}`}>
+              <span>{error}</span>
+              {isInactiveError && (
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleResendVerification}
+                  disabled={isResending}
+                  className="w-fit mt-1 border-red-200 text-red-700 hover:bg-red-100"
+                >
+                  {isResending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  {t("resendVerification")}
+                </Button>
+              )}
+            </div>
+          )}
+
+          {resendStatus && (
+            <div className={`p-3 rounded-lg mb-6 text-sm ${resendStatus.includes(t("verificationSent")) ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"}`}>
+              {resendStatus}
             </div>
           )}
 

@@ -31,6 +31,7 @@ dependencies = [
     "psycopg2-binary>=2.9.11",
     "pydantic>=2.12.0,<3.0.0",
     "pydantic-settings>=2.12.0,<3.0.0",
+    "python-dotenv>=1.0.1",
     "python-jose[cryptography]>=3.5.0",
     "python-multipart>=0.0.22",
     "python-socketio>=5.16.0,<6.0.0",

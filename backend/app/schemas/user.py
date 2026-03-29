@@ -18,6 +18,9 @@ class UserUpdate(BaseModel):
     is_admin: Optional[bool] = None
     password: Optional[str] = None
 
+class ResendVerificationRequest(BaseModel):
+    username: str
+
 class UserResponse(UserBase):
     id: int
     created_at: datetime
