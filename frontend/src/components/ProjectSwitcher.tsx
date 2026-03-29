@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, Plus, Folder, Check } from 'lucide-react';
+import { ChevronDown, Plus, Folder, Check, Brain } from 'lucide-react';
 import { useProjectStore } from '@/store/projectStore';
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
@@ -129,6 +129,7 @@ export function ProjectSwitcher() {
 
       <Popover open={modelOpen} onOpenChange={setModelOpen}>
         <PopoverTrigger className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors group">
+          <Brain className="h-4 w-4 mr-1 text-purple-500" />
           <span className="font-semibold text-[14px]">
             {selectedModelId ? (models.find(m => m.id === selectedModelId)?.name || models.find(m => m.id === selectedModelId)?.model || 'DataClaw') : 'DataClaw'}
           </span>
