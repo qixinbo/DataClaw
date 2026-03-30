@@ -1,8 +1,11 @@
-import { useState, useEffect } from "react";
-import { Code2, Eye, X, Download, Copy, ExternalLink, Check, ChevronDown } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Code2, Eye, X, Download, Copy, ExternalLink, Check, ChevronDown, FileIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import { cn } from "@/lib/utils";
 
 interface ArtifactPreviewTarget {
@@ -19,23 +22,49 @@ interface ArtifactPanelProps {
 
 export function ArtifactPanel({ artifact, onClose }: ArtifactPanelProps) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'code' | 'preview'>('preview');
+  const [activeTab, setActiveTab] = useState<'code' | 'preview' | 'fallback'>('preview');
   const [code, setCode] = useState<string>('');
   const [loadingCode, setLoadingCode] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const { canPreview, canCode, isMarkdown } = useMemo(() => {
+    const extension = artifact.name.split('.').pop()?.toLowerCase() || '';
+    const textExtensions = ['py', 'js', 'ts', 'jsx', 'tsx', 'json', 'csv', 'md', 'txt', 'css', 'html', 'xml', 'yaml', 'yml', 'sql', 'sh', 'bat'];
+    const isTextExt = textExtensions.includes(extension);
+    const isHtmlExt = extension === 'html' || extension === 'htm';
+    const isMd = extension === 'md' || artifact.mimeType === 'text/markdown';
+
+    const isImage = artifact.mimeType.startsWith('image/');
+    const isPdf = artifact.mimeType === 'application/pdf' || extension === 'pdf';
+    const isHtml = artifact.mimeType === 'text/html' || isHtmlExt;
+    const isText = artifact.mimeType.startsWith('text/') || 
+      ["application/json", "application/javascript", "application/xml", "application/sql", "application/x-sh"].includes(artifact.mimeType) ||
+      isTextExt;
+
+    return {
+      canPreview: isImage || isPdf || isHtml || isMd,
+      canCode: isText || isHtml || isMd,
+      isMarkdown: isMd
+    };
+  }, [artifact.mimeType, artifact.name]);
+
   useEffect(() => {
     // Reset state when artifact changes
     setCode('');
-    if (artifact.mimeType.startsWith("image/") || artifact.mimeType.startsWith("application/pdf")) {
+    if (canPreview) {
       setActiveTab('preview');
+    } else if (canCode) {
+      setActiveTab('code');
     } else {
-      setActiveTab('preview');
+      setActiveTab('fallback');
     }
-  }, [artifact]);
+  }, [artifact, canPreview, canCode]);
 
   useEffect(() => {
-    if (activeTab === 'code' && !code && artifact.downloadUrl) {
+    // Need to fetch code for both 'code' view and markdown 'preview' view
+    const needsCodeFetch = (activeTab === 'code' || (activeTab === 'preview' && isMarkdown)) && !code && artifact.downloadUrl;
+    
+    if (needsCodeFetch) {
       setLoadingCode(true);
       fetch(artifact.downloadUrl)
         .then(res => res.text())
@@ -49,7 +78,7 @@ export function ArtifactPanel({ artifact, onClose }: ArtifactPanelProps) {
           setLoadingCode(false);
         });
     }
-  }, [activeTab, artifact.downloadUrl, code]);
+  }, [activeTab, artifact.downloadUrl, code, isMarkdown]);
 
   const handleCopy = async () => {
     if (code) {
@@ -63,7 +92,7 @@ export function ArtifactPanel({ artifact, onClose }: ArtifactPanelProps) {
     }
   };
 
-  const isCodeViewSupported = !artifact.mimeType.startsWith("image/") && !artifact.mimeType.startsWith("application/pdf");
+  const showToggle = canPreview && canCode;
 
   return (
     <div className="h-full flex flex-col bg-background border-l border-border shadow-2xl">
@@ -74,7 +103,7 @@ export function ArtifactPanel({ artifact, onClose }: ArtifactPanelProps) {
           <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
         </div>
         
-        {isCodeViewSupported && (
+        {showToggle && (
           <div className="flex items-center bg-muted/50 rounded-lg p-0.5 ml-4">
             <button
               onClick={() => setActiveTab('code')}
@@ -141,9 +170,35 @@ export function ArtifactPanel({ artifact, onClose }: ArtifactPanelProps) {
 
       {/* Content */}
       <div className="flex-1 min-h-0 relative bg-zinc-950">
-        {activeTab === 'preview' ? (
-          <div className="w-full h-full bg-white">
-            {artifact.mimeType.startsWith("image/") ? (
+        {activeTab === 'fallback' ? (
+          <div className="w-full h-full bg-background flex flex-col items-center justify-center p-6 text-center">
+            <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center mb-4">
+              <FileIcon className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              {t('noPreviewAvailable', 'No preview available')}
+            </h3>
+            <p className="text-sm text-muted-foreground max-w-md mb-6">
+              {t('noPreviewDesc', 'This file type cannot be previewed in the browser. Please download the file to view its contents.')}
+            </p>
+            <a
+              href={artifact.downloadUrl}
+              download={artifact.name}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-sm font-medium transition-colors"
+            >
+              <Download className="h-4 w-4" />
+              {t('downloadFile', 'Download File')}
+            </a>
+          </div>
+        ) : activeTab === 'preview' ? (
+          <div className="w-full h-full bg-white overflow-auto">
+            {isMarkdown ? (
+              <div className="prose prose-sm max-w-none p-6">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                  {code || "Loading..."}
+                </ReactMarkdown>
+              </div>
+            ) : artifact.mimeType.startsWith("image/") ? (
               <img
                 src={artifact.previewUrl}
                 alt={artifact.name}
