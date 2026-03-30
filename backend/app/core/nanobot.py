@@ -36,6 +36,7 @@ from app.services.llm_cache import get_llm_configs, get_active_llm_config
 from app.services.web_search_config_store import get_web_search_config
 
 from app.core.data_root import get_workspace_root
+from app.trace import build_error_attributes, build_usage_attributes, trace_service
 
 class NanobotIntegration:
     def __init__(self):
@@ -385,68 +386,100 @@ class NanobotIntegration:
         on_progress: Callable[[str], Awaitable[None]] | None = None,
         on_stream: Callable[[str], Awaitable[None]] | None = None,
     ):
-        if not self.agent:
-            self.initialize()
-        if not self._started:
-            await self.start()
-            
-        if project_id is None:
-            from app.core.session_alias_store import session_alias_store
-            alias_meta = session_alias_store.get_alias_meta(session_id)
-            if alias_meta and alias_meta.get("project_id") is not None:
-                project_id = alias_meta.get("project_id")
-                
-        agent_to_use = self.agent
-        need_custom_agent = False
-        target_config = None
+        span_attributes = {
+            "session_id": session_id,
+            "project_id": project_id,
+            "model_id": model_id,
+            "component": "nanobot.process_message",
+        }
+        with trace_service.start_span(
+            "nanobot.process_message",
+            attributes=span_attributes,
+            input_payload={"message": message},
+        ) as root_span:
+            try:
+                if not self.agent:
+                    self.initialize()
+                if not self._started:
+                    await self.start()
 
-        selected_model_id = self._normalize_model_id(model_id)
-        if selected_model_id:
-            llm_configs = get_llm_configs()
-            target_config = next(
-                (item for item in llm_configs if self._normalize_model_id(item.get("id")) == selected_model_id),
-                None,
-            )
+                if project_id is None:
+                    from app.core.session_alias_store import session_alias_store
 
-        if target_config is None:
-            active_config = get_active_llm_config()
-            if active_config and active_config.get("id"):
-                selected_model_id = self._normalize_model_id(active_config.get("id"))
-                target_config = active_config
+                    alias_meta = session_alias_store.get_alias_meta(session_id)
+                    if alias_meta and alias_meta.get("project_id") is not None:
+                        project_id = alias_meta.get("project_id")
+                        root_span.set_attributes({"project_id": project_id})
 
-        if target_config and self._need_custom_agent_for_target(target_config):
-            need_custom_agent = True
+                agent_to_use = self.agent
+                need_custom_agent = False
+                target_config = None
 
-        if project_id is not None:
-            need_custom_agent = True
+                selected_model_id = self._normalize_model_id(model_id)
+                if selected_model_id:
+                    llm_configs = get_llm_configs()
+                    target_config = next(
+                        (item for item in llm_configs if self._normalize_model_id(item.get("id")) == selected_model_id),
+                        None,
+                    )
 
-        if need_custom_agent:
-            agent_to_use = await self._get_or_create_model_agent(selected_model_id, target_config, project_id)
+                if target_config is None:
+                    active_config = get_active_llm_config()
+                    if active_config and active_config.get("id"):
+                        selected_model_id = self._normalize_model_id(active_config.get("id"))
+                        target_config = active_config
 
-        full_message = message
-        # We no longer inject the full skill content into the user's message here,
-        # because the skill is already available to the agent via its workspace/tools.
-        # The routing instructions (System Prompt) injected in main.py are sufficient
-        # to guide the agent to use the selected skills.
+                if target_config and self._need_custom_agent_for_target(target_config):
+                    need_custom_agent = True
+                if project_id is not None:
+                    need_custom_agent = True
 
-        session = agent_to_use.sessions.get_or_create(session_id)
-        normalized_messages = self._normalize_session_messages(session.messages)
-        if len(normalized_messages) != len(session.messages):
-            session.messages = normalized_messages
-            agent_to_use.sessions.save(session)
+                with trace_service.start_span(
+                    "nanobot.resolve_agent",
+                    attributes={
+                        "session_id": session_id,
+                        "project_id": project_id,
+                        "selected_model_id": selected_model_id,
+                        "custom_agent": need_custom_agent,
+                    },
+                ):
+                    if need_custom_agent:
+                        agent_to_use = await self._get_or_create_model_agent(selected_model_id, target_config, project_id)
 
-        response = await agent_to_use.process_direct(
-            full_message,
-            session_key=session_id,
-            channel="api",
-            chat_id=session_id,
-            on_progress=on_progress,
-            on_stream=on_stream,
-        )
-        usage = self._normalize_usage(getattr(agent_to_use, "_last_usage", None))
-        if usage:
-            self._last_usage_by_session[session_id] = usage
-        return self._extract_response_text(response)
+                session = agent_to_use.sessions.get_or_create(session_id)
+                normalized_messages = self._normalize_session_messages(session.messages)
+                if len(normalized_messages) != len(session.messages):
+                    session.messages = normalized_messages
+                    agent_to_use.sessions.save(session)
+
+                with trace_service.start_span(
+                    "nanobot.process_direct",
+                    attributes={
+                        "session_id": session_id,
+                        "model": getattr(agent_to_use, "model", None),
+                    },
+                ) as direct_span:
+                    response = await agent_to_use.process_direct(
+                        message,
+                        session_key=session_id,
+                        channel="api",
+                        chat_id=session_id,
+                        on_progress=on_progress,
+                        on_stream=on_stream,
+                    )
+                    usage = self._normalize_usage(getattr(agent_to_use, "_last_usage", None))
+                    if usage:
+                        self._last_usage_by_session[session_id] = usage
+                        direct_span.set_attributes(build_usage_attributes(usage))
+                        root_span.set_attributes(build_usage_attributes(usage))
+                    text = self._extract_response_text(response)
+                    direct_span.update(output={"content": text})
+                    root_span.update(output={"content": text})
+                    return text
+            except Exception as exc:
+                root_span.set_attributes(build_error_attributes(exc, stage="nanobot_process_message"))
+                root_span.record_error(exc, stage="nanobot_process_message")
+                raise
 
     def _normalize_session_messages(self, messages: List[Any]) -> List[dict[str, Any]]:
         normalized: List[dict[str, Any]] = []

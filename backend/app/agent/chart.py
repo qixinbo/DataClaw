@@ -14,6 +14,7 @@ if str(NANOBOT_ROOT) not in sys.path:
 from app.core.llm_provider import build_llm_provider
 from app.schemas.chart import ChartGenerationResponse
 from app.services.llm_cache import get_active_llm_config
+from app.trace import build_error_attributes, trace_service
 
 CHART_MAX_TOKENS = 700
 CHART_TEMPERATURE = 0.2
@@ -140,6 +141,10 @@ CHART_EXAMPLES = """
 """
 
 async def generate_chart(data: List[Dict[str, Any]], query: str) -> ChartGenerationResponse:
+    trace_attributes = {
+        "component": "chart_generation",
+        "rows": len(data),
+    }
     active_config = get_active_llm_config()
     
     if not active_config:
@@ -218,37 +223,42 @@ Language: Chinese (Simplified)
 
     # 4. Call LLM
     try:
-        response = await provider.chat(
-            messages=messages,
-            max_tokens=CHART_MAX_TOKENS,
-            temperature=CHART_TEMPERATURE,
-            reasoning_effort=CHART_REASONING_EFFORT,
-        )
-        content = response.content
-        
-        # Clean up code blocks
-        if "```json" in content:
-            content = content.split("```json")[1].split("```")[0]
-        elif "```" in content:
-            content = content.split("```")[1].split("```")[0]
-            
-        content = content.strip()
-        result = json.loads(content)
-        
-        # Post-process to fix common LLM hallucinations (translating field names)
-        if result.get("chart_spec") and isinstance(result["chart_spec"], dict):
-            encoding = result["chart_spec"].get("encoding", {})
-            for channel, enc_def in encoding.items():
-                if isinstance(enc_def, dict) and "field" in enc_def:
-                    field = enc_def["field"]
-                    # If field is not in columns, try to find a match or let it be (Vega will render empty)
-                    # But if we can detect it was translated, we might not be able to fix it perfectly.
-                    # As a simple fallback, if there's only one string column and one numeric column, we could guess,
-                    # but it's safer to just rely on the stricter prompt.
-        
-        return ChartGenerationResponse(**result)
-        
+        with trace_service.start_span(
+            "chart.generate",
+            attributes={
+                **trace_attributes,
+                "model": active_config.get("model"),
+            },
+            input_payload={"query": query, "columns": columns},
+        ) as span:
+            response = await provider.chat(
+                messages=messages,
+                max_tokens=CHART_MAX_TOKENS,
+                temperature=CHART_TEMPERATURE,
+                reasoning_effort=CHART_REASONING_EFFORT,
+            )
+            content = response.content
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0]
+            elif "```" in content:
+                content = content.split("```")[1].split("```")[0]
+            content = content.strip()
+            result = json.loads(content)
+            chart_result = ChartGenerationResponse(**result)
+            span.set_attributes(
+                {
+                    "chart.can_visualize": bool(chart_result.can_visualize),
+                    "chart.type": chart_result.chart_type,
+                }
+            )
+            span.update(output={"chart_type": chart_result.chart_type})
+            return chart_result
     except Exception as e:
+        with trace_service.start_span(
+            "chart.generate.error",
+            attributes={**trace_attributes, **build_error_attributes(e, stage="chart_generation")},
+        ):
+            pass
         return ChartGenerationResponse(
             reasoning=f"Failed to generate chart configuration: {str(e)}",
             can_visualize=False,
