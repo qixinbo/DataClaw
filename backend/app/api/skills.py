@@ -5,17 +5,20 @@ import zipfile
 import tarfile
 import re
 import yaml
+from pathlib import Path
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 
 from app.core.data_root import get_data_root, get_workspace_root
+from nanobot.agent.skills import BUILTIN_SKILLS_DIR as NANOBOT_BUILTIN_SKILLS_DIR
 
 router = APIRouter()
 
 DATA_FILE = str(get_data_root() / "skills.json")
 SKILL_HUB_DIR = str(get_workspace_root() / "skills")
+BACKEND_BUILTIN_SKILLS_DIR = str(Path(__file__).resolve().parents[1] / "skills_builtin")
 
 def _ensure_skill_hub_dir() -> None:
     os.makedirs(SKILL_HUB_DIR, exist_ok=True)
@@ -118,16 +121,22 @@ def _dedupe_skills(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     deduped: Dict[str, Dict[str, Any]] = {}
     for item in data:
         skill_id = str(item.get("id") or "").strip()
+        project_id = item.get("project_id")
         if not skill_id:
             continue
-        existing = deduped.get(skill_id)
+        
+        # Use a composite key of (id, project_id) for deduplication
+        # so that different projects can theoretically have the same skill_id
+        dedupe_key = f"{skill_id}_{project_id}"
+        
+        existing = deduped.get(dedupe_key)
         if existing is None:
-            deduped[skill_id] = item
+            deduped[dedupe_key] = item
             continue
-        existing_project = existing.get("project_id")
-        incoming_project = item.get("project_id")
-        if existing_project is None and incoming_project is not None:
-            deduped[skill_id] = item
+            
+        # If they somehow have the exact same dedupe_key, we just keep the later one
+        deduped[dedupe_key] = item
+        
     return list(deduped.values())
 
 def _safe_skill_dir_name(value: str) -> str:
@@ -150,6 +159,48 @@ def _write_skill_markdown(skill_dir: str, skill_name: str, description: Optional
         f.write(markdown)
     return skill_md_path
 
+def _scan_builtin_skills(data: List[Dict[str, Any]], registered_paths: set, source_dir: str, source_name: str):
+    if not os.path.exists(source_dir):
+        return
+    for item in os.listdir(source_dir):
+        skill_dir = os.path.abspath(os.path.join(source_dir, item))
+        if os.path.isdir(skill_dir):
+            skill_md_path = os.path.join(skill_dir, "SKILL.md")
+            if os.path.exists(skill_md_path):
+                metadata_res = _parse_skill_md(skill_md_path)
+                skill_name = metadata_res.get("name") or item
+                
+                existing = None
+                for d in data:
+                    if (d.get("id") == item and d.get("is_builtin")) or d.get("file_path") == skill_dir:
+                        existing = d
+                        break
+                
+                if existing:
+                    existing["name"] = skill_name
+                    existing["description"] = metadata_res.get("description") or "No description provided"
+                    existing["content"] = metadata_res.get("content") or ""
+                    existing["file_path"] = skill_dir
+                    existing["is_builtin"] = True
+                    existing["source"] = source_name
+                    registered_paths.add(skill_dir)
+                else:
+                    new_skill = {
+                        "id": item,
+                        "name": skill_name,
+                        "description": metadata_res.get("description") or "No description provided",
+                        "content": metadata_res.get("content") or "",
+                        "type": "agentskill",
+                        "project_id": None,
+                        "source": source_name,
+                        "installation_time": datetime.now().strftime("%Y年%m月%d日"),
+                        "status": "安全",
+                        "file_path": skill_dir,
+                        "is_builtin": True
+                    }
+                    data.append(new_skill)
+                    registered_paths.add(skill_dir)
+
 def load_skills(project_id: Optional[int] = None) -> List[Dict[str, Any]]:
     _ensure_skill_hub_dir()
     data = _load_data()
@@ -158,7 +209,11 @@ def load_skills(project_id: Optional[int] = None) -> List[Dict[str, Any]]:
     
     # Sync registered skills with their SKILL.md if available
     for item in data:
-        item.setdefault("is_builtin", False)
+        if item.get("id") in ("nl2sql", "visualization") or item.get("is_builtin"):
+            item["is_builtin"] = True
+        else:
+            item.setdefault("is_builtin", False)
+            
         if item.get("file_path"):
             abs_path = os.path.abspath(item["file_path"])
             registered_paths.add(abs_path)
@@ -172,7 +227,11 @@ def load_skills(project_id: Optional[int] = None) -> List[Dict[str, Any]]:
                 if metadata_res.get("content"):
                     item["content"] = metadata_res["content"]
     
-    # Scan for unregistered skills in SKILL_HUB_DIR
+    # Scan builtin skills
+    _scan_builtin_skills(data, registered_paths, NANOBOT_BUILTIN_SKILLS_DIR, "系统内置")
+    _scan_builtin_skills(data, registered_paths, BACKEND_BUILTIN_SKILLS_DIR, "系统内置")
+
+    # Scan for unregistered skills in SKILL_HUB_DIR (1-level deep to match nanobot's behavior)
     if os.path.exists(SKILL_HUB_DIR):
         for item in os.listdir(SKILL_HUB_DIR):
             skill_dir = os.path.abspath(os.path.join(SKILL_HUB_DIR, item))
@@ -182,14 +241,19 @@ def load_skills(project_id: Optional[int] = None) -> List[Dict[str, Any]]:
                     metadata_res = _parse_skill_md(skill_md_path)
                     skill_name = metadata_res.get("name") or item
                     
-                    # Create a new entry for this discovered skill
+                    # Try to deduce project_id from directory prefix (e.g., p123_skillname)
+                    deduced_project_id = None
+                    match = re.match(r'^p(\d+)_', item)
+                    if match:
+                        deduced_project_id = int(match.group(1))
+                    
                     new_skill = {
                         "id": item,
                         "name": skill_name,
                         "description": metadata_res.get("description") or "No description provided",
                         "content": metadata_res.get("content") or "",
                         "type": "agentskill",
-                        "project_id": None,
+                        "project_id": deduced_project_id,
                         "source": "后台生成",
                         "installation_time": datetime.now().strftime("%Y年%m月%d日"),
                         "status": "安全",
@@ -295,7 +359,14 @@ async def upload_skill(
         # Create a safe directory name for the skill
         safe_name = _safe_skill_dir_name(skill_name)
         final_skill_id = f"{safe_name}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        final_skill_dir = os.path.join(SKILL_HUB_DIR, final_skill_id)
+        
+        if project_id is not None:
+            # Prefix the folder name with p{project_id}_ to distinguish projects in storage
+            # without breaking nanobot's 1-level-deep skill loader
+            final_skill_dir = os.path.join(SKILL_HUB_DIR, f"p{project_id}_{final_skill_id}")
+            final_skill_id = f"p{project_id}_{final_skill_id}"
+        else:
+            final_skill_dir = os.path.join(SKILL_HUB_DIR, final_skill_id)
         
         print(f"Finalizing skill: {skill_name} -> {final_skill_dir}")
         
@@ -345,14 +416,23 @@ async def upload_skill(
 def create_skill(skill: SkillCreate):
     _ensure_skill_hub_dir()
     data = load_skills()
-    if any(item["id"] == skill.id for item in data):
-        raise HTTPException(status_code=400, detail="Skill with this ID already exists")
+    if any(item["id"] == skill.id and item.get("project_id") == skill.project_id for item in data):
+        raise HTTPException(status_code=400, detail="Skill with this ID already exists in this project")
     
     new_skill_dict = skill.dict()
     if not new_skill_dict.get("installation_time"):
         new_skill_dict["installation_time"] = datetime.now().strftime("%Y年%m月%d日")
     if not new_skill_dict.get("file_path"):
-        skill_dir = os.path.join(SKILL_HUB_DIR, _safe_skill_dir_name(new_skill_dict["id"]))
+        project_id = new_skill_dict.get("project_id")
+        base_dir_name = _safe_skill_dir_name(new_skill_dict["id"])
+        if project_id is not None:
+            # Add prefix for project storage distinction
+            if not base_dir_name.startswith(f"p{project_id}_"):
+                base_dir_name = f"p{project_id}_{base_dir_name}"
+            skill_dir = os.path.join(SKILL_HUB_DIR, base_dir_name)
+        else:
+            skill_dir = os.path.join(SKILL_HUB_DIR, base_dir_name)
+            
         _write_skill_markdown(
             skill_dir=skill_dir,
             skill_name=new_skill_dict["name"],
@@ -360,6 +440,7 @@ def create_skill(skill: SkillCreate):
             content=new_skill_dict.get("content", ""),
         )
         new_skill_dict["file_path"] = skill_dir
+        new_skill_dict["id"] = base_dir_name
     
     data.append(new_skill_dict)
     _save_data(data)

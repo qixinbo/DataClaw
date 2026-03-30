@@ -97,7 +97,7 @@ export function WebSearchConfig() {
                 <Label>{t('provider', 'Provider')}</Label>
                 <Select 
                   value={config.provider} 
-                  onValueChange={(val) => setConfig({ ...config, provider: val })}
+                  onValueChange={(val) => { if (val) setConfig({ ...config, provider: val }) }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={t('selectProvider', 'Select a provider')} />

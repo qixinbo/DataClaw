@@ -53,6 +53,7 @@ const dedupeSkillsById = (skills: Skill[]): Skill[] => {
 export function Skills() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'skills' | 'mcp'>('skills');
+  const [sourceFilter, setSourceFilter] = useState<string>('all');
 
   // Skills state
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -125,6 +126,14 @@ export function Skills() {
         setIsLoading(false);
     }
   };
+
+  // Get unique sources for the filter dropdown
+  const uniqueSources = Array.from(new Set(skills.map(s => s.source))).filter(Boolean);
+
+  // Filtered skills
+  const filteredSkills = sourceFilter === 'all' 
+    ? skills 
+    : skills.filter(skill => skill.source === sourceFilter);
 
   const fetchMcpServers = async () => {
     if (!currentProject) return;
@@ -329,6 +338,19 @@ export function Skills() {
           </div>
           {activeTab === 'skills' ? (
             <>
+                {uniqueSources.length > 0 && (
+                  <Select value={sourceFilter} onValueChange={(val) => { if (val) setSourceFilter(val); }}>
+                    <SelectTrigger className="w-[140px] h-9">
+                      <SelectValue placeholder={t('filterBySource', '筛选来源')} />
+                    </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t('allSources', '全部来源')}</SelectItem>
+                    {uniqueSources.map(source => (
+                      <SelectItem key={source} value={source}>{source}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <input
                 type="file"
                 ref={fileInputRef}
@@ -339,8 +361,17 @@ export function Skills() {
               <Button 
                 className="h-9 bg-[#ff4d29] hover:bg-[#ff4d29]/90 text-white gap-2 rounded-md px-3"
                 onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading}
               >
-                <Upload className="h-4 w-4" />{t('uploadSkill')}
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                {isLoading ? t('uploading', '上传中...') : t('uploadSkill')}
+              </Button>
+              <Button 
+                onClick={() => setIsDialogOpen(true)}
+                className="h-9 bg-indigo-600 hover:bg-indigo-700 text-white gap-2 rounded-md px-3 shadow-sm"
+              >
+                <Plus className="h-4 w-4" />
+                {t('addNewSkill')}
               </Button>
             </>
           ) : (
@@ -393,7 +424,7 @@ export function Skills() {
                 </TableRow>
               ) : (
                 <>
-                  {skills.map((skill, index) => (
+                  {filteredSkills.map((skill, index) => (
                     <TableRow key={`${skill.id}_${index}`} className="group hover:bg-muted/50/50 transition-colors border-border">
                       <TableCell className="py-4 px-4 overflow-hidden">
                         <div className="flex items-start gap-3 min-w-0">
@@ -464,7 +495,7 @@ export function Skills() {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {skills.length === 0 && (
+                  {filteredSkills.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={5} className="py-24 text-center">
                         <div className="flex flex-col items-center gap-3 text-muted-foreground">
@@ -517,11 +548,11 @@ export function Skills() {
                         </TableCell>
                         <TableCell className="py-4 px-4 text-muted-foreground text-sm truncate">
                           <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] md:text-xs font-medium whitespace-nowrap ${
-                            mcp.status === 'connected' 
+                            !mcp.status || mcp.status === 'connected' 
                             ? 'bg-green-50 text-green-700 border border-green-100' 
                             : mcp.status.startsWith('error')
-                            ? 'bg-red-50 text-red-700 border border-red-100'
-                            : 'bg-muted/50 text-foreground/80 border border-border'
+                            ? 'bg-rose-50 text-rose-700 border border-rose-100'
+                            : 'bg-amber-50 text-amber-700 border border-amber-100'
                           }`}
                           title={mcp.status}
                           >
