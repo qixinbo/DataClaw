@@ -40,6 +40,30 @@ interface MCPServer {
   status?: string;
 }
 
+const SOURCE_LOCAL_IMPORT = "local_import";
+const SOURCE_SYSTEM_BUILTIN = "system_builtin";
+const SOURCE_BACKEND_GENERATED = "backend_generated";
+const SOURCE_UPLOADED_FILE = "uploaded_file";
+
+const STATUS_SAFE = "safe";
+const STATUS_LOW_RISK = "low_risk";
+
+const normalizeSkillSource = (value?: string): string => {
+  if (!value) return SOURCE_LOCAL_IMPORT;
+  if (value === SOURCE_LOCAL_IMPORT || value === "本地导入" || value === "Local Import") return SOURCE_LOCAL_IMPORT;
+  if (value === SOURCE_SYSTEM_BUILTIN || value === "系统内置" || value === "System Built-in") return SOURCE_SYSTEM_BUILTIN;
+  if (value === SOURCE_BACKEND_GENERATED || value === "后台生成" || value === "Backend Generated") return SOURCE_BACKEND_GENERATED;
+  if (value === SOURCE_UPLOADED_FILE || value === "文件上传" || value === "File Upload") return SOURCE_UPLOADED_FILE;
+  return value;
+};
+
+const normalizeSkillStatus = (value?: string): string => {
+  if (!value) return STATUS_SAFE;
+  if (value === STATUS_SAFE || value === "安全" || value === "Safe") return STATUS_SAFE;
+  if (value === STATUS_LOW_RISK || value === "低风险" || value === "Low Risk") return STATUS_LOW_RISK;
+  return value;
+};
+
 const dedupeSkillsById = (skills: Skill[]): Skill[] => {
   const map = new Map<string, Skill>();
   for (const skill of skills) {
@@ -60,7 +84,7 @@ export function Skills() {
   const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSkill, setEditingSkill] = useState<Skill | null>(null);
-  const [newSkill, setNewSkill] = useState<Partial<Skill>>({ type: 'python', content: '', source: t('localImport'), status: t('safe') });
+  const [newSkill, setNewSkill] = useState<Partial<Skill>>({ type: 'python', content: '', source: SOURCE_LOCAL_IMPORT, status: STATUS_SAFE });
   
   // MCP state
   const [mcpServers, setMcpServers] = useState<MCPServer[]>([]);
@@ -76,6 +100,14 @@ export function Skills() {
   const { currentProject } = useProjectStore();
   const { hasMcpError, refresh: refreshMcpHealth } = useMcpHealthStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const getSourceLabel = (source: string): string => {
+    if (source === 'all') return t('allSources');
+    if (source === SOURCE_SYSTEM_BUILTIN) return t('systemBuiltin');
+    if (source === SOURCE_BACKEND_GENERATED) return t('backendGenerated');
+    if (source === SOURCE_UPLOADED_FILE) return t('uploadedFile');
+    if (source === SOURCE_LOCAL_IMPORT) return t('localImport');
+    return source;
+  };
 
   useEffect(() => {
     const fetchSkills = async () => {
@@ -128,12 +160,12 @@ export function Skills() {
   };
 
   // Get unique sources for the filter dropdown
-  const uniqueSources = Array.from(new Set(skills.map(s => s.source))).filter(Boolean);
+  const uniqueSources = Array.from(new Set(skills.map(s => normalizeSkillSource(s.source)))).filter(Boolean);
 
   // Filtered skills
-  const filteredSkills = sourceFilter === 'all' 
-    ? skills 
-    : skills.filter(skill => skill.source === sourceFilter);
+  const filteredSkills = sourceFilter === 'all'
+    ? skills
+    : skills.filter(skill => normalizeSkillSource(skill.source) === sourceFilter);
 
   const fetchMcpServers = async () => {
     if (!currentProject) return;
@@ -203,7 +235,7 @@ export function Skills() {
               await api.post<Skill>('/api/v1/skills', skillToCreate);
           }
           await fetchSkills();
-          setNewSkill({ type: 'python', content: '', source: t('localImport'), status: t('safe') });
+          setNewSkill({ type: 'python', content: '', source: SOURCE_LOCAL_IMPORT, status: STATUS_SAFE });
           setEditingSkill(null);
           setIsDialogOpen(false);
       } catch (error) {
@@ -214,7 +246,11 @@ export function Skills() {
 
   const handleEditSkill = (skill: Skill) => {
     setEditingSkill(skill);
-    setNewSkill(skill);
+    setNewSkill({
+      ...skill,
+      source: normalizeSkillSource(skill.source),
+      status: normalizeSkillStatus(skill.status),
+    });
     setIsDialogOpen(true);
   };
 
@@ -341,12 +377,16 @@ export function Skills() {
                 {uniqueSources.length > 0 && (
                   <Select value={sourceFilter} onValueChange={(val) => { if (val) setSourceFilter(val); }}>
                     <SelectTrigger className="w-[140px] h-9">
-                      <SelectValue placeholder={t('filterBySource', '筛选来源')} />
+                      <SelectValue placeholder={t('filterBySource')}>
+                        {getSourceLabel(sourceFilter)}
+                      </SelectValue>
                     </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">{t('allSources', '全部来源')}</SelectItem>
+                    <SelectItem value="all">{t('allSources')}</SelectItem>
                     {uniqueSources.map(source => (
-                      <SelectItem key={source} value={source}>{source}</SelectItem>
+                      <SelectItem key={source} value={source}>
+                        {getSourceLabel(source)}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -450,23 +490,33 @@ export function Skills() {
                         </div>
                       </TableCell>
                       <TableCell className="py-4 px-4 text-muted-foreground text-sm">
-                        <div className="truncate" title={skill.source}>{skill.source}</div>
+                        <div className="truncate" title={skill.source}>
+                          {normalizeSkillSource(skill.source) === SOURCE_SYSTEM_BUILTIN ? t('systemBuiltin') :
+                           normalizeSkillSource(skill.source) === SOURCE_BACKEND_GENERATED ? t('backendGenerated') :
+                           normalizeSkillSource(skill.source) === SOURCE_UPLOADED_FILE ? t('uploadedFile') :
+                           normalizeSkillSource(skill.source) === SOURCE_LOCAL_IMPORT ? t('localImport') :
+                           skill.source}
+                        </div>
                       </TableCell>
                       <TableCell className="py-4 px-4 text-muted-foreground text-center text-xs">
                         <div className="truncate">{skill.installation_time}</div>
                       </TableCell>
                       <TableCell className="py-4 px-4 text-center">
                         <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] md:text-xs font-medium whitespace-nowrap ${
-                          skill.status === t('safe') 
+                          normalizeSkillStatus(skill.status) === STATUS_SAFE
                           ? 'bg-green-50 text-green-700 border border-green-100' 
                           : 'bg-amber-50 text-amber-700 border border-amber-100'
                         }`}>
-                          {skill.status === t('safe') ? (
+                          {normalizeSkillStatus(skill.status) === STATUS_SAFE ? (
                             <ShieldCheck className="h-3 w-3" />
                           ) : (
                             <AlertCircle className="h-3 w-3" />
                           )}
-                          {skill.status}
+                          {normalizeSkillStatus(skill.status) === STATUS_SAFE
+                            ? t('safe')
+                            : normalizeSkillStatus(skill.status) === STATUS_LOW_RISK
+                              ? t('lowRisk')
+                              : skill.status}
                         </div>
                       </TableCell>
                       <TableCell className="py-4 px-4 text-right">
@@ -610,7 +660,7 @@ export function Skills() {
           setIsDialogOpen(open);
           if (!open) {
               setEditingSkill(null);
-              setNewSkill({ type: 'python', content: '', source: t('localImport'), status: t('safe') });
+              setNewSkill({ type: 'python', content: '', source: SOURCE_LOCAL_IMPORT, status: STATUS_SAFE });
           }
       }}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col rounded-2xl p-0 overflow-hidden">
@@ -651,7 +701,7 @@ export function Skills() {
                 <div className="grid gap-1.5">
                   <Label htmlFor="status" className="text-muted-foreground font-medium text-sm">{t('status')}</Label>
                   <Select 
-                      value={newSkill.status} 
+                      value={normalizeSkillStatus(newSkill.status)}
                       onValueChange={(val) => { if (val) setNewSkill({...newSkill, status: val}) }}
                       disabled={editingSkill?.is_builtin}
                   >
@@ -659,8 +709,8 @@ export function Skills() {
                           <SelectValue placeholder={t('selectStatus')} />
                       </SelectTrigger>
                       <SelectContent className="rounded-lg">
-                          <SelectItem value={t('safe')}>{t('safe')}</SelectItem>
-                          <SelectItem value={t('lowRisk')}>{t('lowRisk')}</SelectItem>
+                          <SelectItem value={STATUS_SAFE}>{t('safe')}</SelectItem>
+                          <SelectItem value={STATUS_LOW_RISK}>{t('lowRisk')}</SelectItem>
                       </SelectContent>
                   </Select>
                 </div>

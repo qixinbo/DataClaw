@@ -20,6 +20,50 @@ DATA_FILE = str(get_data_root() / "skills.json")
 SKILL_HUB_DIR = str(get_workspace_root() / "skills")
 BACKEND_BUILTIN_SKILLS_DIR = str(Path(__file__).resolve().parents[1] / "skills_builtin")
 
+SOURCE_LOCAL_IMPORT = "local_import"
+SOURCE_SYSTEM_BUILTIN = "system_builtin"
+SOURCE_BACKEND_GENERATED = "backend_generated"
+SOURCE_UPLOADED_FILE = "uploaded_file"
+
+STATUS_SAFE = "safe"
+STATUS_LOW_RISK = "low_risk"
+
+_SOURCE_ALIASES = {
+    SOURCE_LOCAL_IMPORT: SOURCE_LOCAL_IMPORT,
+    "本地导入": SOURCE_LOCAL_IMPORT,
+    "Local Import": SOURCE_LOCAL_IMPORT,
+    SOURCE_SYSTEM_BUILTIN: SOURCE_SYSTEM_BUILTIN,
+    "系统内置": SOURCE_SYSTEM_BUILTIN,
+    "System Built-in": SOURCE_SYSTEM_BUILTIN,
+    SOURCE_BACKEND_GENERATED: SOURCE_BACKEND_GENERATED,
+    "后台生成": SOURCE_BACKEND_GENERATED,
+    "Backend Generated": SOURCE_BACKEND_GENERATED,
+    SOURCE_UPLOADED_FILE: SOURCE_UPLOADED_FILE,
+    "文件上传": SOURCE_UPLOADED_FILE,
+    "File Upload": SOURCE_UPLOADED_FILE,
+}
+
+_STATUS_ALIASES = {
+    STATUS_SAFE: STATUS_SAFE,
+    "安全": STATUS_SAFE,
+    "Safe": STATUS_SAFE,
+    STATUS_LOW_RISK: STATUS_LOW_RISK,
+    "低风险": STATUS_LOW_RISK,
+    "Low Risk": STATUS_LOW_RISK,
+}
+
+
+def _normalize_source(value: Optional[str]) -> str:
+    if not value:
+        return SOURCE_LOCAL_IMPORT
+    return _SOURCE_ALIASES.get(value, value)
+
+
+def _normalize_status(value: Optional[str]) -> str:
+    if not value:
+        return STATUS_SAFE
+    return _STATUS_ALIASES.get(value, value)
+
 def _ensure_skill_hub_dir() -> None:
     os.makedirs(SKILL_HUB_DIR, exist_ok=True)
 
@@ -30,9 +74,9 @@ class Skill(BaseModel):
     content: str = Field(..., description="The content/prompt/logic of the skill")
     type: str = Field("python", description="Type of the skill (python, sql, api)")
     project_id: Optional[int] = Field(None, description="The ID of the project this skill belongs to")
-    source: str = Field("本地导入", description="Source of the skill (e.g., 本地导入, GitHub 导入)")
+    source: str = Field(SOURCE_LOCAL_IMPORT, description="Stable source key of the skill")
     installation_time: str = Field(default_factory=lambda: datetime.now().strftime("%Y年%m月%d日"), description="Time when the skill was installed")
-    status: str = Field("安全", description="Security status of the skill (e.g., 安全, 低风险)")
+    status: str = Field(STATUS_SAFE, description="Stable security status key")
     file_path: Optional[str] = Field(None, description="Path to the skill folder in skill-hub")
     is_builtin: bool = Field(False, description="Whether this is a system builtin skill")
 
@@ -43,9 +87,9 @@ class SkillCreate(BaseModel):
     content: str
     type: str = "python"
     project_id: Optional[int] = None
-    source: str = "本地导入"
+    source: str = SOURCE_LOCAL_IMPORT
     installation_time: Optional[str] = None
-    status: str = "安全"
+    status: str = STATUS_SAFE
     file_path: Optional[str] = None
 
 class SkillUpdate(BaseModel):
@@ -183,6 +227,7 @@ def _scan_builtin_skills(data: List[Dict[str, Any]], registered_paths: set, sour
                     existing["file_path"] = skill_dir
                     existing["is_builtin"] = True
                     existing["source"] = source_name
+                    existing["status"] = STATUS_SAFE
                     registered_paths.add(skill_dir)
                 else:
                     new_skill = {
@@ -194,7 +239,7 @@ def _scan_builtin_skills(data: List[Dict[str, Any]], registered_paths: set, sour
                         "project_id": None,
                         "source": source_name,
                         "installation_time": datetime.now().strftime("%Y年%m月%d日"),
-                        "status": "安全",
+                        "status": STATUS_SAFE,
                         "file_path": skill_dir,
                         "is_builtin": True
                     }
@@ -209,6 +254,8 @@ def load_skills(project_id: Optional[int] = None) -> List[Dict[str, Any]]:
     
     # Sync registered skills with their SKILL.md if available
     for item in data:
+        item["source"] = _normalize_source(item.get("source"))
+        item["status"] = _normalize_status(item.get("status"))
         if item.get("id") in ("nl2sql", "visualization") or item.get("is_builtin"):
             item["is_builtin"] = True
         else:
@@ -228,8 +275,8 @@ def load_skills(project_id: Optional[int] = None) -> List[Dict[str, Any]]:
                     item["content"] = metadata_res["content"]
     
     # Scan builtin skills
-    _scan_builtin_skills(data, registered_paths, NANOBOT_BUILTIN_SKILLS_DIR, "系统内置")
-    _scan_builtin_skills(data, registered_paths, BACKEND_BUILTIN_SKILLS_DIR, "系统内置")
+    _scan_builtin_skills(data, registered_paths, NANOBOT_BUILTIN_SKILLS_DIR, SOURCE_SYSTEM_BUILTIN)
+    _scan_builtin_skills(data, registered_paths, BACKEND_BUILTIN_SKILLS_DIR, SOURCE_SYSTEM_BUILTIN)
 
     # Scan for unregistered skills in SKILL_HUB_DIR (1-level deep to match nanobot's behavior)
     if os.path.exists(SKILL_HUB_DIR):
@@ -254,9 +301,9 @@ def load_skills(project_id: Optional[int] = None) -> List[Dict[str, Any]]:
                         "content": metadata_res.get("content") or "",
                         "type": "agentskill",
                         "project_id": deduced_project_id,
-                        "source": "后台生成",
+                        "source": SOURCE_BACKEND_GENERATED,
                         "installation_time": datetime.now().strftime("%Y年%m月%d日"),
-                        "status": "安全",
+                        "status": STATUS_SAFE,
                         "file_path": skill_dir,
                         "is_builtin": item in ("nl2sql", "visualization")
                     }
@@ -389,9 +436,9 @@ async def upload_skill(
             "content": metadata_res.get("content") or "",
             "type": "agentskill",
             "project_id": project_id,
-            "source": "文件上传",
+            "source": SOURCE_UPLOADED_FILE,
             "installation_time": datetime.now().strftime("%Y年%m月%d日"),
-            "status": "安全",
+            "status": STATUS_SAFE,
             "file_path": final_skill_dir
         }
         
@@ -420,6 +467,8 @@ def create_skill(skill: SkillCreate):
         raise HTTPException(status_code=400, detail="Skill with this ID already exists in this project")
     
     new_skill_dict = skill.dict()
+    new_skill_dict["source"] = _normalize_source(new_skill_dict.get("source"))
+    new_skill_dict["status"] = _normalize_status(new_skill_dict.get("status"))
     if not new_skill_dict.get("installation_time"):
         new_skill_dict["installation_time"] = datetime.now().strftime("%Y年%m月%d日")
     if not new_skill_dict.get("file_path"):
@@ -455,6 +504,10 @@ def update_skill(skill_id: str, skill: SkillUpdate, project_id: Optional[int] = 
                 continue
             updated_item = item.copy()
             update_data = skill.dict(exclude_unset=True)
+            if "source" in update_data:
+                update_data["source"] = _normalize_source(update_data.get("source"))
+            if "status" in update_data:
+                update_data["status"] = _normalize_status(update_data.get("status"))
             updated_item.update(update_data)
             if updated_item.get("file_path"):
                 _write_skill_markdown(
