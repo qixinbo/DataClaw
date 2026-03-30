@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { User, Loader2, ArrowUp, ChevronDown, Check, Square, Plus, Database, Wand2, CheckCircle2, Table, XCircle, Settings, ExternalLink, FileText, Download, Eye, Copy, Mic, X } from "lucide-react";
+import { User, Loader2, ArrowUp, ChevronDown, Check, Square, Plus, Database, Wand2, CheckCircle2, Table, XCircle, Settings, ExternalLink, Download, Copy, Mic, X, Compass } from "lucide-react";
 import { api } from "@/lib/api";
 import { type ChartSpec } from "@/store/visualizationStore";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -13,7 +13,7 @@ import { useTranslation } from "react-i18next";
 import { InlineVisualizationCard } from "./InlineVisualizationCard";
 import { useProjectStore } from "@/store/projectStore";
 import { SlashCommandMenu } from "./SlashCommandMenu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ArtifactPanel } from "./ArtifactPanel";
 
 interface Message {
   id: string;
@@ -63,6 +63,7 @@ interface ArtifactPreviewTarget {
   name: string;
   mimeType: string;
   previewUrl: string;
+  downloadUrl: string;
 }
 
 const REPORT_HTML_BLOCK_REGEX = /<!--\s*REPORT_HTML_START\s*-->([\s\S]*?)<!--\s*REPORT_HTML_END\s*-->/i;
@@ -142,19 +143,6 @@ interface SessionData {
     [key: string]: any;
   }>;
 }
-
-const formatArtifactSize = (size: number): string => {
-  if (!Number.isFinite(size) || size < 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let value = size;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-  const fixed = value >= 10 || unitIndex === 0 ? 0 : 1;
-  return `${value.toFixed(fixed)} ${units[unitIndex]}`;
-};
 
 const normalizeArtifacts = (raw: unknown): MessageArtifact[] => {
   if (!Array.isArray(raw)) return [];
@@ -1357,7 +1345,8 @@ export function ChatInterface() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-background relative">
+    <div className="flex h-full bg-background relative overflow-hidden">
+      <div className={cn("flex flex-col h-full transition-all duration-300", artifactPreview ? "w-full md:w-1/2 border-r border-border hidden md:flex" : "w-full")}>
       <ScrollArea className="flex-1 min-h-0">
         {/* Hidden file input available in all states */}
         <input
@@ -1558,34 +1547,39 @@ export function ChatInterface() {
                             {msg.artifacts && msg.artifacts.length > 0 ? (
                               <div className="mt-4 grid gap-2 sm:grid-cols-2">
                                 {msg.artifacts.map((artifact, artifactIndex) => (
-                                  <div key={`${msg.id}-artifact-${artifactIndex}`} className="rounded-xl border border-border bg-muted/50/60 px-3 py-2.5">
-                                    <div className="flex items-center gap-2.5">
-                                      <div className="h-8 w-8 rounded-lg bg-background border border-border flex items-center justify-center text-muted-foreground shrink-0">
-                                        <FileText className="h-4 w-4" />
+                                  <div 
+                                    key={`${msg.id}-artifact-${artifactIndex}`} 
+                                    className="rounded-xl border border-border bg-background px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors flex items-center justify-between gap-4"
+                                    onClick={() => {
+                                      if (artifact.previewable && artifact.preview_url) {
+                                        setArtifactPreview({ 
+                                          name: artifact.name, 
+                                          mimeType: artifact.mime_type, 
+                                          previewUrl: artifact.preview_url,
+                                          downloadUrl: artifact.download_url
+                                        });
+                                      }
+                                    }}
+                                  >
+                                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                                      <div className="h-10 w-10 rounded-full bg-background border border-border flex items-center justify-center text-foreground shrink-0">
+                                        <Compass className="h-5 w-5" />
                                       </div>
                                       <div className="min-w-0 flex-1">
-                                        <div className="text-sm font-medium text-foreground/90 truncate">{artifact.name}</div>
-                                        <div className="text-[11px] text-muted-foreground">{formatArtifactSize(artifact.size)}</div>
+                                        <div className="text-sm font-bold text-foreground truncate">{artifact.name}</div>
+                                        <div className="text-xs text-muted-foreground truncate">{artifact.mime_type === "text/html" ? "HTML file" : artifact.mime_type}</div>
                                       </div>
                                     </div>
-                                    <div className="mt-2 flex items-center gap-2">
-                                      {artifact.previewable && artifact.preview_url ? (
-                                        <button
-                                          onClick={() => setArtifactPreview({ name: artifact.name, mimeType: artifact.mime_type, previewUrl: artifact.preview_url || "" })}
-                                          className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border border-border text-foreground/80 hover:bg-background transition-colors"
-                                        >
-                                          <Eye className="h-3.5 w-3.5" />
-                                          {t('preview')}
-                                        </button>
-                                      ) : null}
+                                    <div className="flex items-center gap-2 flex-shrink-0">
                                       <a
                                         href={artifact.download_url}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border border-border text-foreground/80 hover:bg-background transition-colors"
+                                        className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md text-foreground/80 hover:bg-muted transition-colors whitespace-nowrap"
+                                        onClick={(e) => e.stopPropagation()}
                                       >
-                                        <Download className="h-3.5 w-3.5" />
-                                        {t('download')}
+                                        <Download className="h-4 w-4" />
+                                        <span>{t('download')}</span>
                                       </a>
                                     </div>
                                   </div>
@@ -1644,42 +1638,17 @@ export function ChatInterface() {
           })}
         </div>
       )}
-      <Dialog open={Boolean(artifactPreview)} onOpenChange={(open) => {
-        if (!open) setArtifactPreview(null);
-      }}>
-        <DialogContent className="sm:max-w-[min(1100px,95vw)] h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>{artifactPreview?.name || t('artifactPreview')}</DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 min-h-0 rounded-lg border border-border bg-background overflow-hidden">
-            {artifactPreview?.mimeType.startsWith("image/") ? (
-              <img
-                src={artifactPreview.previewUrl}
-                alt={artifactPreview.name}
-                className="w-full h-full object-contain bg-muted/50"
-              />
-            ) : artifactPreview ? (
-              <iframe
-                title={artifactPreview.name}
-                src={artifactPreview.previewUrl}
-                className="w-full h-full border-0"
-                onLoad={(e) => {
-                  try {
-                    const doc = (e.target as HTMLIFrameElement).contentDocument;
-                    if (doc) {
-                      const style = doc.createElement('style');
-                      style.textContent = `html, body { overflow: auto !important; }`;
-                      doc.head.appendChild(style);
-                    }
-                  } catch (err) {
-                    console.error("Failed to inject styles into iframe", err);
-                  }
-                }}
-              />
-            ) : null}
-          </div>
-        </DialogContent>
-      </Dialog>
+      </div>
+
+      {/* Artifact Side Panel */}
+      {artifactPreview && (
+        <div className="w-full md:w-1/2 h-full absolute md:relative inset-0 md:inset-auto z-50">
+          <ArtifactPanel
+            artifact={artifactPreview}
+            onClose={() => setArtifactPreview(null)}
+          />
+        </div>
+      )}
     </div>
   );
 }
