@@ -92,7 +92,7 @@ npm run build
 
 # 2) 构建后端 wheel，并输出到根目录 dist/
 cd ../backend
-uv build --out-dir ../dist
+uv build --wheel --out-dir ../dist
 ```
 
 构建完成后，wheel 位于项目根目录 `dist/`，例如 `dist/dataclaw-0.1.0-py3-none-any.whl`。

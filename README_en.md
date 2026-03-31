@@ -94,7 +94,7 @@ npm run build
 
 # Then, build the backend wheel
 cd ../backend
-uv build --out-dir ../dist
+uv build --wheel --out-dir ../dist
 ```
 
 Once built, the wheel is located in the project root `dist/` directory, e.g., `dist/dataclaw-0.1.0-py3-none-any.whl`.

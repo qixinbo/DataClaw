@@ -124,7 +124,7 @@ def start(
     reload: bool = typer.Option(False, "--reload", "-r", help="开启自动重载（开发模式）"),
     log_level: str = typer.Option("info", "--log-level", help="日志级别"),
     app_target: str = typer.Option("main:app", "--app", help="ASGI 应用导入路径"),
-    ready_timeout: float = typer.Option(12.0, "--ready-timeout", help="就绪等待时长（秒）"),
+    ready_timeout: float = typer.Option(60.0, "--ready-timeout", help="就绪等待时长（秒）"),
     pid_file: str | None = typer.Option(None, "--pid-file", help="PID 状态文件路径"),
     log_file: str | None = typer.Option(None, "--log-file", help="服务日志文件路径"),
 ) -> None:
