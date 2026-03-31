@@ -88,6 +88,13 @@ class TraceService:
     def initialize(self) -> bool:
         if self._initialized:
             return self._enabled
+            
+        enable_tracing = os.getenv("ENABLE_TRACING", "false").lower() in ("true", "1", "t", "yes")
+        if not enable_tracing:
+            self._initialized = True
+            self._enabled = False
+            return False
+            
         self._initialized = True
         cfg = self._read_config()
         if not cfg["public_key"] or not cfg["secret_key"]:
