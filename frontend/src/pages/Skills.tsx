@@ -406,13 +406,6 @@ export function Skills() {
                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                 {isLoading ? t('uploading', '上传中...') : t('uploadSkill')}
               </Button>
-              <Button 
-                onClick={() => setIsDialogOpen(true)}
-                className="h-9 bg-indigo-600 hover:bg-indigo-700 text-white gap-2 rounded-md px-3 shadow-sm"
-              >
-                <Plus className="h-4 w-4" />
-                {t('addNewSkill')}
-              </Button>
             </>
           ) : (
             <>
