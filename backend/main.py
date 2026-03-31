@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import binascii
+import importlib.resources as importlib_resources
 from typing import Any, Dict, List, Optional, Literal, Tuple
 import mimetypes
 from pathlib import Path
@@ -10,11 +11,12 @@ from dotenv import load_dotenv
 env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel
 import json
 import re
@@ -98,6 +100,28 @@ PREVIEWABLE_TEXT_EXTENSIONS = {
     ".log",
 }
 
+
+def _resolve_webui_directory() -> Optional[Path]:
+    try:
+        package_webui = importlib_resources.files("app").joinpath("webui")
+        package_webui_path = Path(str(package_webui))
+        if package_webui_path.is_dir():
+            return package_webui_path
+    except Exception:
+        pass
+    source_webui = Path(__file__).resolve().parent / "app" / "webui"
+    if source_webui.is_dir():
+        return source_webui
+    source_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+    if source_dist.is_dir():
+        return source_dist
+    return None
+
+
+_WEBUI_DIR = _resolve_webui_directory()
+_WEBUI_INDEX = _WEBUI_DIR / "index.html" if _WEBUI_DIR else None
+_WEBUI_STATIC = StaticFiles(directory=str(_WEBUI_DIR), html=False) if _WEBUI_DIR else None
+
 @app.on_event("startup")
 async def startup_event():
     try:
@@ -119,9 +143,33 @@ async def shutdown_event():
     await nanobot_service.stop()
     trace_service.shutdown()
 
-@app.get("/")
-def read_root():
+async def read_root():
+    if _WEBUI_INDEX and _WEBUI_INDEX.is_file():
+        return FileResponse(path=str(_WEBUI_INDEX), media_type="text/html")
     return {"Hello": "DataClaw Backend"}
+
+
+async def serve_webui_path(full_path: str, request: Request):
+    reserved_prefixes = ("api/", "reports/", "nanobot/", "connect/", "docs", "redoc", "openapi.json")
+    if full_path.startswith(reserved_prefixes):
+        raise HTTPException(status_code=404, detail="Not Found")
+    if not _WEBUI_STATIC:
+        raise HTTPException(status_code=404, detail="Not Found")
+    try:
+        response = await _WEBUI_STATIC.get_response(full_path, request.scope)
+    except StarletteHTTPException as exc:
+        if exc.status_code != 404:
+            raise
+        response = None
+    if response and response.status_code != 404:
+        return response
+    if Path(full_path).suffix:
+        if response:
+            return response
+        raise HTTPException(status_code=404, detail="Not Found")
+    if _WEBUI_INDEX and _WEBUI_INDEX.is_file():
+        return FileResponse(path=str(_WEBUI_INDEX), media_type="text/html")
+    raise HTTPException(status_code=404, detail="Not Found")
 
 @app.get("/connect/postgres")
 def test_postgres():
@@ -794,3 +842,7 @@ def update_session_context_file(session_id: str, payload: SessionFileContextUpda
     session.updated_at = datetime.now()
     nanobot_service.agent.sessions.save(session)
     return {"status": "success", "metadata": session.metadata}
+
+
+app.add_api_route("/", read_root, methods=["GET"], include_in_schema=False)
+app.add_api_route("/{full_path:path}", serve_webui_path, methods=["GET"], include_in_schema=False)

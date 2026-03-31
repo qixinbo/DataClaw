@@ -80,9 +80,63 @@ Please edit the `.env` file in the root directory and fill in your actual config
 > 5. Click "Generate Authorization Code" (生成授权码) below it, scan the QR code with mobile QQ or send an SMS as prompted
 > 6. After verification, you will get a **16-digit random letter combination**. Copy and paste it into the `SMTP_PASSWORD` field in your `.env` file
 
-### 2. Backend Setup 🐍
+### 2. Standard Deployment (Recommended, No Node.js Required) 📦
 
-Ensure you have Python 3.10+ installed.
+Ensure you have Python 3.11+ installed. The pre-built React frontend is bundled in the Python wheel, so you don't need Node.js for production deployment.
+
+#### Build the wheel (output to `dist/`)
+
+```bash
+# First, build the frontend
+cd frontend
+npm install
+npm run build
+
+# Then, build the backend wheel
+cd ../backend
+uv build --out-dir ../dist
+```
+
+Once built, the wheel is located in the project root `dist/` directory, e.g., `dist/dataclaw-0.1.0-py3-none-any.whl`.
+
+#### Install and Run
+
+```bash
+# We recommend creating a virtual environment first
+python -m venv .venv
+source .venv/bin/activate
+
+# Install DataClaw
+pip install ./dist/dataclaw-*.whl
+
+# Start the service (defaults to http://127.0.0.1:8000)
+dataclaw start
+```
+
+Common service control commands:
+
+```bash
+# Check running status
+dataclaw status
+
+# Custom host/port
+dataclaw start --host 0.0.0.0 --port 8000
+
+# Stop the service
+dataclaw stop
+```
+
+Optional environment variable:
+
+```bash
+export DATA_ROOT=/absolute/path/to/data
+```
+
+If not set, DataClaw uses the repository-level `data/` directory by default. Service state files and logs are located in `DATA_ROOT/run/`.
+
+### 3. Development Mode (Requires Node.js) 🧪
+
+If you want to debug the frontend code or rebuild the frontend artifacts, use the separate development mode:
 
 ```bash
 cd backend
@@ -97,20 +151,6 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-Optional environment variable:
-
-```bash
-export DATA_ROOT=/absolute/path/to/data
-```
-
-If not set, DataClaw uses the repository-level `data/` directory by default.
-
-*Note: Ensure your* *`nanobot`* *is properly linked or installed in editable mode as per the project workspace.*
-
-### 2. Frontend Setup ⚛️
-
-Ensure you have Node.js 18+ installed.
-
 ```bash
 cd frontend
 # Install dependencies
@@ -120,7 +160,9 @@ npm install
 npm run dev
 ```
 
-### 3. Optional Voice Service 🎙️
+*Note: Ensure your* *`nanobot`* *is properly linked or installed in editable mode as per the project workspace.*
+
+### 4. Optional Voice Service 🎙️
 
 If you want to use voice input in chat, run the standalone `whisper` service:
 

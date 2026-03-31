@@ -80,9 +80,63 @@ cp .env.example .env
 > 5. 点击下方的“生成授权码”，使用手机 QQ 扫码或按提示发送短信
 > 6. 验证通过后将获得一串 **16位随机字母组合**，将其复制填入 `.env` 文件中的 `SMTP_PASSWORD` 字段
 
-### 2. 后端服务启动 🐍
+### 2. 打包 wheel（产物输出到根目录 `dist/`）📦
 
-请确保你已安装 Python 3.10 或以上版本。
+如需自行打包发布，请按以下顺序执行：先构建前端，再构建后端 wheel，并将产物输出到项目根目录 `dist/`（与 `backend/` 同级）。
+
+```bash
+# 1) 构建前端静态资源
+cd frontend
+npm install
+npm run build
+
+# 2) 构建后端 wheel，并输出到根目录 dist/
+cd ../backend
+uv build --out-dir ../dist
+```
+
+构建完成后，wheel 位于项目根目录 `dist/`，例如 `dist/dataclaw-0.1.0-py3-none-any.whl`。
+
+### 3. 标准部署（推荐，无需 Node.js）📦
+
+请确保你已安装 Python 3.11 或以上版本。发布包已内置前端静态资源，生产部署无需安装 Node.js。
+
+```bash
+# 建议先创建虚拟环境
+python -m venv .venv
+source .venv/bin/activate
+
+# 安装 DataClaw（示例：安装根目录 dist 下的 wheel）
+pip install ./dist/dataclaw-*.whl
+
+# 启动服务（默认 http://127.0.0.1:8000）
+dataclaw start
+```
+
+常用服务控制命令：
+
+```bash
+# 查看运行状态
+dataclaw status
+
+# 自定义监听地址/端口
+dataclaw start --host 0.0.0.0 --port 8000
+
+# 停止服务
+dataclaw stop
+```
+
+可选环境变量：
+
+```bash
+export DATA_ROOT=/absolute/path/to/data
+```
+
+若未设置，默认使用仓库根目录下的 `data/`。服务状态文件与日志默认位于 `DATA_ROOT/run/`。
+
+### 4. 开发模式（需要 Node.js）🧪
+
+如果你要调试前端代码或重新构建前端产物，请使用前后端分离开发模式：
 
 ```bash
 cd backend
@@ -97,31 +151,18 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-可选环境变量：
-
-```bash
-export DATA_ROOT=/absolute/path/to/data
-```
-
-若未设置，默认使用仓库根目录下的 `data/`。
-
-*提示：请确保* *`nanobot`* *核心库已根据项目工作区的要求正确链接或以可编辑模式 (editable mode) 安装。*
-
-### 2. 前端服务启动 ⚛️
-
-请确保你已安装 Node.js 18 或以上版本。
-
 ```bash
 cd frontend
-# 安装依赖
+# 安装依赖（仅开发模式需要 Node.js）
 npm install
 
 # 启动 Vite 开发服务器
 npm run dev
 ```
 
+*提示：请确保* *`nanobot`* *核心库已根据项目工作区的要求正确链接或以可编辑模式 (editable mode) 安装。*
 
-### 3. 语音识别服务（可选）🎙️
+### 5. 语音识别服务（可选）🎙️
 
 若你希望使用聊天输入框中的语音输入能力，请单独启动 `whisper` 服务：
 
@@ -142,7 +183,7 @@ python main.py
 3. 填写服务地址（例如 `http://localhost:8001`）；
 4. 点击「测试连接」通过后保存。
 
-### 4. 初始账号配置 👤
+### 6. 初始账号配置 👤
 系统首次注册的用户将自动成为管理员。您可以在登录页面直接点击“注册”按钮创建您的管理员账号（例如：用户名 `admin`，密码 `admin`），随后即可登录并管理项目、数据源和用户。
 
 ***
