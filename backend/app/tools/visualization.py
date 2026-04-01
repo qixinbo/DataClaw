@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import Any
 
 from nanobot.agent.tools.base import Tool
@@ -7,6 +8,10 @@ from app.context import current_data, current_viz_data, current_progress_callbac
 from fastapi.encoders import jsonable_encoder
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_query(value: str) -> str:
+    return re.sub(r"\s+", "", (value or "")).lower()
 
 class VisualizationTool(Tool):
     """
@@ -22,7 +27,8 @@ class VisualizationTool(Tool):
         return (
             "Generate a chart or visualization based on the most recently queried data. "
             "Use this tool when the user asks to plot, visualize, or create a chart from data that has already been retrieved. "
-            "Note: This tool relies on the data from the last executed SQL query. If no query has been executed yet, you must use the nl2sql tool first."
+            "Note: This tool relies on the data from the last executed SQL query. If no query has been executed yet, you must use the nl2sql tool first. "
+            "Do not call this tool right after nl2sql(generate_chart=True) for the same request."
         )
 
     @property
@@ -47,6 +53,20 @@ class VisualizationTool(Tool):
             return "Error: No data available to visualize. Please query the data first using the nl2sql tool."
 
         try:
+            existing_viz = current_viz_data.get() or {}
+            existing_chart = existing_viz.get("chart") if isinstance(existing_viz, dict) else None
+            existing_result = existing_viz.get("result") if isinstance(existing_viz, dict) else None
+            existing_query_normalized = (
+                existing_viz.get("chart_query_normalized") if isinstance(existing_viz, dict) else None
+            )
+            if (
+                existing_chart
+                and existing_result == data
+                and existing_query_normalized
+                and existing_query_normalized == _normalize_query(query)
+            ):
+                return "Chart already exists for this query and dataset. Reusing existing Vega visualization."
+
             if on_progress:
                 await on_progress("正在分析数据特征并生成可视化方案...")
 
@@ -61,6 +81,9 @@ class VisualizationTool(Tool):
                     "sql": existing_viz.get("sql", ""),
                     "result": data,
                     "chart": chart_response.model_dump(by_alias=True, exclude_none=True),
+                    "chart_query": query,
+                    "chart_query_normalized": _normalize_query(query),
+                    "chart_generated_by": "visualization",
                     "error": None,
                 }
                 encoded_viz = jsonable_encoder(viz_payload)

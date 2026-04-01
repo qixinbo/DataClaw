@@ -470,6 +470,9 @@ async def nanobot_chat(request: ChatRequest):
         instructions = []
         if request.route_mode == "sql" or request.prefer_sql_chart:
             instructions.append("Use the nl2sql tool to answer the query")
+            instructions.append("If the user also asks for visualization, set generate_chart=true in the same nl2sql call")
+            instructions.append("Do not call visualization after nl2sql if a chart is already generated for this request")
+            instructions.append("Do not use exec, Python scripts, or matplotlib for chart plotting")
         elif request.route_mode == "chat":
             instructions.append("Normal chat mode. Do NOT use the nl2sql tool")
 
@@ -581,6 +584,9 @@ async def nanobot_chat_stream(request: ChatRequest):
                 instructions = []
                 if request.route_mode == "sql" or request.prefer_sql_chart:
                     instructions.append("Use the nl2sql tool to answer the query")
+                    instructions.append("If the user also asks for visualization, set generate_chart=true in the same nl2sql call")
+                    instructions.append("Do not call visualization after nl2sql if a chart is already generated for this request")
+                    instructions.append("Do not use exec, Python scripts, or matplotlib for chart plotting")
                 elif request.route_mode == "chat":
                     instructions.append("Normal chat mode. Do NOT use the nl2sql tool")
 

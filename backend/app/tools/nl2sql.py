@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from typing import Any
 
 from nanobot.agent.tools.base import Tool
@@ -9,12 +10,19 @@ from fastapi.encoders import jsonable_encoder
 
 logger = logging.getLogger(__name__)
 
-def _build_sql_chart_viz(nl2sql_result: NL2SQLResponse) -> dict:
+def _normalize_query(value: str) -> str:
+    return re.sub(r"\s+", "", (value or "")).lower()
+
+
+def _build_sql_chart_viz(nl2sql_result: NL2SQLResponse, query: str) -> dict:
     chart = nl2sql_result.chart
     payload = {
         "sql": nl2sql_result.sql,
         "result": nl2sql_result.result,
         "chart": chart.model_dump(by_alias=True, exclude_none=True) if chart else None,
+        "chart_query": query,
+        "chart_query_normalized": _normalize_query(query),
+        "chart_generated_by": "nl2sql",
         "error": nl2sql_result.error,
     }
     return jsonable_encoder(payload)
@@ -34,7 +42,8 @@ class NL2SQLTool(Tool):
         return (
             "Query the connected database or data source using natural language. "
             "Use this tool when the user asks to query, analyze, aggregate, or fetch data from the database. "
-            "Set generate_chart=True if the user also wants to visualize or plot the data."
+            "Set generate_chart=True if the user also wants to visualize or plot the data. "
+            "If generate_chart=True, do not call visualization again for the same request."
         )
 
     @property
@@ -76,7 +85,7 @@ class NL2SQLTool(Tool):
             
             # Always save visualization payload to context so the chat stream can pick it up
             # Even if there's an error, we want the frontend to see the generated SQL
-            viz_payload = _build_sql_chart_viz(result)
+            viz_payload = _build_sql_chart_viz(result, query)
             existing_viz = current_viz_data.get()
             if isinstance(existing_viz, dict):
                 existing_viz.clear()
