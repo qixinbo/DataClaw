@@ -103,27 +103,26 @@ Once built, the wheel is located in the project root `dist/` directory, e.g., `d
 
 ```bash
 # We recommend creating a virtual environment first
-python -m venv .venv
-source .venv/bin/activate
+uv venv
 
 # Install DataClaw
-pip install ./dist/dataclaw-*.whl
+uv pip install ./dist/dataclaw-*.whl
 
 # Start the service (defaults to http://127.0.0.1:8000)
-dataclaw start
+uv run dataclaw start
 ```
 
 Common service control commands:
 
 ```bash
 # Check running status
-dataclaw status
+uv run dataclaw status
 
 # Custom host/port
-dataclaw start --host 0.0.0.0 --port 8000
+uv run dataclaw start --host 0.0.0.0 --port 8000
 
 # Stop the service
-dataclaw stop
+uv run dataclaw stop
 ```
 
 Optional environment variable:
@@ -141,14 +140,13 @@ If you want to debug the frontend code or rebuild the frontend artifacts, use th
 ```bash
 cd backend
 # Create a virtual environment (optional but recommended)
-python -m venv .venv
-source .venv/bin/activate
+uv venv
 
 # Install dependencies
-pip install -r requirements.txt
+uv sync
 
 # Start the FastAPI server
-uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --reload --port 8000
 ```
 
 ```bash
@@ -168,10 +166,9 @@ If you want to use voice input in chat, run the standalone `whisper` service:
 
 ```bash
 cd whisper
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python main.py
+uv venv
+uv pip install -r requirements.txt
+uv run python main.py
 ```
 
 Default service URL: `http://localhost:8001`  
@@ -264,15 +261,13 @@ Run them in two terminals:
 ```bash
 # Terminal 1 - Instance A
 cd backend
-source .venv/bin/activate
-DATA_ROOT=/tmp/dataclaw-a uvicorn main:app --reload --port 8000
+DATA_ROOT=/tmp/dataclaw-a uv run uvicorn main:app --reload --port 8000
 ```
 
 ```bash
 # Terminal 2 - Instance B
 cd backend
-source .venv/bin/activate
-DATA_ROOT=/tmp/dataclaw-b uvicorn main:app --reload --port 8001
+DATA_ROOT=/tmp/dataclaw-b uv run uvicorn main:app --reload --port 8001
 ```
 
 Create/login users and fetch tokens:

@@ -103,11 +103,11 @@ uv build --wheel --out-dir ../dist
 
 ```bash
 # 建议先创建虚拟环境
-python -m venv .venv
+uv venv
 source .venv/bin/activate
 
 # 安装 DataClaw（示例：安装根目录 dist 下的 wheel）
-pip install ./dist/dataclaw-*.whl
+uv pip install ./dist/dataclaw-*.whl
 
 # 启动服务（默认 http://127.0.0.1:8000）
 dataclaw start
@@ -141,14 +141,14 @@ export DATA_ROOT=/absolute/path/to/data
 ```bash
 cd backend
 # 创建虚拟环境（可选但强烈建议）
-python -m venv .venv
+uv venv
 source .venv/bin/activate
 
 # 安装依赖
-pip install -r requirements.txt
+uv sync
 
 # 启动 FastAPI 服务器
-uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --reload --port 8000
 ```
 
 ```bash
@@ -168,10 +168,10 @@ npm run dev
 
 ```bash
 cd whisper
-python -m venv .venv
+uv venv
 source .venv/bin/activate
-pip install -r requirements.txt
-python main.py
+uv pip install -r requirements.txt
+uv run python main.py
 ```
 
 默认服务地址：`http://localhost:8001`  
@@ -313,15 +313,13 @@ curl -X POST http://127.0.0.1:8000/api/v1/a2a/tasks/<task_id>/webhooks \
 ```bash
 # 终端1：实例 A
 cd backend
-source .venv/bin/activate
-DATA_ROOT=/tmp/dataclaw-a uvicorn main:app --reload --port 8000
+DATA_ROOT=/tmp/dataclaw-a uv run uvicorn main:app --reload --port 8000
 ```
 
 ```bash
 # 终端2：实例 B
 cd backend
-source .venv/bin/activate
-DATA_ROOT=/tmp/dataclaw-b uvicorn main:app --reload --port 8001
+DATA_ROOT=/tmp/dataclaw-b uv run uvicorn main:app --reload --port 8001
 ```
 
 然后在两个实例分别注册并登录，拿到 token：
