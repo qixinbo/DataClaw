@@ -186,6 +186,183 @@ python main.py
 ### 6. 初始账号配置 👤
 系统首次注册的用户将自动成为管理员。您可以在登录页面直接点击“注册”按钮创建您的管理员账号（例如：用户名 `admin`，密码 `admin`），随后即可登录并管理项目、数据源和用户。
 
+### 7. A2A 模式使用指南 🤖
+
+A2A（Agent2Agent）用于让 DataClaw 把任务委托给远端 Agent，并保持任务可跟踪（状态流、产物流、取消、重试）。
+
+#### 7.1 在前端启用 A2A（推荐）
+
+1. 进入 **Skills** 页面，切到 **A2A** 标签页。  
+2. 点击新增远端 Agent，填写：
+   - `name`: 远端 Agent 名称
+   - `base_url`: 远端 DataClaw/A2A 网关地址（如 `https://agent-b.example.com`）
+   - `auth_scheme`: `none` 或 `bearer`
+   - `auth_token`: 当 `auth_scheme=bearer` 时填写
+3. 点击健康检查，确认 `healthy=true`。  
+4. 回到聊天页，开启 **A2A Mode**，选择 `route_mode` 与目标 Agent 后发送问题。  
+5. 在消息卡片与 A2A 任务面板中查看 `SUBMITTED/WORKING/COMPLETED/FAILED` 等状态，可执行取消与重试。
+
+`route_mode` 建议：
+- `auto`: 按项目灰度配置与策略自动决策
+- `local`: 强制本地执行
+- `a2a`: 强制远端 A2A 执行（需选远端 Agent）
+- `a2a_first`: 先远端，失败按回退链执行
+- `local_first`: 先本地，按需再回退
+
+#### 7.2 API 示例（生产常用）
+
+以下示例假设服务地址为 `http://127.0.0.1:8000`，并已获取登录令牌 `${TOKEN}`。
+
+**示例 1：查看本机 A2A Agent Card**
+
+```bash
+curl -H "Authorization: Bearer ${TOKEN}" \
+  http://127.0.0.1:8000/api/v1/a2a/agent-card
+```
+
+**示例 2：注册远端 Agent**
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/a2a/remote-agents \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "project_id": 1,
+    "name": "Agent-B",
+    "base_url": "https://agent-b.example.com",
+    "auth_scheme": "bearer",
+    "auth_token": "remote-agent-token"
+  }'
+```
+
+**示例 3：以 A2A 优先模式发起任务**
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/a2a/messages/send \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "project_id": 1,
+    "message": "请分析最近30天订单转化趋势并给出建议",
+    "session_id": "chat:demo-a2a",
+    "remote_agent_id": 3,
+    "route_mode": "a2a_first",
+    "fallback_chain": ["a2a", "local", "mcp"],
+    "idempotency_key": "demo-a2a-001"
+  }'
+```
+
+返回结果中的 `task.id` 可用于订阅与管理任务。
+
+**示例 4：订阅任务流（SSE）**
+
+```bash
+curl -N -H "Authorization: Bearer ${TOKEN}" \
+  http://127.0.0.1:8000/api/v1/a2a/tasks/<task_id>/subscribe
+```
+
+你会收到类似事件：
+- `TaskStatusUpdateEvent`（状态变更）
+- `TaskArtifactUpdateEvent`（产物更新）
+- `done`（流结束）
+
+**示例 5：取消任务**
+
+```bash
+curl -X POST -H "Authorization: Bearer ${TOKEN}" \
+  http://127.0.0.1:8000/api/v1/a2a/tasks/<task_id>/cancel
+```
+
+**示例 6：为任务配置 Webhook 回调（离线接收结果）**
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/a2a/tasks/<task_id>/webhooks \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "target_url": "https://your-system.example.com/a2a/webhook",
+    "secret": "your-webhook-secret",
+    "auth_header": "Bearer your-internal-token"
+  }'
+```
+
+#### 7.3 一个完整实战流程
+
+场景：你有一个“本地数据分析 Agent”，还接入了“外部行业知识 Agent-B”。
+
+1. 在 Skills -> A2A 注册 `Agent-B` 并完成健康检查。  
+2. 在聊天页开启 A2A，选择 `route_mode=a2a_first`。  
+3. 输入问题：  
+   `请结合外部行业知识与本地销量数据，生成本季度增长策略。`  
+4. 系统先尝试委托给 `Agent-B`；若远端异常则按回退链降级到本地/MCP。  
+5. 在任务面板查看状态流与最终产物，必要时可取消或重试。  
+
+生产建议：
+- 对业务侧请求始终传 `idempotency_key`，避免重复任务。
+- 为长任务配置 webhook，避免客户端断线丢失进度。
+- 在项目级 rollout 配置灰度比例，先小流量启用 A2A 再全量放开。
+
+#### 7.4 本地调试 A2A（双实例联调）
+
+推荐在本机同时启动两个后端实例：
+- 实例 A（调用方）：`http://127.0.0.1:8000`
+- 实例 B（被调用远端 Agent）：`http://127.0.0.1:8001`
+
+分别用两个终端启动（建议使用不同 `DATA_ROOT`，避免数据目录冲突）：
+
+```bash
+# 终端1：实例 A
+cd backend
+source .venv/bin/activate
+DATA_ROOT=/tmp/dataclaw-a uvicorn main:app --reload --port 8000
+```
+
+```bash
+# 终端2：实例 B
+cd backend
+source .venv/bin/activate
+DATA_ROOT=/tmp/dataclaw-b uvicorn main:app --reload --port 8001
+```
+
+然后在两个实例分别注册并登录，拿到 token：
+
+```bash
+# 分别注册（每个实例首次注册用户会成为管理员）
+curl -X POST http://127.0.0.1:8000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin_a","email":"a@test.com","password":"admin12345"}'
+
+curl -X POST http://127.0.0.1:8001/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin_b","email":"b@test.com","password":"admin12345"}'
+
+# 登录并保存 token
+TOKEN_A=$(curl -s -X POST http://127.0.0.1:8000/api/v1/auth/login \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin_a&password=admin12345" | jq -r '.access_token')
+
+TOKEN_B=$(curl -s -X POST http://127.0.0.1:8001/api/v1/auth/login \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin_b&password=admin12345" | jq -r '.access_token')
+```
+
+最后，在实例 A 中把实例 B 注册成远端 Agent（`auth_token` 使用 `TOKEN_B`）：
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/a2a/remote-agents \
+  -H "Authorization: Bearer ${TOKEN_A}" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"project_id\": 1,
+    \"name\": \"local-agent-b\",
+    \"base_url\": \"http://127.0.0.1:8001\",
+    \"auth_scheme\": \"bearer\",
+    \"auth_token\": \"${TOKEN_B}\"
+  }"
+```
+
+完成后即可在实例 A 发起 A2A 任务、订阅任务流、取消任务，完成本地端到端联调。
+
 ***
 
 ## 🔌 数据源配置说明

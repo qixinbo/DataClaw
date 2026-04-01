@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { User, Loader2, ArrowUp, ChevronDown, Check, Square, Plus, Database, Wand2, CheckCircle2, Table, XCircle, Settings, ExternalLink, Download, Copy, Mic, X, Compass } from "lucide-react";
+import { User, Loader2, ArrowUp, ChevronDown, Check, Square, Plus, Database, Wand2, CheckCircle2, Table, XCircle, Settings, ExternalLink, Download, Copy, Mic, X, Compass, RotateCcw } from "lucide-react";
 import { api } from "@/lib/api";
+import { a2aApi, type A2ARemoteAgent, type A2ATask, type A2ASubscribeEvent } from "@/api/a2a";
 import { type ChartSpec } from "@/store/visualizationStore";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,12 @@ interface Message {
   };
   artifacts?: MessageArtifact[];
   kbCitations?: KnowledgeCitation[];
+  a2aTaskId?: string;
+  a2aTaskState?: string;
+  a2aRouteMode?: string;
+  a2aRemoteAgentId?: number | null;
+  a2aInputText?: string;
+  a2aError?: string;
 }
 
 interface MessageViz {
@@ -81,7 +88,7 @@ const splitReportHtml = (content: string): { markdown: string; reportHtml: strin
   return { markdown, reportHtml: reportHtml || null };
 };
 
-const HTML_FILE_REGEX = /data[\\\/]data[\\\/]([a-zA-Z0-9_\-]+\.html?)/i;
+const HTML_FILE_REGEX = /data[\\/]data[\\/]([a-zA-Z0-9_-]+\.html?)/i;
 
 const extractExternalReport = (content: string): string | null => {
   if (!content) return null;
@@ -135,13 +142,25 @@ interface SessionData {
     active_data_file?: DataFileContext | null;
     selected_data_source?: string | null;
     selected_knowledge_base_id?: string | null;
-    [key: string]: any;
+    [key: string]: unknown;
   };
-  messages: Array<{
-    role: string;
-    content: string;
-    [key: string]: any;
-  }>;
+  messages: SessionMessage[];
+}
+
+interface SessionMessage {
+  role: string;
+  content: string;
+  tool_calls?: unknown[];
+  viz?: unknown;
+  reasoning_content?: string;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+  artifacts?: unknown;
+  kb_citations?: unknown;
+  [key: string]: unknown;
 }
 
 const normalizeArtifacts = (raw: unknown): MessageArtifact[] => {
@@ -201,6 +220,12 @@ const normalizeKnowledgeCitations = (raw: unknown): KnowledgeCitation[] => {
   }, []);
 };
 
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "";
+};
+
 export function ChatInterface() {
   const { t } = useTranslation();
   const [messagesBySession, setMessagesBySession] = useState<Record<string, Message[]>>({});
@@ -222,6 +247,13 @@ export function ChatInterface() {
 
   const [availableSkills, setAvailableSkills] = useState<Skill[]>([]);
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
+  const [a2aEnabled, setA2aEnabled] = useState(false);
+  const [a2aRouteMode, setA2aRouteMode] = useState<"auto" | "local" | "a2a" | "a2a_first" | "local_first">("auto");
+  const [a2aRemoteAgents, setA2aRemoteAgents] = useState<A2ARemoteAgent[]>([]);
+  const [selectedA2aAgentId, setSelectedA2aAgentId] = useState<string>("");
+  const [a2aTaskStateFilter, setA2aTaskStateFilter] = useState<string>("all");
+  const [a2aTasks, setA2aTasks] = useState<A2ATask[]>([]);
+  const [isA2aTaskLoading, setIsA2aTaskLoading] = useState(false);
   const filteredSlashSkills = slashQuery !== null 
     ? availableSkills.filter(s => s.name.toLowerCase().includes(slashQuery.toLowerCase()))
     : [];
@@ -233,7 +265,7 @@ export function ChatInterface() {
     
     // Remove the slash command from input
     // Match the last occurrence of /query
-    const match = input.match(/(?:^|\s)\/([a-zA-Z0-9_\-]*)$/);
+    const match = input.match(/(?:^|\s)\/([a-zA-Z0-9_-]*)$/);
     if (match && match.index !== undefined) {
        // match[0] includes the leading space if present
        const prefix = input.slice(0, match.index);
@@ -282,7 +314,7 @@ export function ChatInterface() {
     setInput(val);
     
     // Simple slash detection: if the last word starts with /
-    const match = val.match(/(?:^|\s)\/([a-zA-Z0-9_\-]*)$/);
+    const match = val.match(/(?:^|\s)\/([a-zA-Z0-9_-]*)$/);
     if (match) {
       setSlashQuery(match[1]);
       setSlashIndex(0);
@@ -311,10 +343,45 @@ export function ChatInterface() {
   
   const generatingSessionsRef = useRef<Record<string, boolean>>({});
   const abortControllersRef = useRef<Record<string, AbortController>>({});
+  const a2aSubscribeControllersRef = useRef<Record<string, AbortController>>({});
+  const a2aActiveTaskBySessionRef = useRef<Record<string, string>>({});
 
   // Model selection state
   const [models, setModels] = useState<ModelConfig[]>([]);
   const [selectedModelId, setSelectedModelId] = useState<string>("");
+
+  const isTerminalA2aState = (state?: string) => {
+    return state ? ["COMPLETED", "FAILED", "CANCELED", "REJECTED"].includes(state) : false;
+  };
+
+  const parseA2aErrorMessage = (raw?: string | null) => {
+    if (!raw) return "";
+    try {
+      const parsed = JSON.parse(raw) as { message?: string };
+      return parsed.message || raw;
+    } catch {
+      return raw;
+    }
+  };
+
+  const fetchA2aAgentsAndTasks = async (projectId: number, stateFilter: string = a2aTaskStateFilter) => {
+    setIsA2aTaskLoading(true);
+    try {
+      const [agents, tasks] = await Promise.all([
+        a2aApi.listRemoteAgents(projectId),
+        a2aApi.listTasks(projectId, stateFilter),
+      ]);
+      setA2aRemoteAgents(agents || []);
+      setA2aTasks(tasks || []);
+      if (selectedA2aAgentId && !(agents || []).some((agent) => String(agent.id) === selectedA2aAgentId)) {
+        setSelectedA2aAgentId("");
+      }
+    } catch (error) {
+      console.error("Failed to fetch A2A agents or tasks", error);
+    } finally {
+      setIsA2aTaskLoading(false);
+    }
+  };
 
   // Listen for model changes from the ProjectSwitcher
   useEffect(() => {
@@ -486,11 +553,15 @@ export function ChatInterface() {
     if (currentProject) {
       fetchDataSources();
       fetchKnowledgeBases();
+      void fetchA2aAgentsAndTasks(currentProject.id, a2aTaskStateFilter);
     } else {
       setAvailableKnowledgeBases([]);
       setSelectedKnowledgeBaseId("");
+      setA2aRemoteAgents([]);
+      setA2aTasks([]);
+      setSelectedA2aAgentId("");
     }
-  }, [currentProject]);
+  }, [currentProject, a2aTaskStateFilter]);
 
   const fetchDataSources = async () => {
     if (!currentProject) return;
@@ -733,12 +804,179 @@ export function ChatInterface() {
     }
   };
 
+  const updateA2aMessageByTaskId = (sessionKey: string, taskId: string, updater: (msg: Message) => Message) => {
+    setMessagesForSession(sessionKey, (prev) =>
+      prev.map((msg) => (msg.a2aTaskId === taskId ? updater(msg) : msg))
+    );
+  };
+
+  const syncTaskSnapshotToMessage = (sessionKey: string, task: A2ATask) => {
+    updateA2aMessageByTaskId(sessionKey, task.id, (msg) => ({
+      ...msg,
+      a2aTaskState: task.state,
+      content: task.output_text || msg.content,
+      a2aError: parseA2aErrorMessage(task.error_message),
+      awaitingFirstToken: !isTerminalA2aState(task.state),
+    }));
+  };
+
+  const applyA2aSubscribeEvent = (sessionKey: string, taskId: string, event: A2ASubscribeEvent) => {
+    if (event.type === "TaskStatusUpdateEvent") {
+      const state = event.task_status || event.status || "";
+      updateA2aMessageByTaskId(sessionKey, taskId, (msg) => {
+        const currentLogs = msg.progressLogs || [];
+        const nextLog = state ? `${t('a2aStatus')}: ${state}` : "";
+        const logs = nextLog && currentLogs[currentLogs.length - 1] !== nextLog ? [...currentLogs, nextLog] : currentLogs;
+        return {
+          ...msg,
+          a2aTaskState: state || msg.a2aTaskState,
+          progressLogs: logs,
+          awaitingFirstToken: state ? !isTerminalA2aState(state) : msg.awaitingFirstToken,
+        };
+      });
+      return;
+    }
+    if (event.type === "TaskArtifactUpdateEvent") {
+      const content = event.artifact?.content || event.output || "";
+      if (!content) return;
+      updateA2aMessageByTaskId(sessionKey, taskId, (msg) => ({
+        ...msg,
+        content,
+        awaitingFirstToken: false,
+      }));
+    }
+  };
+
+  const runA2aMessageFlow = async (sessionKey: string, assistantId: string, inputText: string) => {
+    if (!currentProject) return;
+    const payload = {
+      project_id: currentProject.id,
+      message: inputText,
+      session_id: sessionKey,
+      route_mode: a2aRouteMode,
+      ...(selectedA2aAgentId ? { remote_agent_id: Number(selectedA2aAgentId) } : {}),
+      metadata: { from_chat: true },
+    } as const;
+    const response = await a2aApi.sendMessage(payload);
+    const task = response.task;
+    a2aActiveTaskBySessionRef.current[sessionKey] = task.id;
+    setMessagesForSession(sessionKey, (prev) =>
+      prev.map((msg) =>
+        msg.id === assistantId
+          ? {
+              ...msg,
+              a2aTaskId: task.id,
+              a2aTaskState: task.state,
+              a2aRouteMode: a2aRouteMode,
+              a2aRemoteAgentId: task.remote_agent_id || null,
+              a2aInputText: inputText,
+              routeInfo: response.routing?.selected || msg.routeInfo,
+              progressLogs: [...(msg.progressLogs || []), `${t('a2aTaskCreated')}: ${task.id}`],
+            }
+          : msg
+      )
+    );
+    await fetchA2aAgentsAndTasks(currentProject.id, a2aTaskStateFilter);
+    const subscribeController = new AbortController();
+    a2aSubscribeControllersRef.current[task.id] = subscribeController;
+    try {
+      await a2aApi.subscribeTask(
+        task.id,
+        (event) => {
+          applyA2aSubscribeEvent(sessionKey, task.id, event);
+        },
+        subscribeController.signal
+      );
+    } catch (error) {
+      if (!subscribeController.signal.aborted) {
+        console.error("A2A subscribe failed", error);
+      }
+    } finally {
+      delete a2aSubscribeControllersRef.current[task.id];
+      const latestTask = await a2aApi.getTask(task.id).catch(() => null);
+      if (latestTask) {
+        syncTaskSnapshotToMessage(sessionKey, latestTask);
+      }
+      if (currentProject) {
+        await fetchA2aAgentsAndTasks(currentProject.id, a2aTaskStateFilter);
+      }
+    }
+  };
+
+  const handleCancelA2aTask = async (taskId: string) => {
+    try {
+      await a2aApi.cancelTask(taskId);
+      const controller = a2aSubscribeControllersRef.current[taskId];
+      if (controller) {
+        controller.abort();
+        delete a2aSubscribeControllersRef.current[taskId];
+      }
+      if (currentProject) {
+        await fetchA2aAgentsAndTasks(currentProject.id, a2aTaskStateFilter);
+      }
+      setMessagesForSession(activeSessionKey, (prev) =>
+        prev.map((msg) => (msg.a2aTaskId === taskId ? { ...msg, a2aTaskState: "CANCELED", awaitingFirstToken: false } : msg))
+      );
+    } catch (error) {
+      console.error("Failed to cancel A2A task", error);
+    }
+  };
+
+  const handleRetryA2aTask = async (msg: Message) => {
+    if (!msg.a2aInputText) return;
+    const targetSessionKey = activeSessionKey;
+    const newUserMessage: Message = { id: Date.now().toString(), role: "user", content: msg.a2aInputText };
+    setMessagesForSession(targetSessionKey, (prev) => [...prev, newUserMessage]);
+    const assistantId = (Date.now() + 1).toString();
+    setMessagesForSession(targetSessionKey, (prev) => [
+      ...prev,
+      {
+        id: assistantId,
+        role: "assistant",
+        content: "",
+        awaitingFirstToken: true,
+        progressLogs: [t('requestSubmittedRouting')],
+      },
+    ]);
+    setIsLoadingForSession(targetSessionKey, true);
+    generatingSessionsRef.current[targetSessionKey] = true;
+    try {
+      await runA2aMessageFlow(targetSessionKey, assistantId, msg.a2aInputText);
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error) || t('unknownError');
+      setMessagesForSession(targetSessionKey, (prev) =>
+        prev.map((item) =>
+          item.id === assistantId
+            ? {
+                ...item,
+                awaitingFirstToken: false,
+                a2aTaskState: "FAILED",
+                a2aError: errorMessage,
+                content: item.content || `${t('a2aTaskFailed')}: ${errorMessage}`,
+              }
+            : item
+        )
+      );
+    } finally {
+      generatingSessionsRef.current[targetSessionKey] = false;
+      setIsLoadingForSession(targetSessionKey, false);
+      delete a2aActiveTaskBySessionRef.current[targetSessionKey];
+    }
+  };
+
   const renderActiveSelections = () => {
     const hasValidDataSourceSelection = Boolean(selectedDataSource && selectedDataSourceName);
-    if (!hasValidDataSourceSelection && !selectedKnowledgeBaseId) return null;
+    const selectedAgent = a2aRemoteAgents.find((agent) => String(agent.id) === selectedA2aAgentId);
+    if (!hasValidDataSourceSelection && !selectedKnowledgeBaseId && !a2aEnabled) return null;
     return (
       <div className="px-2 pt-2">
         <div className="flex flex-wrap gap-2">
+          {a2aEnabled ? (
+            <div className="px-3 py-1.5 rounded-full text-xs border flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border-emerald-200">
+              <Database className="h-3.5 w-3.5" />
+              {`A2A：${a2aRouteMode}${selectedAgent ? ` · ${selectedAgent.name}` : ""}`}
+            </div>
+          ) : null}
           {hasValidDataSourceSelection ? (
             <div className="px-3 py-1.5 rounded-full text-xs border flex items-center gap-1.5 bg-blue-50 text-blue-700 border-blue-200">
               <Database className="h-3.5 w-3.5" />
@@ -803,6 +1041,58 @@ export function ChatInterface() {
     return (
       <div className="relative group max-w-4xl mx-auto">
         <div className="flex flex-col bg-background rounded-[26px] border border-border shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-all duration-200">
+          <div className="px-3 pt-2">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <button
+                type="button"
+                className={cn(
+                  "px-2.5 py-1 rounded-full border transition-colors",
+                  a2aEnabled ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-muted text-muted-foreground border-border"
+                )}
+                onClick={() => setA2aEnabled((prev) => !prev)}
+              >
+                {a2aEnabled ? t('a2aModeEnabled') : t('a2aModeDisabled')}
+              </button>
+              {a2aEnabled ? (
+                <>
+                  <select
+                    value={a2aRouteMode}
+                    onChange={(e) => setA2aRouteMode(e.target.value as "auto" | "local" | "a2a" | "a2a_first" | "local_first")}
+                    className="h-7 rounded-md border border-border bg-background px-2 text-xs text-foreground"
+                  >
+                    <option value="auto">auto</option>
+                    <option value="local">local</option>
+                    <option value="a2a">a2a</option>
+                    <option value="a2a_first">a2a_first</option>
+                    <option value="local_first">local_first</option>
+                  </select>
+                  <select
+                    value={selectedA2aAgentId}
+                    onChange={(e) => setSelectedA2aAgentId(e.target.value)}
+                    className="h-7 rounded-md border border-border bg-background px-2 text-xs text-foreground min-w-[160px]"
+                  >
+                    <option value="">{t('autoSelectAgent')}</option>
+                    {a2aRemoteAgents.map((agent) => (
+                      <option key={agent.id} value={String(agent.id)}>
+                        {agent.name} ({agent.healthy ? t('healthy') : t('unhealthy')})
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="h-7 px-2 rounded-md border border-border text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      if (currentProject) {
+                        void fetchA2aAgentsAndTasks(currentProject.id, a2aTaskStateFilter);
+                      }
+                    }}
+                  >
+                    {t('refresh')}
+                  </button>
+                </>
+              ) : null}
+            </div>
+          </div>
           {renderFileCard()}
           {renderActiveSelections()}
           <div className="flex items-center pl-2 pr-2 py-2">
@@ -1037,9 +1327,15 @@ export function ChatInterface() {
   }, [messages]);
 
   const handleForceStop = () => {
+    const activeTaskId = a2aActiveTaskBySessionRef.current[activeSessionKey];
+    if (activeTaskId) {
+      void handleCancelA2aTask(activeTaskId);
+      delete a2aActiveTaskBySessionRef.current[activeSessionKey];
+    }
     const controller = abortControllersRef.current[activeSessionKey];
-    if (!controller) return;
-    controller.abort();
+    if (controller) {
+      controller.abort();
+    }
     setIsLoadingForSession(activeSessionKey, false);
     generatingSessionsRef.current[activeSessionKey] = false;
     setMessagesForSession(activeSessionKey, (prev) =>
@@ -1064,6 +1360,49 @@ export function ChatInterface() {
     if (currentAttachedFile) {
       messagePayload = `[${t('userUploadedFile')}: ${currentAttachedFile.filename}]\n[${t('fileContentSummary')}: ${currentAttachedFile.summary || t('none')}]\n[${t('dataColumns')}: ${currentAttachedFile.columns?.join(", ") || t('none')}]\n[${t('fileDownloadLink')}: ${currentAttachedFile.url}]\n\n${newMessage.content}`;
       setAttachedFile(null);
+    }
+
+    if (a2aEnabled && currentProject) {
+      generatingSessionsRef.current[targetSessionKey] = true;
+      setIsLoadingForSession(targetSessionKey, true);
+      const assistantId = (Date.now() + 1).toString();
+      setMessagesForSession(targetSessionKey, (prev) => [
+        ...prev,
+        {
+          id: assistantId,
+          role: "assistant",
+          content: "",
+          awaitingFirstToken: true,
+          progressLogs: [t('requestSubmittedRouting')],
+          a2aRouteMode,
+          a2aRemoteAgentId: selectedA2aAgentId ? Number(selectedA2aAgentId) : null,
+          a2aInputText: messagePayload,
+        },
+      ]);
+      try {
+        await runA2aMessageFlow(targetSessionKey, assistantId, messagePayload);
+      } catch (error: unknown) {
+        const errorMessage = getErrorMessage(error) || t('unknownError');
+        setMessagesForSession(targetSessionKey, (prev) =>
+          prev.map((msg) =>
+            msg.id === assistantId
+              ? {
+                  ...msg,
+                  awaitingFirstToken: false,
+                  a2aTaskState: "FAILED",
+                  a2aError: errorMessage,
+                  content: msg.content || `${t('a2aTaskFailed')}: ${errorMessage}`,
+                }
+              : msg
+          )
+        );
+      } finally {
+        generatingSessionsRef.current[targetSessionKey] = false;
+        setIsLoadingForSession(targetSessionKey, false);
+        delete a2aActiveTaskBySessionRef.current[targetSessionKey];
+        window.dispatchEvent(new Event("nanobot:sessions-changed"));
+      }
+      return;
     }
     
     const controller = new AbortController();
@@ -1318,8 +1657,9 @@ export function ChatInterface() {
           )
         );
        }
-    } catch (error: any) {
-        if (error?.name === "AbortError" || String(error?.message || "").toLowerCase().includes("aborted")) {
+    } catch (error: unknown) {
+        const errorMessage = getErrorMessage(error);
+        if (errorMessage.toLowerCase().includes("aborted")) {
           setMessagesForSession(targetSessionKey, (prev) =>
             prev.map((msg) =>
               msg.awaitingFirstToken
@@ -1332,7 +1672,7 @@ export function ChatInterface() {
         setMessagesForSession(targetSessionKey, prev => [...prev, { 
             id: (Date.now() + 1).toString(), 
             role: 'assistant', 
-            content: `Sorry, something went wrong: ${error.message}` 
+            content: `Sorry, something went wrong: ${errorMessage}` 
         }]);
     } finally {
         if (abortControllersRef.current[targetSessionKey] === controller) {
@@ -1383,6 +1723,61 @@ export function ChatInterface() {
             </div>
           ) : (
             <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
+              {a2aEnabled ? (
+                <div className="rounded-xl border border-border bg-background p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">A2A Tasks</div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={a2aTaskStateFilter}
+                        onChange={(e) => setA2aTaskStateFilter(e.target.value)}
+                        className="h-7 rounded-md border border-border bg-background px-2 text-xs text-foreground"
+                      >
+                        <option value="all">{t('allStates')}</option>
+                        <option value="SUBMITTED">SUBMITTED</option>
+                        <option value="WORKING">WORKING</option>
+                        <option value="COMPLETED">COMPLETED</option>
+                        <option value="FAILED">FAILED</option>
+                        <option value="CANCELED">CANCELED</option>
+                      </select>
+                      <button
+                        type="button"
+                        className="h-7 px-2 rounded-md border border-border text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => {
+                          if (currentProject) {
+                            void fetchA2aAgentsAndTasks(currentProject.id, a2aTaskStateFilter);
+                          }
+                        }}
+                      >
+                        {isA2aTaskLoading ? t('loading') : t('refresh')}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5 max-h-[160px] overflow-y-auto">
+                    {a2aTasks.length === 0 ? (
+                      <div className="text-xs text-muted-foreground">{t('noA2aTasks')}</div>
+                    ) : (
+                      a2aTasks.slice(0, 8).map((task) => (
+                        <div key={task.id} className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5">
+                          <div className="min-w-0">
+                            <div className="text-[11px] text-foreground font-mono truncate">{task.id}</div>
+                            <div className="text-[11px] text-muted-foreground truncate">{task.source} · {task.state}</div>
+                          </div>
+                          {!isTerminalA2aState(task.state) ? (
+                            <button
+                              type="button"
+                              className="text-[11px] px-2 py-1 rounded border border-border text-muted-foreground hover:text-foreground"
+                              onClick={() => void handleCancelA2aTask(task.id)}
+                            >
+                              {t('cancel')}
+                            </button>
+                          ) : null}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ) : null}
               {messages.map((msg, msgIdx) => {
                 const isMessageGenerating = isLoading && msgIdx === messages.length - 1;
                 const { markdown, reportHtml } = splitReportHtml(msg.content);
@@ -1414,6 +1809,41 @@ export function ChatInterface() {
                   >
                     {msg.role === "assistant" ? (
                       <>
+                        {msg.a2aTaskId ? (
+                          <div className="mb-3 rounded-xl border border-border bg-muted/50/60 px-3 py-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="text-[11px] text-muted-foreground">
+                                <span className="font-mono">{msg.a2aTaskId}</span>
+                                <span className="mx-1">·</span>
+                                <span>{msg.a2aTaskState || 'SUBMITTED'}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {msg.a2aTaskState && !isTerminalA2aState(msg.a2aTaskState) ? (
+                                  <button
+                                    type="button"
+                                    className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground"
+                                    onClick={() => void handleCancelA2aTask(msg.a2aTaskId!)}
+                                  >
+                                    {t('cancel')}
+                                  </button>
+                                ) : null}
+                                {msg.a2aInputText ? (
+                                  <button
+                                    type="button"
+                                    className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground"
+                                    onClick={() => void handleRetryA2aTask(msg)}
+                                  >
+                                    <RotateCcw className="h-3 w-3" />
+                                    {t('retry')}
+                                  </button>
+                                ) : null}
+                              </div>
+                            </div>
+                            {msg.a2aError ? (
+                              <div className="mt-1 text-[11px] text-rose-600">{msg.a2aError}</div>
+                            ) : null}
+                          </div>
+                        ) : null}
                         {displayedThinkingContent && (
                           <div className="mb-3 rounded-xl border border-border bg-muted/50/50 p-3 text-sm text-muted-foreground font-mono whitespace-pre-wrap leading-relaxed shadow-inner">
                             <button
