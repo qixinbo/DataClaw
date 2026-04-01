@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Trash2, Terminal, Loader2, FolderOpen, Eye, ShieldCheck, AlertCircle, Wand2, Upload, Plus, RefreshCw } from "lucide-react";
+import { Trash2, Terminal, Loader2, FolderOpen, Eye, ShieldCheck, AlertCircle, Wand2, Upload, Plus, RefreshCw, HeartPulse } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api";
+import { a2aApi, type A2ARemoteAgent, type A2ATask } from "@/api/a2a";
 import { useProjectStore } from "@/store/projectStore";
 import { useMcpHealthStore } from "@/store/mcpHealthStore";
 import { useRef } from 'react';
@@ -38,6 +39,13 @@ interface MCPServer {
   url?: string;
   headers?: Record<string, string>;
   status?: string;
+}
+
+interface A2ARemoteAgentForm {
+  name: string;
+  base_url: string;
+  auth_scheme: "none" | "bearer";
+  auth_token: string;
 }
 
 const SOURCE_LOCAL_IMPORT = "local_import";
@@ -76,7 +84,7 @@ const dedupeSkillsById = (skills: Skill[]): Skill[] => {
 
 export function Skills() {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'skills' | 'mcp'>('skills');
+  const [activeTab, setActiveTab] = useState<'skills' | 'mcp' | 'a2a'>('skills');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
 
   // Skills state
@@ -96,6 +104,20 @@ export function Skills() {
   const [mcpEnvStr, setMcpEnvStr] = useState('');
   const [mcpHeadersStr, setMcpHeadersStr] = useState('');
   const [isRefreshingMcpHealth, setIsRefreshingMcpHealth] = useState(false);
+
+  const [a2aAgents, setA2aAgents] = useState<A2ARemoteAgent[]>([]);
+  const [a2aTasks, setA2aTasks] = useState<A2ATask[]>([]);
+  const [a2aTaskStateFilter, setA2aTaskStateFilter] = useState<string>('all');
+  const [isA2aLoading, setIsA2aLoading] = useState(false);
+  const [isA2aDialogOpen, setIsA2aDialogOpen] = useState(false);
+  const [editingA2aAgent, setEditingA2aAgent] = useState<A2ARemoteAgent | null>(null);
+  const [a2aForm, setA2aForm] = useState<A2ARemoteAgentForm>({
+    name: '',
+    base_url: '',
+    auth_scheme: 'none',
+    auth_token: '',
+  });
+  const [isA2aRefreshingHealth, setIsA2aRefreshingHealth] = useState(false);
 
   const { currentProject } = useProjectStore();
   const { hasMcpError, refresh: refreshMcpHealth } = useMcpHealthStore();
@@ -136,15 +158,34 @@ export function Skills() {
       }
     };
 
+    const fetchA2aData = async () => {
+      if (!currentProject) return;
+      setIsA2aLoading(true);
+      try {
+        const [agents, tasks] = await Promise.all([
+          a2aApi.listRemoteAgents(currentProject.id),
+          a2aApi.listTasks(currentProject.id, a2aTaskStateFilter),
+        ]);
+        setA2aAgents(agents || []);
+        setA2aTasks(tasks || []);
+      } catch (error) {
+        console.error("Failed to fetch A2A data", error);
+      } finally {
+        setIsA2aLoading(false);
+      }
+    };
+
     if (currentProject) {
       void refreshMcpHealth(currentProject.id);
       if (activeTab === 'skills') {
         void fetchSkills();
-      } else {
+      } else if (activeTab === 'mcp') {
         void fetchMcpServers();
+      } else {
+        void fetchA2aData();
       }
     }
-  }, [currentProject?.id, activeTab, refreshMcpHealth]);
+  }, [currentProject, currentProject?.id, activeTab, refreshMcpHealth, a2aTaskStateFilter]);
 
   const fetchSkills = async () => {
     if (!currentProject) return;
@@ -191,6 +232,100 @@ export function Skills() {
       }
     } finally {
       setIsRefreshingMcpHealth(false);
+    }
+  };
+
+  const fetchA2aData = async () => {
+    if (!currentProject) return;
+    setIsA2aLoading(true);
+    try {
+      const [agents, tasks] = await Promise.all([
+        a2aApi.listRemoteAgents(currentProject.id),
+        a2aApi.listTasks(currentProject.id, a2aTaskStateFilter),
+      ]);
+      setA2aAgents(agents || []);
+      setA2aTasks(tasks || []);
+    } catch (error) {
+      console.error("Failed to fetch A2A data", error);
+    } finally {
+      setIsA2aLoading(false);
+    }
+  };
+
+  const handleRefreshA2aHealth = async () => {
+    if (!currentProject || a2aAgents.length === 0) return;
+    setIsA2aRefreshingHealth(true);
+    try {
+      await Promise.all(a2aAgents.map((agent) => a2aApi.healthCheckRemoteAgent(agent.id)));
+      await fetchA2aData();
+    } finally {
+      setIsA2aRefreshingHealth(false);
+    }
+  };
+
+  const handleOpenCreateA2a = () => {
+    setEditingA2aAgent(null);
+    setA2aForm({
+      name: '',
+      base_url: '',
+      auth_scheme: 'none',
+      auth_token: '',
+    });
+    setIsA2aDialogOpen(true);
+  };
+
+  const handleOpenEditA2a = (agent: A2ARemoteAgent) => {
+    setEditingA2aAgent(agent);
+    setA2aForm({
+      name: agent.name,
+      base_url: agent.base_url,
+      auth_scheme: agent.auth_scheme,
+      auth_token: '',
+    });
+    setIsA2aDialogOpen(true);
+  };
+
+  const handleSaveA2aAgent = async () => {
+    if (!currentProject) return;
+    if (!a2aForm.name.trim() || !a2aForm.base_url.trim()) return;
+    const payload = {
+      name: a2aForm.name.trim(),
+      base_url: a2aForm.base_url.trim(),
+      auth_scheme: a2aForm.auth_scheme,
+      ...(a2aForm.auth_scheme === 'bearer' && a2aForm.auth_token.trim() ? { auth_token: a2aForm.auth_token.trim() } : {}),
+    };
+    try {
+      if (editingA2aAgent) {
+        await a2aApi.updateRemoteAgent(editingA2aAgent.id, payload);
+      } else {
+        await a2aApi.createRemoteAgent({
+          project_id: currentProject.id,
+          ...payload,
+        });
+      }
+      setIsA2aDialogOpen(false);
+      await fetchA2aData();
+    } catch (error) {
+      console.error("Failed to save A2A agent", error);
+    }
+  };
+
+  const handleDeleteA2aAgent = async (agentId: number) => {
+    if (!window.confirm(t('confirmDeleteA2aAgent'))) return;
+    try {
+      await a2aApi.deleteRemoteAgent(agentId);
+      await fetchA2aData();
+    } catch (error) {
+      console.error("Failed to delete A2A agent", error);
+    }
+  };
+
+  const handleRefreshA2aCard = async (agentId: number) => {
+    try {
+      await a2aApi.refreshRemoteAgentCard(agentId);
+      await fetchA2aData();
+    } catch (error) {
+      console.error("Failed to refresh A2A card", error);
     }
   };
 
@@ -371,6 +506,12 @@ export function Skills() {
                 <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" title="MCP Server Error" />
               )}
             </button>
+            <button
+              className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${activeTab === 'a2a' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground/80'}`}
+              onClick={() => setActiveTab('a2a')}
+            >
+              {t('a2aConfig')}
+            </button>
           </div>
           {activeTab === 'skills' ? (
             <>
@@ -407,7 +548,7 @@ export function Skills() {
                 {isLoading ? t('uploading', '上传中...') : t('uploadSkill')}
               </Button>
             </>
-          ) : (
+          ) : activeTab === 'mcp' ? (
             <>
               <Button
                 variant="outline"
@@ -422,11 +563,50 @@ export function Skills() {
                 )}
                 {t('refresh')}
               </Button>
-              <Button 
+              <Button
                 className="h-9 bg-[#ff4d29] hover:bg-[#ff4d29]/90 text-white gap-2 rounded-md px-3"
                 onClick={() => setIsMcpDialogOpen(true)}
               >
                 <Plus className="h-4 w-4" />{t('addMcpServer')}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Select value={a2aTaskStateFilter} onValueChange={(val) => { if (val) setA2aTaskStateFilter(val); }}>
+                <SelectTrigger className="w-[150px] h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('allStates')}</SelectItem>
+                  <SelectItem value="SUBMITTED">SUBMITTED</SelectItem>
+                  <SelectItem value="WORKING">WORKING</SelectItem>
+                  <SelectItem value="COMPLETED">COMPLETED</SelectItem>
+                  <SelectItem value="FAILED">FAILED</SelectItem>
+                  <SelectItem value="CANCELED">CANCELED</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                className="h-9 gap-2 rounded-md px-3"
+                onClick={handleRefreshA2aHealth}
+                disabled={isA2aRefreshingHealth || a2aAgents.length === 0}
+              >
+                {isA2aRefreshingHealth ? <Loader2 className="h-4 w-4 animate-spin" /> : <HeartPulse className="h-4 w-4" />}
+                {t('refreshHealth')}
+              </Button>
+              <Button
+                variant="outline"
+                className="h-9 gap-2 rounded-md px-3"
+                onClick={() => void fetchA2aData()}
+              >
+                <RefreshCw className="h-4 w-4" />
+                {t('refresh')}
+              </Button>
+              <Button
+                className="h-9 bg-[#ff4d29] hover:bg-[#ff4d29]/90 text-white gap-2 rounded-md px-3"
+                onClick={handleOpenCreateA2a}
+              >
+                <Plus className="h-4 w-4" />{t('addA2aAgent')}
               </Button>
             </>
           )}
@@ -555,7 +735,7 @@ export function Skills() {
             </TableBody>
           </Table>
         </div>
-        ) : (
+        ) : activeTab === 'mcp' ? (
           <div className="bg-background rounded-xl border border-border shadow-sm overflow-hidden min-w-[800px] lg:min-w-0">
             <Table className="table-fixed w-full">
               <TableHeader className="bg-muted/50/50">
@@ -645,6 +825,112 @@ export function Skills() {
                 )}
               </TableBody>
             </Table>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="bg-background rounded-xl border border-border shadow-sm overflow-hidden min-w-[800px] lg:min-w-0">
+              <div className="px-4 py-3 border-b border-border text-sm font-semibold text-foreground/80">
+                {t('a2aAgentManagement')}
+              </div>
+              <Table className="table-fixed w-full">
+                <TableHeader className="bg-muted/50/50">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-[20%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('name')}</TableHead>
+                    <TableHead className="w-[24%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('url')}</TableHead>
+                    <TableHead className="w-[10%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('protocol')}</TableHead>
+                    <TableHead className="w-[16%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('capabilities')}</TableHead>
+                    <TableHead className="w-[15%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('healthStatus')}</TableHead>
+                    <TableHead className="w-[15%] font-semibold text-foreground/80 py-3 px-4 text-sm text-right">{t('actions')}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isA2aLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="py-20 text-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-indigo-500 mx-auto" />
+                      </TableCell>
+                    </TableRow>
+                  ) : a2aAgents.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="py-16 text-center text-muted-foreground">{t('noA2aAgents')}</TableCell>
+                    </TableRow>
+                  ) : (
+                    a2aAgents.map((agent) => (
+                      <TableRow key={agent.id} className="group hover:bg-muted/50/50 transition-colors border-border">
+                        <TableCell className="py-4 px-4 text-sm font-medium">{agent.name}</TableCell>
+                        <TableCell className="py-4 px-4 text-sm text-muted-foreground truncate" title={agent.base_url}>{agent.base_url}</TableCell>
+                        <TableCell className="py-4 px-4 text-sm text-muted-foreground">{agent.protocol_version || '-'}</TableCell>
+                        <TableCell className="py-4 px-4 text-sm text-muted-foreground truncate" title={agent.capabilities.join(', ')}>{agent.capabilities.join(', ') || '-'}</TableCell>
+                        <TableCell className="py-4 px-4">
+                          <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] md:text-xs font-medium whitespace-nowrap ${agent.healthy ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-rose-50 text-rose-700 border border-rose-100'}`}>
+                            {agent.healthy ? <ShieldCheck className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
+                            {agent.healthy ? t('healthy') : t('unhealthy')}
+                            <span className="opacity-70">#{agent.failure_count}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-all shrink-0" onClick={() => void handleRefreshA2aCard(agent.id)}>
+                              <RefreshCw className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-all shrink-0" onClick={() => handleOpenEditA2a(agent)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-rose-600 hover:bg-rose-50 rounded-md transition-all shrink-0" onClick={() => void handleDeleteA2aAgent(agent.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="bg-background rounded-xl border border-border shadow-sm overflow-hidden min-w-[800px] lg:min-w-0">
+              <div className="px-4 py-3 border-b border-border text-sm font-semibold text-foreground/80">
+                {t('a2aTaskObservability')}
+              </div>
+              <Table className="table-fixed w-full">
+                <TableHeader className="bg-muted/50/50">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-[18%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('taskId')}</TableHead>
+                    <TableHead className="w-[12%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('taskSource')}</TableHead>
+                    <TableHead className="w-[12%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('status')}</TableHead>
+                    <TableHead className="w-[38%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('content')}</TableHead>
+                    <TableHead className="w-[20%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('time')}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isA2aLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="py-16 text-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-indigo-500 mx-auto" />
+                      </TableCell>
+                    </TableRow>
+                  ) : a2aTasks.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="py-14 text-center text-muted-foreground">{t('noA2aTasks')}</TableCell>
+                    </TableRow>
+                  ) : (
+                    a2aTasks.map((task) => (
+                      <TableRow key={task.id} className="group hover:bg-muted/50/50 transition-colors border-border">
+                        <TableCell className="py-4 px-4 text-xs font-mono truncate" title={task.id}>{task.id}</TableCell>
+                        <TableCell className="py-4 px-4 text-sm text-muted-foreground">{task.source}</TableCell>
+                        <TableCell className="py-4 px-4 text-sm">{task.state}</TableCell>
+                        <TableCell className="py-4 px-4 text-xs text-muted-foreground">
+                          <div className="line-clamp-2" title={task.error_message || task.output_text || task.input_text}>
+                            {task.error_message || task.output_text || task.input_text}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-4 text-xs text-muted-foreground">{task.updated_at}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         )}
       </div>
@@ -844,6 +1130,76 @@ export function Skills() {
           </div>
           <DialogFooter className="p-6 pt-2">
             <Button onClick={handleAddMcpServer} className="bg-indigo-600 hover:bg-indigo-700 text-primary-foreground rounded-lg px-6 h-10 w-full">{t('saveMcpServer')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isA2aDialogOpen} onOpenChange={(open) => {
+          setIsA2aDialogOpen(open);
+          if (!open) {
+            setEditingA2aAgent(null);
+            setA2aForm({
+              name: '',
+              base_url: '',
+              auth_scheme: 'none',
+              auth_token: '',
+            });
+          }
+      }}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col rounded-2xl p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle className="text-xl font-bold text-foreground">{editingA2aAgent ? t('editA2aAgent') : t('addA2aAgent')}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto px-6 py-2">
+            <div className="grid gap-5">
+              <div className="grid gap-1.5">
+                <Label htmlFor="a2a-name" className="text-muted-foreground font-medium text-sm">{t('name')}</Label>
+                <Input
+                  id="a2a-name"
+                  placeholder={t('a2aAgentName')}
+                  value={a2aForm.name}
+                  onChange={(e) => setA2aForm({ ...a2aForm, name: e.target.value })}
+                  className="rounded-lg border-border h-10"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="a2a-url" className="text-muted-foreground font-medium text-sm">{t('baseUrl')}</Label>
+                <Input
+                  id="a2a-url"
+                  placeholder="https://example-agent.com"
+                  value={a2aForm.base_url}
+                  onChange={(e) => setA2aForm({ ...a2aForm, base_url: e.target.value })}
+                  className="rounded-lg border-border h-10"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="a2a-auth-scheme" className="text-muted-foreground font-medium text-sm">{t('authScheme')}</Label>
+                <Select value={a2aForm.auth_scheme} onValueChange={(val) => { if (val) setA2aForm({ ...a2aForm, auth_scheme: val as "none" | "bearer" }); }}>
+                  <SelectTrigger className="rounded-lg border-border h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-lg">
+                    <SelectItem value="none">none</SelectItem>
+                    <SelectItem value="bearer">bearer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {a2aForm.auth_scheme === 'bearer' ? (
+                <div className="grid gap-1.5">
+                  <Label htmlFor="a2a-auth-token" className="text-muted-foreground font-medium text-sm">{t('authToken')}</Label>
+                  <Input
+                    id="a2a-auth-token"
+                    placeholder={editingA2aAgent ? t('leaveEmptyToKeepUnchanged') : t('enterApiKey')}
+                    value={a2aForm.auth_token}
+                    onChange={(e) => setA2aForm({ ...a2aForm, auth_token: e.target.value })}
+                    className="rounded-lg border-border h-10"
+                  />
+                </div>
+              ) : null}
+            </div>
+          </div>
+          <DialogFooter className="p-6 pt-2">
+            <Button onClick={handleSaveA2aAgent} className="bg-indigo-600 hover:bg-indigo-700 text-primary-foreground rounded-lg px-6 h-10 w-full">{t('saveA2aAgent')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

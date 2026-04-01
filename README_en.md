@@ -186,6 +186,134 @@ Frontend setup:
 ### 4. Initial Account Setup 👤
 The first user to register in the system will automatically be granted admin privileges. You can simply click the "Register" button on the login page to create your admin account (e.g., Username: `admin`, Password: `admin`), and then log in to manage projects, data sources, and users.
 
+### 5. A2A Mode Guide 🤖
+
+A2A (Agent2Agent) lets DataClaw delegate tasks to remote agents with full task lifecycle controls (status stream, artifact stream, cancel, retry).
+
+#### 5.1 Enable A2A in UI (Recommended)
+
+1. Open **Skills** page and switch to the **A2A** tab.
+2. Add a remote agent with:
+   - `name`
+   - `base_url` (for example `https://agent-b.example.com`)
+   - `auth_scheme` (`none` or `bearer`)
+   - `auth_token` (required when `auth_scheme=bearer`)
+3. Run health check and confirm `healthy=true`.
+4. Go to Chat, enable **A2A Mode**, choose `route_mode` and remote agent, then send your prompt.
+5. Track task states in Chat (`SUBMITTED/WORKING/COMPLETED/FAILED`) and use cancel/retry when needed.
+
+`route_mode` quick reference:
+- `auto`: Use project rollout policy and routing strategy
+- `local`: Force local execution
+- `a2a`: Force remote A2A execution
+- `a2a_first`: Try remote first, then fallback chain
+- `local_first`: Try local first
+
+#### 5.2 API Examples
+
+Assume service URL is `http://127.0.0.1:8000` and your bearer token is `${TOKEN}`.
+
+```bash
+# 1) Get local Agent Card
+curl -H "Authorization: Bearer ${TOKEN}" \
+  http://127.0.0.1:8000/api/v1/a2a/agent-card
+
+# 2) Register remote agent
+curl -X POST http://127.0.0.1:8000/api/v1/a2a/remote-agents \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "project_id": 1,
+    "name": "Agent-B",
+    "base_url": "https://agent-b.example.com",
+    "auth_scheme": "bearer",
+    "auth_token": "remote-agent-token"
+  }'
+
+# 3) Send task with a2a_first route
+curl -X POST http://127.0.0.1:8000/api/v1/a2a/messages/send \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "project_id": 1,
+    "message": "Analyze order conversion trend for last 30 days and propose actions",
+    "session_id": "chat:demo-a2a",
+    "remote_agent_id": 3,
+    "route_mode": "a2a_first",
+    "fallback_chain": ["a2a", "local", "mcp"],
+    "idempotency_key": "demo-a2a-001"
+  }'
+
+# 4) Subscribe task stream
+curl -N -H "Authorization: Bearer ${TOKEN}" \
+  http://127.0.0.1:8000/api/v1/a2a/tasks/<task_id>/subscribe
+
+# 5) Cancel task
+curl -X POST -H "Authorization: Bearer ${TOKEN}" \
+  http://127.0.0.1:8000/api/v1/a2a/tasks/<task_id>/cancel
+```
+
+#### 5.3 Local Debugging for A2A (Two-Instance Setup)
+
+Use two local backend instances:
+- Instance A (caller): `http://127.0.0.1:8000`
+- Instance B (remote agent): `http://127.0.0.1:8001`
+
+Run them in two terminals:
+
+```bash
+# Terminal 1 - Instance A
+cd backend
+source .venv/bin/activate
+DATA_ROOT=/tmp/dataclaw-a uvicorn main:app --reload --port 8000
+```
+
+```bash
+# Terminal 2 - Instance B
+cd backend
+source .venv/bin/activate
+DATA_ROOT=/tmp/dataclaw-b uvicorn main:app --reload --port 8001
+```
+
+Create/login users and fetch tokens:
+
+```bash
+# Register (first user becomes admin) - run once per instance
+curl -X POST http://127.0.0.1:8000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin_a","email":"a@test.com","password":"admin12345"}'
+
+curl -X POST http://127.0.0.1:8001/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin_b","email":"b@test.com","password":"admin12345"}'
+
+# Login and keep tokens
+TOKEN_A=$(curl -s -X POST http://127.0.0.1:8000/api/v1/auth/login \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin_a&password=admin12345" | jq -r '.access_token')
+
+TOKEN_B=$(curl -s -X POST http://127.0.0.1:8001/api/v1/auth/login \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin_b&password=admin12345" | jq -r '.access_token')
+```
+
+Then register B as remote agent in A, using `TOKEN_B` as `auth_token`:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/a2a/remote-agents \
+  -H "Authorization: Bearer ${TOKEN_A}" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"project_id\": 1,
+    \"name\": \"local-agent-b\",
+    \"base_url\": \"http://127.0.0.1:8001\",
+    \"auth_scheme\": \"bearer\",
+    \"auth_token\": \"${TOKEN_B}\"
+  }"
+```
+
+Finally, send/subscribe/cancel tasks from A. This validates the complete local A2A flow.
+
 ***
 
 ## 🔌 Data Source Configuration Guide

@@ -23,7 +23,7 @@ import re
 import os
 from datetime import datetime
 
-from app.api import upload, llm, skills, users, datasources, projects, semantic, mcp, subagents, knowledge, embedding_models, web_search
+from app.api import upload, llm, skills, users, datasources, projects, semantic, mcp, subagents, knowledge, embedding_models, web_search, a2a
 from app.connectors.postgres import postgres_connector
 from app.connectors.clickhouse import clickhouse_connector
 from app.core.artifacts import extract_artifacts
@@ -52,6 +52,15 @@ from app.models.user import User, EmailVerification
 from app.models.project import Project
 from app.models.datasource import DataSource
 from app.models.subagent import Subagent
+from app.models.a2a import (
+    A2ARemoteAgent,
+    A2ATask,
+    A2ATaskEvent,
+    A2ATaskWebhook,
+    A2AWebhookDelivery,
+    A2AProjectConfig,
+    A2AAuditLog,
+)
 
 app = FastAPI()
 
@@ -86,6 +95,7 @@ app.include_router(subagents.router, prefix="/api/v1")
 app.include_router(knowledge.router, prefix="/api/v1")
 app.include_router(embedding_models.router, prefix="/api/v1")
 app.include_router(web_search.router, prefix="/api/v1")
+app.include_router(a2a.router, prefix="/api/v1")
 
 STREAM_DELTA_CHUNK_SIZE = 48
 PREVIEWABLE_TEXT_EXTENSIONS = {
@@ -292,7 +302,9 @@ class ChatRequest(BaseModel):
     source: str = "postgres"
     prefer_sql_chart: bool = False
     file_url: Optional[str] = None
-    route_mode: Literal["auto", "chat", "sql"] = "auto"
+    route_mode: Literal["auto", "chat", "sql", "a2a", "a2a_first", "local_first", "mcp_first"] = "auto"
+    route_fallback_chain: Optional[List[Literal["a2a", "local", "mcp"]]] = None
+    a2a_agent_id: Optional[int] = None
     knowledge_base_id: Optional[str] = None
 
 
