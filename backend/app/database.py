@@ -3,7 +3,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-from app.core.data_root import get_data_root
+from app.core.data_root import ensure_data_layout, get_data_root
+
+# Ensure DATA_ROOT directory layout exists before SQLite engine init
+ensure_data_layout()
 
 # Ensure dataclaw.db is created in the global data directory
 DB_PATH = get_data_root() / "dataclaw.db"

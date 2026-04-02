@@ -6,14 +6,11 @@ import secrets
 import hashlib
 from datetime import datetime, timedelta, timezone
 
-from app.database import get_db, engine, Base
+from app.database import get_db
 from app.models.user import User, EmailVerification
 from app.schemas.user import UserCreate, UserUpdate, UserResponse, ResendVerificationRequest
 from app.core.security import get_password_hash, verify_password, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.core.email import send_verification_email
-
-# Create tables
-Base.metadata.create_all(bind=engine)
 
 router = APIRouter()
 
