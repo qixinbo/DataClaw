@@ -80,11 +80,11 @@ Please edit the `.env` file in the root directory and fill in your actual config
 > 5. Click "Generate Authorization Code" (生成授权码) below it, scan the QR code with mobile QQ or send an SMS as prompted
 > 6. After verification, you will get a **16-digit random letter combination**. Copy and paste it into the `SMTP_PASSWORD` field in your `.env` file
 
-### 2. Standard Deployment (Recommended, No Node.js Required) 📦
+### 2. Production Mode (Recommended, No Node.js Required) 📦
 
 Ensure you have Python 3.11+ installed. The pre-built React frontend is bundled in the Python wheel, so you don't need Node.js for production deployment.
 
-#### Build the wheel (output to `dist/`)
+#### 2.1 Build the wheel (output to `dist/`)
 
 ```bash
 # First, build the frontend
@@ -99,30 +99,33 @@ uv build --wheel --out-dir ../dist
 
 Once built, the wheel is located in the project root `dist/` directory, e.g., `dist/dataclaw-0.1.0-py3-none-any.whl`.
 
-#### Install and Run
+#### 2.2 Install and Run (using the wheel from 2.1)
+
+Ensure Python 3.11+ and `uv` are installed. Production mode uses the packaged wheel from 2.1, and does not require Node.js.
 
 ```bash
-# We recommend creating a virtual environment first
-uv venv
+# Create an isolated virtual environment in project root
+uv venv .venv
+source .venv/bin/activate
 
-# Install DataClaw
+# Install built wheel into that environment
 uv pip install ./dist/dataclaw-*.whl
 
 # Start the service (defaults to http://127.0.0.1:8000)
-uv run dataclaw start
+dataclaw start
 ```
 
 Common service control commands:
 
 ```bash
 # Check running status
-uv run dataclaw status
+dataclaw status
 
 # Custom host/port
-uv run dataclaw start --host 0.0.0.0 --port 8000
+dataclaw start --host 0.0.0.0 --port 8000
 
 # Stop the service
-uv run dataclaw stop
+dataclaw stop
 ```
 
 Optional environment variable:
@@ -135,18 +138,15 @@ If not set, DataClaw uses the repository-level `data/` directory by default. Ser
 
 ### 3. Development Mode (Requires Node.js) 🧪
 
-If you want to debug the frontend code or rebuild the frontend artifacts, use the separate development mode:
+If you want to debug source code, use development mode (runs source directly, no wheel required):
 
 ```bash
 cd backend
-# Create a virtual environment (optional but recommended)
-uv venv
-
-# Install dependencies
+# Sync backend dependencies (environment is prepared under backend/.venv)
 uv sync
 
 # Start the FastAPI server
-uv run uvicorn app.main:app --reload --port 8000
+uv run uvicorn main:app --reload --port 8000
 ```
 
 ```bash
@@ -180,14 +180,14 @@ Frontend setup:
 3. Fill in the service URL (e.g. `http://localhost:8001`);
 4. Click `Test Connection`, then `Save`.
 
-### 4. Initial Account Setup 👤
+### 5. Initial Account Setup 👤
 The first user to register in the system will automatically be granted admin privileges. You can simply click the "Register" button on the login page to create your admin account (e.g., Username: `admin`, Password: `admin`), and then log in to manage projects, data sources, and users.
 
-### 5. A2A Mode Guide 🤖
+### 6. A2A Mode Guide 🤖
 
 A2A (Agent2Agent) lets DataClaw delegate tasks to remote agents with full task lifecycle controls (status stream, artifact stream, cancel, retry).
 
-#### 5.1 Enable A2A in UI (Recommended)
+#### 6.1 Enable A2A in UI (Recommended)
 
 1. Open **Skills** page and switch to the **A2A** tab.
 2. Add a remote agent with:
@@ -206,7 +206,7 @@ A2A (Agent2Agent) lets DataClaw delegate tasks to remote agents with full task l
 - `a2a_first`: Try remote first, then fallback chain
 - `local_first`: Try local first
 
-#### 5.2 API Examples
+#### 6.2 API Examples
 
 Assume service URL is `http://127.0.0.1:8000` and your bearer token is `${TOKEN}`.
 
@@ -250,7 +250,7 @@ curl -X POST -H "Authorization: Bearer ${TOKEN}" \
   http://127.0.0.1:8000/api/v1/a2a/tasks/<task_id>/cancel
 ```
 
-#### 5.3 Local Debugging for A2A (Two-Instance Setup)
+#### 6.3 Local Debugging for A2A (Two-Instance Setup)
 
 Use two local backend instances:
 - Instance A (caller): `http://127.0.0.1:8000`
