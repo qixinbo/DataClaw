@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api";
-import { a2aApi, type A2ARemoteAgent, type A2ATask } from "@/api/a2a";
+import { a2aApi, type A2ARemoteAgent, type A2ATask, type A2AArtifact, renderPart, renderParts, getArtifactPreview, groupTasksByContextId } from "@/api/a2a";
 import { useProjectStore } from "@/store/projectStore";
 import { useMcpHealthStore } from "@/store/mcpHealthStore";
 import { useRef } from 'react';
@@ -118,6 +118,11 @@ export function Skills() {
     auth_token: '',
   });
   const [isA2aRefreshingHealth, setIsA2aRefreshingHealth] = useState(false);
+  const [selectedA2aAgent, setSelectedA2aAgent] = useState<A2ARemoteAgent | null>(null);
+  const [selectedTask, setSelectedTask] = useState<A2ATask | null>(null);
+  const [taskArtifactPreview, setTaskArtifactPreview] = useState<{ type: string; content: string } | null>(null);
+  const [contextIdFilter, setContextIdFilter] = useState<string>('all');
+  const [groupedByContextId, setGroupedByContextId] = useState<Map<string, A2ATask[]>>(new Map());
 
   const { currentProject } = useProjectStore();
   const { hasMcpError, refresh: refreshMcpHealth } = useMcpHealthStore();
@@ -245,11 +250,31 @@ export function Skills() {
       ]);
       setA2aAgents(agents || []);
       setA2aTasks(tasks || []);
+      setGroupedByContextId(groupTasksByContextId(tasks || []));
     } catch (error) {
       console.error("Failed to fetch A2A data", error);
     } finally {
       setIsA2aLoading(false);
     }
+  };
+
+  const handlePreviewArtifact = (artifact: A2AArtifact) => {
+    const preview = getArtifactPreview(artifact);
+    setTaskArtifactPreview(preview);
+  };
+
+  const handleTaskClick = (task: A2ATask) => {
+    setSelectedTask(task);
+    if (task.artifacts && task.artifacts.length > 0) {
+      const preview = getArtifactPreview(task.artifacts[0]);
+      setTaskArtifactPreview(preview);
+    } else {
+      setTaskArtifactPreview(null);
+    }
+  };
+
+  const handleAgentCardClick = (agent: A2ARemoteAgent) => {
+    setSelectedA2aAgent(agent);
   };
 
   const handleRefreshA2aHealth = async () => {
@@ -602,6 +627,20 @@ export function Skills() {
                 <RefreshCw className="h-4 w-4" />
                 {t('refresh')}
               </Button>
+              <Select value={contextIdFilter} onValueChange={(val) => { if (val) setContextIdFilter(val); }}>
+                <SelectTrigger className="w-[180px] h-9">
+                  <SelectValue placeholder={t('filterByContext')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('allContexts')}</SelectItem>
+                  {Array.from(groupedByContextId.keys()).filter(k => k !== 'no-context').map(contextId => (
+                    <SelectItem key={contextId} value={contextId}>{contextId.slice(0, 16)}...</SelectItem>
+                  ))}
+                  {groupedByContextId.has('no-context') && (
+                    <SelectItem value="no-context">{t('noContext')}</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
               <Button
                 className="h-9 bg-[#ff4d29] hover:bg-[#ff4d29]/90 text-white gap-2 rounded-md px-3"
                 onClick={handleOpenCreateA2a}
@@ -856,7 +895,7 @@ export function Skills() {
                     </TableRow>
                   ) : (
                     a2aAgents.map((agent) => (
-                      <TableRow key={agent.id} className="group hover:bg-muted/50/50 transition-colors border-border">
+                      <TableRow key={agent.id} className="group hover:bg-muted/50/50 transition-colors border-border cursor-pointer" onClick={() => handleAgentCardClick(agent)}>
                         <TableCell className="py-4 px-4 text-sm font-medium">{agent.name}</TableCell>
                         <TableCell className="py-4 px-4 text-sm text-muted-foreground truncate" title={agent.base_url}>{agent.base_url}</TableCell>
                         <TableCell className="py-4 px-4 text-sm text-muted-foreground">{agent.protocol_version || '-'}</TableCell>
@@ -868,7 +907,7 @@ export function Skills() {
                             <span className="opacity-70">#{agent.failure_count}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="py-4 px-4 text-right">
+                        <TableCell className="py-4 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1">
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-all shrink-0" onClick={() => void handleRefreshA2aCard(agent.id)}>
                               <RefreshCw className="h-4 w-4" />
@@ -895,10 +934,11 @@ export function Skills() {
               <Table className="table-fixed w-full">
                 <TableHeader className="bg-muted/50/50">
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-[18%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('taskId')}</TableHead>
-                    <TableHead className="w-[12%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('taskSource')}</TableHead>
-                    <TableHead className="w-[12%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('status')}</TableHead>
-                    <TableHead className="w-[38%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('content')}</TableHead>
+                    <TableHead className="w-[16%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('taskId')}</TableHead>
+                    <TableHead className="w-[12%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('contextId')}</TableHead>
+                    <TableHead className="w-[10%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('taskSource')}</TableHead>
+                    <TableHead className="w-[10%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('status')}</TableHead>
+                    <TableHead className="w-[32%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('content')}</TableHead>
                     <TableHead className="w-[20%] font-semibold text-foreground/80 py-3 px-4 text-sm">{t('time')}</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -915,14 +955,20 @@ export function Skills() {
                     </TableRow>
                   ) : (
                     a2aTasks.map((task) => (
-                      <TableRow key={task.id} className="group hover:bg-muted/50/50 transition-colors border-border">
+                      <TableRow key={task.id} className="group hover:bg-muted/50/50 transition-colors border-border cursor-pointer" onClick={() => handleTaskClick(task)}>
                         <TableCell className="py-4 px-4 text-xs font-mono truncate" title={task.id}>{task.id}</TableCell>
+                        <TableCell className="py-4 px-4 text-xs font-mono truncate text-muted-foreground" title={task.context_id || ''}>{task.context_id ? task.context_id.slice(0, 12) + '...' : '-'}</TableCell>
                         <TableCell className="py-4 px-4 text-sm text-muted-foreground">{task.source}</TableCell>
                         <TableCell className="py-4 px-4 text-sm">{task.state}</TableCell>
                         <TableCell className="py-4 px-4 text-xs text-muted-foreground">
-                          <div className="line-clamp-2" title={task.error_message || task.output_text || task.input_text}>
-                            {task.error_message || task.output_text || task.input_text}
+                          <div className="line-clamp-2" title={task.error_message || task.output_text || task.input_text || (task.input_parts ? renderParts(task.input_parts) : '')}>
+                            {task.error_message || task.output_text || task.input_text || (task.input_parts ? renderParts(task.input_parts) : '')}
                           </div>
+                          {task.artifacts && task.artifacts.length > 0 && (
+                            <div className="mt-1 text-[10px] text-indigo-600">
+                              {task.artifacts.length} artifact(s)
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell className="py-4 px-4 text-xs text-muted-foreground">{task.updated_at}</TableCell>
                       </TableRow>
@@ -1200,6 +1246,290 @@ export function Skills() {
           </div>
           <DialogFooter className="p-6 pt-2">
             <Button onClick={handleSaveA2aAgent} className="bg-indigo-600 hover:bg-indigo-700 text-primary-foreground rounded-lg px-6 h-10 w-full">{t('saveA2aAgent')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!selectedA2aAgent} onOpenChange={(open) => { if (!open) setSelectedA2aAgent(null); }}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col rounded-2xl p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle className="text-xl font-bold text-foreground">{selectedA2aAgent?.name} - Agent Card</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto px-6 py-2">
+            {selectedA2aAgent?.agent_card ? (
+              <div className="grid gap-4">
+                {selectedA2aAgent.agent_card.description && (
+                  <div className="grid gap-1.5">
+                    <Label className="text-muted-foreground font-medium text-sm">{t('description')}</Label>
+                    <p className="text-sm text-foreground">{selectedA2aAgent.agent_card.description}</p>
+                  </div>
+                )}
+                {selectedA2aAgent.agent_card.url && (
+                  <div className="grid gap-1.5">
+                    <Label className="text-muted-foreground font-medium text-sm">URL</Label>
+                    <a href={selectedA2aAgent.agent_card.url} target="_blank" rel="noopener noreferrer" className="text-sm text-indigo-600 hover:underline">{selectedA2aAgent.agent_card.url}</a>
+                  </div>
+                )}
+                {selectedA2aAgent.agent_card.provider && (
+                  <div className="grid gap-1.5">
+                    <Label className="text-muted-foreground font-medium text-sm">{t('provider')}</Label>
+                    <div className="text-sm text-foreground">
+                      {selectedA2aAgent.agent_card.provider.organization && <span>{selectedA2aAgent.agent_card.provider.organization}</span>}
+                      {selectedA2aAgent.agent_card.provider.url && <span> - <a href={selectedA2aAgent.agent_card.provider.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">{selectedA2aAgent.agent_card.provider.url}</a></span>}
+                    </div>
+                  </div>
+                )}
+                {selectedA2aAgent.agent_card.skills && selectedA2aAgent.agent_card.skills.length > 0 && (
+                  <div className="grid gap-1.5">
+                    <Label className="text-muted-foreground font-medium text-sm">{t('skills')}</Label>
+                    <div className="space-y-2">
+                      {selectedA2aAgent.agent_card.skills.map((skill, idx) => (
+                        <div key={idx} className="p-3 bg-muted/50 rounded-lg">
+                          <div className="font-medium text-sm">{skill.name}</div>
+                          {skill.description && <p className="text-xs text-muted-foreground mt-1">{skill.description}</p>}
+                          {skill.tags && skill.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {skill.tags.map((tag, i) => (
+                                <span key={i} className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] rounded-full">{tag}</span>
+                              ))}
+                            </div>
+                          )}
+                          {skill.inputModes && skill.inputModes.length > 0 && (
+                            <div className="mt-1 text-xs text-muted-foreground">Input: {skill.inputModes.join(', ')}</div>
+                          )}
+                          {skill.outputModes && skill.outputModes.length > 0 && (
+                            <div className="mt-1 text-xs text-muted-foreground">Output: {skill.outputModes.join(', ')}</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {selectedA2aAgent.agent_card.supportedInterfaces && selectedA2aAgent.agent_card.supportedInterfaces.length > 0 && (
+                  <div className="grid gap-1.5">
+                    <Label className="text-muted-foreground font-medium text-sm">{t('supportedInterfaces')}</Label>
+                    <div className="space-y-1">
+                      {selectedA2aAgent.agent_card.supportedInterfaces.map((iface, idx) => (
+                        <div key={idx} className="p-2 bg-muted/50 rounded text-xs">
+                          <span className="font-medium">{iface.type}</span>
+                          {iface.url && <span className="text-muted-foreground ml-2">{iface.url}</span>}
+                          {iface.protocolVersion && <span className="text-muted-foreground ml-2">v{iface.protocolVersion}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {selectedA2aAgent.agent_card.defaultInputModes && selectedA2aAgent.agent_card.defaultInputModes.length > 0 && (
+                  <div className="grid gap-1.5">
+                    <Label className="text-muted-foreground font-medium text-sm">{t('defaultInputModes')}</Label>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedA2aAgent.agent_card.defaultInputModes.map((mode, idx) => (
+                        <span key={idx} className="px-2 py-0.5 bg-muted rounded text-xs">{mode}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {selectedA2aAgent.agent_card.defaultOutputModes && selectedA2aAgent.agent_card.defaultOutputModes.length > 0 && (
+                  <div className="grid gap-1.5">
+                    <Label className="text-muted-foreground font-medium text-sm">{t('defaultOutputModes')}</Label>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedA2aAgent.agent_card.defaultOutputModes.map((mode, idx) => (
+                        <span key={idx} className="px-2 py-0.5 bg-muted rounded text-xs">{mode}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {selectedA2aAgent.agent_card.iconUrl && (
+                  <div className="grid gap-1.5">
+                    <Label className="text-muted-foreground font-medium text-sm">{t('iconUrl')}</Label>
+                    <img src={selectedA2aAgent.agent_card.iconUrl} alt="Agent Icon" className="h-16 w-16 rounded-lg object-contain" />
+                  </div>
+                )}
+                {selectedA2aAgent.agent_card.documentationUrl && (
+                  <div className="grid gap-1.5">
+                    <Label className="text-muted-foreground font-medium text-sm">{t('documentationUrl')}</Label>
+                    <a href={selectedA2aAgent.agent_card.documentationUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-indigo-600 hover:underline">{selectedA2aAgent.agent_card.documentationUrl}</a>
+                  </div>
+                )}
+                {selectedA2aAgent.agent_card.security && selectedA2aAgent.agent_card.security.length > 0 && (
+                  <div className="grid gap-1.5">
+                    <Label className="text-muted-foreground font-medium text-sm">{t('security')}</Label>
+                    <div className="text-xs text-muted-foreground font-mono bg-muted/50 p-2 rounded">
+                      {JSON.stringify(selectedA2aAgent.agent_card.security, null, 2)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>{t('noAgentCardAvailable')}</p>
+                <p className="text-xs mt-2">{t('tryRefreshingCard')}</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="p-6 pt-2">
+            <Button variant="outline" onClick={() => setSelectedA2aAgent(null)}>{t('close')}</Button>
+            {selectedA2aAgent && (
+              <Button onClick={() => void handleRefreshA2aCard(selectedA2aAgent.id)} className="gap-2">
+                <RefreshCw className="h-4 w-4" />
+                {t('refreshCard')}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!selectedTask} onOpenChange={(open) => { if (!open) { setSelectedTask(null); setTaskArtifactPreview(null); } }}>
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] flex flex-col rounded-2xl p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle className="text-xl font-bold text-foreground">{t('taskDetails')}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto px-6 py-2">
+            {selectedTask && (
+              <div className="grid gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-1.5">
+                    <Label className="text-muted-foreground font-medium text-sm">Task ID</Label>
+                    <p className="text-sm font-mono break-all">{selectedTask.id}</p>
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-muted-foreground font-medium text-sm">Context ID</Label>
+                    <p className="text-sm font-mono break-all">{selectedTask.context_id || '-'}</p>
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-muted-foreground font-medium text-sm">State</Label>
+                    <p className="text-sm">{selectedTask.state}</p>
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-muted-foreground font-medium text-sm">Source</Label>
+                    <p className="text-sm">{selectedTask.source}</p>
+                  </div>
+                </div>
+
+                {selectedTask.input_parts && selectedTask.input_parts.length > 0 && (
+                  <div className="grid gap-1.5">
+                    <Label className="text-muted-foreground font-medium text-sm">{t('inputParts')}</Label>
+                    <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                      {selectedTask.input_parts.map((part, idx) => (
+                        <div key={idx} className="text-sm">
+                          {part.kind === 'text' && <p className="whitespace-pre-wrap">{part.text}</p>}
+                          {part.kind === 'url' && <a href={part.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">{part.url}</a>}
+                          {part.kind === 'file' && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground">[{part.filename || 'file'}]</span>
+                              {part.mediaType?.startsWith('image/') && <span className="text-xs text-muted-foreground">({part.mediaType})</span>}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedTask.output_parts && selectedTask.output_parts.length > 0 && (
+                  <div className="grid gap-1.5">
+                    <Label className="text-muted-foreground font-medium text-sm">{t('outputParts')}</Label>
+                    <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                      {selectedTask.output_parts.map((part, idx) => (
+                        <div key={idx} className="text-sm">
+                          {part.kind === 'text' && <p className="whitespace-pre-wrap">{part.text}</p>}
+                          {part.kind === 'url' && <a href={part.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">{part.url}</a>}
+                          {part.kind === 'file' && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground">[{part.filename || 'file'}]</span>
+                              {part.mediaType?.startsWith('image/') && <span className="text-xs text-muted-foreground">({part.mediaType})</span>}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedTask.artifacts && selectedTask.artifacts.length > 0 && (
+                  <div className="grid gap-1.5">
+                    <Label className="text-muted-foreground font-medium text-sm">{t('artifacts')} ({selectedTask.artifacts.length})</Label>
+                    <div className="space-y-2">
+                      {selectedTask.artifacts.map((artifact, idx) => (
+                        <div key={idx} className="border border-border rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="font-medium text-sm">
+                              {artifact.name || `Artifact ${idx + 1}`}
+                            </div>
+                            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => handlePreviewArtifact(artifact)}>
+                              <Eye className="h-3 w-3" />
+                              {t('preview')}
+                            </Button>
+                          </div>
+                          {artifact.description && (
+                            <p className="text-xs text-muted-foreground mb-2">{artifact.description}</p>
+                          )}
+                          <div className="text-xs text-muted-foreground">
+                            {artifact.parts.length} part(s)
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {taskArtifactPreview && (
+                  <div className="grid gap-1.5">
+                    <Label className="text-muted-foreground font-medium text-sm">{t('artifactPreview')}</Label>
+                    <div className="border border-border rounded-lg p-3 bg-muted/50">
+                      {taskArtifactPreview.type === 'text' && (
+                        <pre className="text-xs whitespace-pre-wrap break-all max-h-[300px] overflow-auto">{taskArtifactPreview.content}</pre>
+                      )}
+                      {taskArtifactPreview.type === 'image' && (
+                        <img src={taskArtifactPreview.content} alt="Artifact Preview" className="max-w-full max-h-[300px] rounded-lg object-contain" />
+                      )}
+                      {taskArtifactPreview.type === 'html' && (
+                        <div className="text-xs text-muted-foreground italic">[HTML Preview - rendered separately]</div>
+                      )}
+                      {taskArtifactPreview.type === 'json' && (
+                        <pre className="text-xs whitespace-pre-wrap break-all max-h-[300px] overflow-auto">{taskArtifactPreview.content}</pre>
+                      )}
+                      {taskArtifactPreview.type === 'unknown' && (
+                        <p className="text-xs text-muted-foreground">{taskArtifactPreview.content}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {selectedTask.error_message && (
+                  <div className="grid gap-1.5">
+                    <Label className="text-muted-foreground font-medium text-sm">{t('errorMessage')}</Label>
+                    <div className="bg-rose-50 border border-rose-100 rounded-lg p-3 text-sm text-rose-700">
+                      {selectedTask.error_message}
+                    </div>
+                  </div>
+                )}
+
+                {selectedTask.history && selectedTask.history.length > 0 && (
+                  <div className="grid gap-1.5">
+                    <Label className="text-muted-foreground font-medium text-sm">{t('messageHistory')} ({selectedTask.history.length})</Label>
+                    <div className="space-y-2 max-h-[300px] overflow-auto">
+                      {selectedTask.history.map((msg, idx) => (
+                        <div key={idx} className={`p-3 rounded-lg ${msg.role === 'user' ? 'bg-blue-50 border border-blue-100' : 'bg-green-50 border border-green-100'}`}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-medium">{msg.role}</span>
+                            {msg.messageId && <span className="text-[10px] text-muted-foreground font-mono">{msg.messageId.slice(0, 8)}...</span>}
+                          </div>
+                          <div className="text-xs">
+                            {msg.parts.map((part, pIdx) => (
+                              <div key={pIdx}>{renderPart(part)}</div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter className="p-6 pt-2">
+            <Button variant="outline" onClick={() => { setSelectedTask(null); setTaskArtifactPreview(null); }}>{t('close')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

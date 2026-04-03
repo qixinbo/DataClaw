@@ -4,8 +4,8 @@ from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 import httpx
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -14,22 +14,109 @@ from app.core.security import CurrentUser, get_current_user
 from app.database import SessionLocal, get_db
 from app.models.a2a import (
     A2AAuditLog,
+    A2AArtifact,
+    A2AMessage,
+    A2APart,
     A2AProjectConfig,
     A2ARemoteAgent,
     A2ATask,
     A2ATaskEvent,
     A2ATaskWebhook,
     A2AWebhookDelivery,
+    A2ATaskState,
 )
 from app.models.project import Project
-from app.services.a2a_service import _json_dumps, _json_loads, a2a_runtime
+from app.schemas.a2a import (
+    A2AMessageCreateSchema,
+    A2AMessageSchema,
+    A2AMessageRole,
+    A2APartSchema,
+    A2ATaskSchema,
+    A2ATaskWithHistorySchema,
+    A2ATaskWithMessagesSchema,
+    A2AArtifactSchema,
+    A2ATaskStatusSchema,
+    TaskStatusUpdateEvent,
+    TaskArtifactUpdateEvent,
+    TaskMessageEvent,
+    StreamResponse,
+    StreamResponseTask,
+    SendMessageRequest,
+    SendStreamingMessageRequest,
+    GetTaskRequest,
+    TaskListRequest,
+    CancelTaskRequest,
+    PushNotificationConfigCreate,
+    PushNotificationConfig,
+    A2ATaskState as SchemaTaskState,
+    AgentCardPublicSchema,
+    AgentCardExtendedSchema,
+    AgentSkill,
+    AgentProvider,
+    AgentSupportedInterface,
+    SecuritySchemeApiKey,
+    SecuritySchemeHttpAuth,
+    SecuritySchemeOAuth2,
+    SecuritySchemeOpenIdConnect,
+    SecuritySchemeMtls,
+    OAuth2Flows,
+    VersionNotSupportedError,
+)
+from app.services.a2a_service import _json_dumps, _json_loads, a2a_runtime, RemoteAgentSecuritySelector
 from app.trace import build_error_attributes, trace_service
 
-router = APIRouter(prefix="/a2a", tags=["a2a"])
+router = APIRouter()
+A2A_API_PREFIX = "/a2a"
 
 SUPPORTED_PROTOCOL_VERSION = "1.0"
 SUPPORTED_CAPABILITIES = ["streaming", "push", "task_management", "subscribe"]
 SUPPORTED_AUTH = ["bearer", "shared_secret", "none"]
+
+
+async def verify_a2a_version(
+    response: Response,
+    a2a_version: Optional[str] = Header(default=None, alias="A2A-Version"),
+) -> None:
+    if a2a_version is not None and a2a_version != SUPPORTED_PROTOCOL_VERSION:
+        error = VersionNotSupportedError(
+            code=-32009,
+            message=f"Protocol version '{a2a_version}' not supported. Supported version is '{SUPPORTED_PROTOCOL_VERSION}'.",
+            data={"supportedVersion": SUPPORTED_PROTOCOL_VERSION},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=json.dumps(error.model_dump(), ensure_ascii=False),
+        )
+    response.headers["A2A-Version"] = SUPPORTED_PROTOCOL_VERSION
+
+
+async def verify_shared_secret(
+    request_data: bytes,
+    x_a2a_signature: Optional[str] = Header(default=None, alias="X-A2A-Signature"),
+    x_a2a_timestamp: Optional[str] = Header(default=None, alias="X-A2A-Timestamp"),
+    shared_secret: Optional[str] = None,
+) -> bool:
+    if not x_a2a_signature or not x_a2a_timestamp:
+        return False
+    if not shared_secret:
+        return False
+    try:
+        from app.services.a2a_service import SharedSecretAuth
+        timestamp = int(x_a2a_timestamp)
+        return SharedSecretAuth.verify_signature(shared_secret, request_data, x_a2a_signature, timestamp)
+    except (ValueError, TypeError):
+        return False
+
+
+def get_user_bearer_token(current_user: CurrentUser) -> str:
+    from app.core.security import create_access_token
+    return create_access_token({"sub": str(current_user.id), "is_admin": current_user.is_admin})
+
+
+class A2AStreamingResponse(StreamingResponse):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.headers["A2A-Version"] = SUPPORTED_PROTOCOL_VERSION
 
 
 def _mask_error(message: str) -> str:
@@ -38,27 +125,167 @@ def _mask_error(message: str) -> str:
     return "request_failed"
 
 
-class AgentCardResponse(BaseModel):
-    name: str
-    protocol_version: str
-    capabilities: List[str]
-    endpoints: Dict[str, str]
-    auth: List[str]
+def _json_serialize(obj: Any) -> Any:
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, enum.Enum):
+        return obj.value
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+
+AGENT_SKILLS = [
+    AgentSkill(
+        id="dataclaw-data-analysis",
+        name="Data Analysis",
+        description="Analyze datasets, generate insights, and produce visualizations",
+        tags=["data", "analysis", "analytics", "visualization"],
+        examples=[],
+        inputModes=["text", "data"],
+        outputModes=["text", "artifact", "stream"],
+        securityRequirements=[],
+    ),
+    AgentSkill(
+        id="dataclaw-nl2sql",
+        name="Natural Language to SQL",
+        description="Convert natural language queries into SQL statements",
+        tags=["nl2sql", "sql", "query", "database"],
+        examples=[],
+        inputModes=["text"],
+        outputModes=["text", "data"],
+        securityRequirements=[],
+    ),
+    AgentSkill(
+        id="dataclaw-artifact-preview",
+        name="Artifact Preview & Download",
+        description="Generate and serve previews for data artifacts",
+        tags=["artifact", "preview", "download", "export"],
+        examples=[],
+        inputModes=["text", "data"],
+        outputModes=["artifact", "stream"],
+        securityRequirements=[],
+    ),
+]
+
+AGENT_PROVIDER = AgentProvider(
+    organization="DataClaw",
+    url="https://dataclaw.io",
+)
+
+AGENT_SUPPORTED_INTERFACES = [
+    AgentSupportedInterface(
+        url="/message:send",
+        protocolBinding="http",
+        protocolVersion="1.0",
+    ),
+    AgentSupportedInterface(
+        url="/message:stream",
+        protocolBinding="http",
+        protocolVersion="1.0",
+    ),
+]
+
+AGENT_SECURITY_SCHEMES = {
+    "bearer": SecuritySchemeHttpAuth(scheme="bearer", description="JWT Bearer token authentication"),
+    "apiKey": SecuritySchemeApiKey(name="X-API-Key", in_="header", description="API key authentication"),
+    "oauth2": SecuritySchemeOAuth2(
+        flows=OAuth2Flows(
+            authorizationCode={
+                "authorizationUrl": "/oauth/authorize",
+                "tokenUrl": "/oauth/token",
+                "scopes": {"read": "Read access", "write": "Write access"},
+            },
+            clientCredentials={"tokenUrl": "/oauth/token", "scopes": {"read": "Read access", "write": "Write access"}},
+            deviceCode={"authorizationUrl": "/oauth/device", "tokenUrl": "/oauth/token", "scopes": {"read": "Read access", "write": "Write access"}},
+        ),
+        description="OAuth2 authentication",
+    ),
+    "openIdConnect": SecuritySchemeOpenIdConnect(
+        openIdConnectUrl="/.well-known/openid-configuration",
+        description="OpenID Connect authentication",
+        scopes={"openid": "OpenID scope", "profile": "Profile scope"},
+    ),
+    "mutualTLS": SecuritySchemeMtls(
+        description="Mutual TLS authentication",
+        caCerts=[],
+        clientCert=None,
+        clientKey=None,
+    ),
+    "shared_secret": SecuritySchemeHttpAuth(scheme="hmac-sha256", description="HMAC-SHA256 shared secret authentication"),
+}
+
+
+def _build_public_agent_card() -> AgentCardPublicSchema:
+    return AgentCardPublicSchema(
+        name="DataClaw A2A Gateway",
+        protocol_version=SUPPORTED_PROTOCOL_VERSION,
+        capabilities=SUPPORTED_CAPABILITIES,
+        endpoints={
+            "sendMessage": "/message:send",
+            "sendStreamingMessage": "/message:stream",
+            "getTask": "/tasks/{task_id}",
+            "listTasks": "/tasks",
+            "cancelTask": "/tasks/{task_id}:cancel",
+            "subscribeTask": "/tasks/{task_id}:subscribe",
+            "pushNotificationConfig": "/tasks/{task_id}/pushNotificationConfigs",
+        },
+        auth=SUPPORTED_AUTH,
+        skills=AGENT_SKILLS,
+        provider=AGENT_PROVIDER,
+        supportedInterfaces=AGENT_SUPPORTED_INTERFACES,
+        defaultInputModes=["text", "data"],
+        defaultOutputModes=["text", "artifact", "stream"],
+        iconUrl="https://dataclaw.io/icon.png",
+        documentationUrl="https://docs.dataclaw.io/a2a",
+    )
+
+
+def _build_extended_agent_card(current_user: CurrentUser) -> AgentCardExtendedSchema:
+    public_card = _build_public_agent_card()
+    return AgentCardExtendedSchema(
+        **public_card.model_dump(),
+        securitySchemes=AGENT_SECURITY_SCHEMES,
+        security=[{"bearer": []}, {"apiKey": []}],
+        signatures=[],
+        tenantId=current_user.id,
+        isAdmin=current_user.is_admin,
+    )
 
 
 class RemoteAgentCreate(BaseModel):
     project_id: int
     name: str = Field(min_length=1, max_length=120)
     base_url: str = Field(min_length=1, max_length=500)
-    auth_scheme: Literal["none", "bearer"] = "none"
+    auth_scheme: Literal["none", "bearer", "shared_secret", "oauth2", "openIdConnect", "mutualTLS"] = "none"
     auth_token: Optional[str] = None
+    shared_secret: Optional[str] = None
+    mtls_ca_cert: Optional[str] = None
+    mtls_client_cert: Optional[str] = None
+    mtls_client_key: Optional[str] = None
+    oauth2_client_id: Optional[str] = None
+    oauth2_client_secret: Optional[str] = None
+    oauth2_token_url: Optional[str] = None
+    oauth2_scopes: Optional[str] = None
+    oidc_issuer_url: Optional[str] = None
+    oidc_client_id: Optional[str] = None
+    oidc_client_secret: Optional[str] = None
 
 
 class RemoteAgentUpdate(BaseModel):
     name: Optional[str] = None
     base_url: Optional[str] = None
-    auth_scheme: Optional[Literal["none", "bearer"]] = None
+    auth_scheme: Optional[Literal["none", "bearer", "shared_secret", "oauth2", "openIdConnect", "mutualTLS"]] = None
     auth_token: Optional[str] = None
+    shared_secret: Optional[str] = None
+    mtls_ca_cert: Optional[str] = None
+    mtls_client_cert: Optional[str] = None
+    mtls_client_key: Optional[str] = None
+    oauth2_client_id: Optional[str] = None
+    oauth2_client_secret: Optional[str] = None
+    oauth2_token_url: Optional[str] = None
+    oauth2_scopes: Optional[str] = None
+    oidc_issuer_url: Optional[str] = None
+    oidc_client_id: Optional[str] = None
+    oidc_client_secret: Optional[str] = None
 
 
 class RemoteAgentView(BaseModel):
@@ -73,17 +300,10 @@ class RemoteAgentView(BaseModel):
     failure_count: int
     circuit_open_until: Optional[datetime] = None
     card_fetched_at: Optional[datetime] = None
-
-
-class SendMessageRequest(BaseModel):
-    project_id: int
-    message: str = Field(min_length=1)
-    session_id: str = "api:a2a"
-    remote_agent_id: Optional[int] = None
-    route_mode: Literal["auto", "local", "a2a", "a2a_first", "local_first", "mcp_first"] = "auto"
-    fallback_chain: Optional[List[Literal["a2a", "local", "mcp"]]] = None
-    idempotency_key: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    shared_secret_configured: bool = False
+    mtls_configured: bool = False
+    oauth2_configured: bool = False
+    oidc_configured: bool = False
 
 
 class TaskView(BaseModel):
@@ -191,6 +411,180 @@ def _task_to_view(task: A2ATask) -> TaskView:
     )
 
 
+def _task_to_schema(task: A2ATask) -> A2ATaskSchema:
+    return A2ATaskSchema(
+        id=task.id,
+        contextId=task.context_id,
+        projectId=task.project_id,
+        tenantId=task.tenant_id,
+        source=task.source,
+        remoteAgentId=task.remote_agent_id,
+        idempotencyKey=task.idempotency_key,
+        state=SchemaTaskState(task.state.value),
+        inputText=task.input_text,
+        outputText=task.output_text,
+        errorMessage=task.error_message,
+        metadata=_json_loads(task.metadata_json, {}),
+        historyLength=task.history_length or 0,
+        createdAt=task.created_at,
+        updatedAt=task.updated_at,
+        finishedAt=task.finished_at,
+    )
+
+
+def _task_to_with_history(task: A2ATask, history_length: Optional[int] = None) -> A2ATaskWithHistorySchema:
+    query = db.query(A2AMessage).filter(A2AMessage.task_id == task.id)
+    if history_length is not None and history_length > 0:
+        query = query.order_by(A2AMessage.id.desc()).limit(history_length)
+        messages = query.all()
+        messages = list(reversed(messages))
+    else:
+        messages = query.order_by(A2AMessage.id.asc()).all()
+
+    message_schemas = []
+    for msg in messages:
+        parts = db.query(A2APart).filter(A2APart.message_id == msg.id).all()
+        part_schemas = []
+        for p in parts:
+            part_schemas.append(A2APartSchema(
+                part_type=p.part_type,
+                text=p.text_content,
+                raw=p.raw_content,
+                url=p.url_content,
+                data=p.data_content,
+                mediaType=p.media_type,
+                filename=p.filename,
+                metadata=_json_loads(p.metadata_json, {}),
+            ))
+        message_schemas.append(A2AMessageSchema(
+            messageId=msg.message_id,
+            contextId=msg.context_id,
+            taskId=msg.task_id,
+            role=msg.role,
+            parts=part_schemas,
+            extensions=_json_loads(msg.extensions_json, {}),
+            referenceTaskIds=_json_loads(msg.reference_task_ids_json, []),
+            createdAt=msg.created_at,
+        ))
+
+    artifacts = db.query(A2AArtifact).filter(A2AArtifact.task_id == task.id).all()
+    artifact_schemas = []
+    for art in artifacts:
+        parts = db.query(A2APart).filter(A2APart.artifact_id == art.id).all()
+        part_schemas = []
+        for p in parts:
+            part_schemas.append(A2APartSchema(
+                part_type=p.part_type,
+                text=p.text_content,
+                raw=p.raw_content,
+                url=p.url_content,
+                data=p.data_content,
+                mediaType=p.media_type,
+                filename=p.filename,
+                metadata=_json_loads(p.metadata_json, {}),
+            ))
+        artifact_schemas.append(A2AArtifactSchema(
+            artifactId=art.artifact_id,
+            name=art.name,
+            description=art.description,
+            parts=part_schemas,
+            metadata=_json_loads(art.metadata_json, {}),
+            extensions=_json_loads(art.extensions_json, {}),
+            createdAt=art.created_at,
+            updatedAt=art.updated_at,
+        ))
+
+    return A2ATaskWithHistorySchema(
+        id=task.id,
+        contextId=task.context_id,
+        projectId=task.project_id,
+        tenantId=task.tenant_id,
+        state=SchemaTaskState(task.state.value),
+        history=message_schemas,
+        artifacts=artifact_schemas,
+        createdAt=task.created_at,
+        updatedAt=task.updated_at,
+        finishedAt=task.finished_at,
+    )
+
+
+def _task_to_with_messages(task: A2ATask) -> A2ATaskWithMessagesSchema:
+    messages = db.query(A2AMessage).filter(A2AMessage.task_id == task.id).order_by(A2AMessage.id.asc()).all()
+    message_schemas = []
+    for msg in messages:
+        parts = db.query(A2APart).filter(A2APart.message_id == msg.id).all()
+        part_schemas = []
+        for p in parts:
+            part_schemas.append(A2APartSchema(
+                part_type=p.part_type,
+                text=p.text_content,
+                raw=p.raw_content,
+                url=p.url_content,
+                data=p.data_content,
+                mediaType=p.media_type,
+                filename=p.filename,
+                metadata=_json_loads(p.metadata_json, {}),
+            ))
+        message_schemas.append(A2AMessageSchema(
+            messageId=msg.message_id,
+            contextId=msg.context_id,
+            taskId=msg.task_id,
+            role=msg.role,
+            parts=part_schemas,
+            extensions=_json_loads(msg.extensions_json, {}),
+            referenceTaskIds=_json_loads(msg.reference_task_ids_json, []),
+            createdAt=msg.created_at,
+        ))
+
+    artifacts = db.query(A2AArtifact).filter(A2AArtifact.task_id == task.id).all()
+    artifact_schemas = []
+    for art in artifacts:
+        parts = db.query(A2APart).filter(A2APart.artifact_id == art.id).all()
+        part_schemas = []
+        for p in parts:
+            part_schemas.append(A2APartSchema(
+                part_type=p.part_type,
+                text=p.text_content,
+                raw=p.raw_content,
+                url=p.url_content,
+                data=p.data_content,
+                mediaType=p.media_type,
+                filename=p.filename,
+                metadata=_json_loads(p.metadata_json, {}),
+            ))
+        artifact_schemas.append(A2AArtifactSchema(
+            artifactId=art.artifact_id,
+            name=art.name,
+            description=art.description,
+            parts=part_schemas,
+            metadata=_json_loads(art.metadata_json, {}),
+            extensions=_json_loads(art.extensions_json, {}),
+            createdAt=art.created_at,
+            updatedAt=art.updated_at,
+        ))
+
+    return A2ATaskWithMessagesSchema(
+        id=task.id,
+        contextId=task.context_id,
+        projectId=task.project_id,
+        tenantId=task.tenant_id,
+        source=task.source,
+        remoteAgentId=task.remote_agent_id,
+        idempotencyKey=task.idempotency_key,
+        state=SchemaTaskState(task.state.value),
+        inputText=task.input_text,
+        outputText=task.output_text,
+        errorMessage=task.error_message,
+        metadata=_json_loads(task.metadata_json, {}),
+        historyLength=task.history_length or 0,
+        createdAt=task.created_at,
+        updatedAt=task.updated_at,
+        finishedAt=task.finished_at,
+        messages=message_schemas,
+        artifacts=artifact_schemas,
+    )
+
+
 def _agent_to_view(agent: A2ARemoteAgent) -> RemoteAgentView:
     return RemoteAgentView(
         id=agent.id,
@@ -204,6 +598,10 @@ def _agent_to_view(agent: A2ARemoteAgent) -> RemoteAgentView:
         failure_count=int(agent.failure_count or 0),
         circuit_open_until=agent.circuit_open_until,
         card_fetched_at=agent.card_fetched_at,
+        shared_secret_configured=bool(agent.shared_secret),
+        mtls_configured=bool(agent.mtls_client_cert and agent.mtls_client_key),
+        oauth2_configured=bool(agent.oauth2_client_id and agent.oauth2_token_url),
+        oidc_configured=bool(agent.oidc_issuer_url),
     )
 
 
@@ -244,10 +642,33 @@ def _build_artifact_event(task_id: str, content: str, *, compatibility_mode: boo
     return payload
 
 
+def _part_to_model(part_schema: A2APartSchema) -> Dict[str, Any]:
+    return {
+        "text": part_schema.text,
+        "raw": part_schema.raw,
+        "url": part_schema.url,
+        "data": part_schema.data,
+        "mediaType": part_schema.mediaType,
+        "filename": part_schema.filename,
+        "metadata": part_schema.metadata or {},
+    }
+
+
+def _message_to_task_input(message: A2AMessageCreateSchema) -> str:
+    text_parts = []
+    for part in message.parts:
+        if part.part_type.value == "text" and part.text:
+            text_parts.append(part.text)
+        elif part.part_type.value == "data" and part.data:
+            text_parts.append(str(part.data))
+    return "\n".join(text_parts) if text_parts else ""
+
+
 async def _delegate_to_remote(task: A2ATask, agent: A2ARemoteAgent, message: str) -> Tuple[str, Dict[str, Any]]:
-    headers: Dict[str, str] = {}
-    if agent.auth_scheme == "bearer" and agent.auth_token:
-        headers["Authorization"] = f"Bearer {agent.auth_token}"
+    security_selector = RemoteAgentSecuritySelector(agent)
+    security_selector.load_security_from_card()
+    preferred_scheme = security_selector.get_preferred_auth_scheme()
+
     payload = {
         "project_id": task.project_id,
         "message": message,
@@ -256,9 +677,28 @@ async def _delegate_to_remote(task: A2ATask, agent: A2ARemoteAgent, message: str
         "route_mode": "local_first",
         "metadata": {"delegated_by": "dataclaw", "task_id": task.id},
     }
+    body_bytes = json.dumps(payload).encode("utf-8")
     url = f"{agent.base_url.rstrip('/')}/api/v1/a2a/messages/send"
-    async with httpx.AsyncClient(timeout=25.0, verify=True) as client:
-        resp = await client.post(url, json=payload, headers=headers)
+    path = "/api/v1/a2a/messages/send"
+
+    headers: Dict[str, str] = {"Content-Type": "application/json"}
+
+    if preferred_scheme == "shared_secret" and agent.shared_secret:
+        sig_headers = security_selector.create_signed_request_headers("POST", path, body_bytes)
+        headers.update(sig_headers)
+    else:
+        auth_headers = await security_selector.authorize_request("POST", url)
+        headers.update(auth_headers)
+
+    mtls_context = security_selector.get_mtls_context()
+
+    if mtls_context:
+        async with httpx.AsyncClient(timeout=25.0, ssl=mtls_context) as client:
+            resp = await client.post(url, content=body_bytes, headers=headers)
+    else:
+        async with httpx.AsyncClient(timeout=25.0, verify=True) as client:
+            resp = await client.post(url, content=body_bytes, headers=headers)
+
     if resp.status_code >= 400:
         raise RuntimeError(f"remote_http_{resp.status_code}")
     body = resp.json()
@@ -276,25 +716,28 @@ async def _run_task(task_id: str, request: SendMessageRequest, tenant_id: int) -
         if not task:
             return
         config = a2a_runtime.get_project_config(db, task.project_id, tenant_id)
-        if task.state in {"CANCELED", "REJECTED"}:
+        if task.state in {A2ATaskState.CANCELED, A2ATaskState.REJECTED}:
             return
         with trace_service.start_span("a2a.task.execute", attributes={"task_id": task.id, "project_id": task.project_id, "source": task.source}) as span:
             start_ts = datetime.utcnow().timestamp()
             try:
-                task = a2a_runtime.transition_task(db, task, to_state="WORKING")
+                task = a2a_runtime.transition_task(db, task, to_state=A2ATaskState.WORKING)
                 status_event = _build_status_event(task, compatibility_mode=config.compatibility_mode, dual_event_write=config.dual_event_write)
                 status_row = a2a_runtime.append_event(db, task, "TaskStatusUpdateEvent", status_event)
                 await a2a_runtime.publish(task.id, status_event)
                 await a2a_runtime.notify_webhooks(db, task, status_row)
 
+                input_message = db.query(A2AMessage).filter(A2AMessage.task_id == task.id).order_by(A2AMessage.id.asc()).first()
+                message_text = _message_to_task_input(request.message) if input_message is None else task.input_text
+
                 if task.source == "a2a" and task.remote_agent_id:
                     agent = db.query(A2ARemoteAgent).filter(A2ARemoteAgent.id == task.remote_agent_id).first()
                     if not agent:
                         raise RuntimeError("remote_agent_missing")
-                    response_text, metadata = await _delegate_to_remote(task, agent, request.message)
+                    response_text, metadata = await _delegate_to_remote(task, agent, message_text)
                 else:
                     response_text = await nanobot_service.process_message(
-                        request.message,
+                        message_text,
                         session_id=f"a2a-task:{task.id}",
                         project_id=task.project_id,
                     )
@@ -306,7 +749,7 @@ async def _run_task(task_id: str, request: SendMessageRequest, tenant_id: int) -
                 task = a2a_runtime.transition_task(
                     db,
                     task,
-                    to_state="COMPLETED",
+                    to_state=A2ATaskState.COMPLETED,
                     output_text=response_text or "",
                     metadata=metadata,
                 )
@@ -320,8 +763,8 @@ async def _run_task(task_id: str, request: SendMessageRequest, tenant_id: int) -
                 span.set_attributes(build_error_attributes(exc, stage="a2a_task_execute"))
                 await a2a_runtime.metrics.incr("a2a.requests.error")
                 task = db.query(A2ATask).filter(A2ATask.id == task.id).first()
-                if task and task.state not in {"COMPLETED", "FAILED", "CANCELED", "REJECTED"}:
-                    task = a2a_runtime.transition_task(db, task, to_state="FAILED", error_message=_json_dumps({"message": _mask_error(str(exc))}))
+                if task and task.state not in {A2ATaskState.COMPLETED, A2ATaskState.FAILED, A2ATaskState.CANCELED, A2ATaskState.REJECTED}:
+                    task = a2a_runtime.transition_task(db, task, to_state=A2ATaskState.FAILED, error_message=_json_dumps({"message": _mask_error(str(exc))}))
                     fail_event = _build_status_event(task, compatibility_mode=task.compatibility_mode, dual_event_write=True)
                     fail_row = a2a_runtime.append_event(db, task, "TaskStatusUpdateEvent", fail_event)
                     await a2a_runtime.publish(task.id, fail_event)
@@ -330,25 +773,17 @@ async def _run_task(task_id: str, request: SendMessageRequest, tenant_id: int) -
         db.close()
 
 
-@router.get("/agent-card", response_model=AgentCardResponse)
-def get_agent_card() -> AgentCardResponse:
-    return AgentCardResponse(
-        name="DataClaw A2A Gateway",
-        protocol_version=SUPPORTED_PROTOCOL_VERSION,
-        capabilities=SUPPORTED_CAPABILITIES,
-        endpoints={
-            "send_message": "/api/v1/a2a/messages/send",
-            "send_streaming_message": "/api/v1/a2a/messages/stream",
-            "get_task": "/api/v1/a2a/tasks/{task_id}",
-            "list_tasks": "/api/v1/a2a/tasks",
-            "cancel_task": "/api/v1/a2a/tasks/{task_id}/cancel",
-            "subscribe_task": "/api/v1/a2a/tasks/{task_id}/subscribe",
-        },
-        auth=SUPPORTED_AUTH,
-    )
+@router.get("/.well-known/agent-card.json", response_model=AgentCardPublicSchema)
+def get_agent_card_public() -> AgentCardPublicSchema:
+    return _build_public_agent_card()
 
 
-@router.get("/remote-agents", response_model=List[RemoteAgentView])
+@router.get(f"{A2A_API_PREFIX}/agent-card", response_model=AgentCardPublicSchema)
+def get_agent_card() -> AgentCardPublicSchema:
+    return _build_public_agent_card()
+
+
+@router.get(f"{A2A_API_PREFIX}/remote-agents", response_model=List[RemoteAgentView])
 def list_remote_agents(
     project_id: Optional[int] = Query(default=None),
     db: Session = Depends(get_db),
@@ -366,7 +801,7 @@ def list_remote_agents(
     return [_agent_to_view(item) for item in query.order_by(A2ARemoteAgent.id.desc()).all()]
 
 
-@router.post("/remote-agents", response_model=RemoteAgentView, status_code=status.HTTP_201_CREATED)
+@router.post(f"{A2A_API_PREFIX}/remote-agents", response_model=RemoteAgentView, status_code=status.HTTP_201_CREATED)
 async def create_remote_agent(
     payload: RemoteAgentCreate,
     db: Session = Depends(get_db),
@@ -379,6 +814,17 @@ async def create_remote_agent(
         base_url=payload.base_url.strip().rstrip("/"),
         auth_scheme=payload.auth_scheme,
         auth_token=payload.auth_token,
+        shared_secret=payload.shared_secret,
+        mtls_ca_cert=payload.mtls_ca_cert,
+        mtls_client_cert=payload.mtls_client_cert,
+        mtls_client_key=payload.mtls_client_key,
+        oauth2_client_id=payload.oauth2_client_id,
+        oauth2_client_secret=payload.oauth2_client_secret,
+        oauth2_token_url=payload.oauth2_token_url,
+        oauth2_scopes=payload.oauth2_scopes,
+        oidc_issuer_url=payload.oidc_issuer_url,
+        oidc_client_id=payload.oidc_client_id,
+        oidc_client_secret=payload.oidc_client_secret,
         created_by=current_user.id,
     )
     db.add(item)
@@ -400,7 +846,7 @@ async def create_remote_agent(
     return _agent_to_view(item)
 
 
-@router.put("/remote-agents/{agent_id}", response_model=RemoteAgentView)
+@router.put(f"{A2A_API_PREFIX}/remote-agents/{{agent_id}}", response_model=RemoteAgentView)
 async def update_remote_agent(
     agent_id: int,
     payload: RemoteAgentUpdate,
@@ -432,7 +878,7 @@ async def update_remote_agent(
     return _agent_to_view(item)
 
 
-@router.delete("/remote-agents/{agent_id}")
+@router.delete(f"{A2A_API_PREFIX}/remote-agents/{{agent_id}}")
 def delete_remote_agent(
     agent_id: int,
     db: Session = Depends(get_db),
@@ -453,7 +899,7 @@ def delete_remote_agent(
     return {"status": "success"}
 
 
-@router.post("/remote-agents/{agent_id}/refresh-card", response_model=RemoteAgentView)
+@router.post(f"{A2A_API_PREFIX}/remote-agents/{{agent_id}}/refresh-card", response_model=RemoteAgentView)
 async def refresh_remote_agent_card(
     agent_id: int,
     db: Session = Depends(get_db),
@@ -480,7 +926,7 @@ async def refresh_remote_agent_card(
     return _agent_to_view(item)
 
 
-@router.post("/remote-agents/{agent_id}/health-check")
+@router.post(f"{A2A_API_PREFIX}/remote-agents/{{agent_id}}/health-check")
 async def health_check_remote_agent(
     agent_id: int,
     db: Session = Depends(get_db),
@@ -494,41 +940,125 @@ async def health_check_remote_agent(
         return {"healthy": False, "failure_count": item.failure_count}
 
 
-@router.post("/messages/send")
+@router.post("/message:send")
 async def send_message(
     request: SendMessageRequest,
+    response: Response,
     x_a2a_token: Optional[str] = Header(default=None),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
-) -> Dict[str, Any]:
-    _ensure_project_access(db, request.project_id, current_user)
-    config = a2a_runtime.get_project_config(db, request.project_id, current_user.id)
-    route = a2a_runtime.resolve_route(
-        project_config=config,
-        session_id=request.session_id,
-        requested_mode=request.route_mode,
-        requested_fallback=request.fallback_chain,
-    )
-    selected_source = "local"
+    _version_check: None = Depends(verify_a2a_version),
+) -> StreamResponse:
+    message = request.message
+    project_id = message.parts[0].data.get("project_id") if message.parts and message.parts[0].data else None
+    if not project_id:
+        raise HTTPException(status_code=400, detail="project_id required in message part data")
+
+    _ensure_project_access(db, project_id, current_user)
+    config = a2a_runtime.get_project_config(db, project_id, current_user.id)
+
+    message_id_str = message.messageId
+    context_id = request.contextId or message.contextId
+    task_id = request.taskId or message.taskId
+
+    existing_task = None
+    if task_id:
+        existing_task = db.query(A2ATask).filter(A2ATask.id == task_id).first()
+        if existing_task and existing_task.tenant_id != current_user.id and not current_user.is_admin:
+            raise HTTPException(status_code=404, detail="Task not found")
+
+    input_text = _message_to_task_input(message)
+
+    if existing_task:
+        msg_record = A2AMessage(
+            message_id=message_id_str,
+            context_id=context_id,
+            task_id=existing_task.id,
+            role=message.role,
+            extensions_json=_json_dumps(message.extensions or {}),
+            reference_task_ids_json=_json_dumps(message.referenceTaskIds or []),
+        )
+        db.add(msg_record)
+        for idx, part in enumerate(message.parts):
+            part_record = A2APart(
+                message_id=msg_record.id,
+                part_type=part.part_type,
+                text_content=part.text,
+                raw_content=part.raw,
+                url_content=part.url,
+                data_content=str(part.data) if part.data else None,
+                media_type=part.mediaType,
+                filename=part.filename,
+                metadata_json=_json_dumps(part.metadata or {}),
+            )
+            db.add(part_record)
+        db.commit()
+        asyncio.create_task(_run_task(existing_task.id, request, current_user.id))
+        return StreamResponse(
+            task=StreamResponseTask(
+                id=existing_task.id,
+                contextId=existing_task.context_id,
+                state=SchemaTaskState(existing_task.state.value),
+                artifacts=[],
+            )
+        )
+
+    route_selected = "local"
     remote_agent_id = None
-    if route.selected == "a2a" and request.remote_agent_id:
-        agent = _ensure_agent_access(db, request.remote_agent_id, current_user)
-        if not agent.healthy and config.rollback_to_local:
-            selected_source = "local"
-        else:
-            selected_source = "a2a"
-            remote_agent_id = agent.id
+    agent = None
+    if message.parts and message.parts[0].data:
+        route_mode = message.parts[0].data.get("route_mode", "auto")
+        remote_agent_id_param = message.parts[0].data.get("remote_agent_id")
+        if route_mode == "a2a" and remote_agent_id_param:
+            agent = _ensure_agent_access(db, remote_agent_id_param, current_user)
+            if not agent.healthy and config.rollback_to_local:
+                route_selected = "local"
+            else:
+                route_selected = "a2a"
+                remote_agent_id = agent.id
+
+    idempotency_key = message.parts[0].data.get("idempotency_key") if message.parts and message.parts[0].data else None
+    metadata = message.parts[0].data.get("metadata", {}) if message.parts and message.parts[0].data else {}
+
     task = a2a_runtime.create_task(
         db,
-        project_id=request.project_id,
+        project_id=project_id,
         tenant_id=current_user.id,
-        source=selected_source,
-        input_text=request.message,
-        idempotency_key=request.idempotency_key,
+        source=route_selected,
+        input_text=input_text,
+        idempotency_key=idempotency_key,
         remote_agent_id=remote_agent_id,
         compatibility_mode=config.compatibility_mode,
-        metadata={"route": route.model_dump() if hasattr(route, "model_dump") else route.__dict__, "token_present": bool(x_a2a_token), "request_metadata": request.metadata or {}},
+        metadata={"route_selected": route_selected, "token_present": bool(x_a2a_token), "request_metadata": metadata},
+        context_id=context_id,
     )
+
+    msg_record = A2AMessage(
+        message_id=message_id_str,
+        context_id=context_id,
+        task_id=task.id,
+        role=message.role,
+        extensions_json=_json_dumps(message.extensions or {}),
+        reference_task_ids_json=_json_dumps(message.referenceTaskIds or []),
+    )
+    db.add(msg_record)
+    for idx, part in enumerate(message.parts):
+        part_record = A2APart(
+            message_id=msg_record.id,
+            part_type=part.part_type,
+            text_content=part.text,
+            raw_content=part.raw,
+            url_content=part.url,
+            data_content=str(part.data) if part.data else None,
+            media_type=part.mediaType,
+            filename=part.filename,
+            metadata_json=_json_dumps(part.metadata or {}),
+        )
+        db.add(part_record)
+
+    task.context_id = context_id
+    db.commit()
+
     event_payload = _build_status_event(task, compatibility_mode=config.compatibility_mode, dual_event_write=config.dual_event_write)
     event_row = a2a_runtime.append_event(db, task, "TaskStatusUpdateEvent", event_payload)
     await a2a_runtime.publish(task.id, event_payload)
@@ -545,83 +1075,327 @@ async def send_message(
         project_id=task.project_id,
         task_id=task.id,
     )
-    return {"task": _task_to_view(task).model_dump(), "routing": route.__dict__}
+
+    task_record = db.query(A2ATask).filter(A2ATask.id == task.id).first()
+    return StreamResponse(
+        task=StreamResponseTask(
+            id=task_record.id,
+            contextId=task_record.context_id,
+            state=SchemaTaskState(task_record.state.value),
+            artifacts=[],
+        )
+    )
 
 
-@router.post("/messages/stream")
+@router.post("/message:stream")
 async def send_streaming_message(
-    request: SendMessageRequest,
+    request: SendStreamingMessageRequest,
+    response: Response,
+    x_a2a_token: Optional[str] = Header(default=None),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
+    _version_check: None = Depends(verify_a2a_version),
 ) -> StreamingResponse:
-    response = await send_message(request=request, x_a2a_token=None, db=db, current_user=current_user)
-    task_id = response["task"]["id"]
+    message = request.message
+    project_id = message.parts[0].data.get("project_id") if message.parts and message.parts[0].data else None
+    if not project_id:
+        raise HTTPException(status_code=400, detail="project_id required in message part data")
+
+    _ensure_project_access(db, project_id, current_user)
+    config = a2a_runtime.get_project_config(db, project_id, current_user.id)
+
+    message_id_str = message.messageId
+    context_id = request.contextId or message.contextId
+    task_id = request.taskId or message.taskId
+
+    existing_task = None
+    if task_id:
+        existing_task = db.query(A2ATask).filter(A2ATask.id == task_id).first()
+
+    input_text = _message_to_task_input(message)
+
+    task_context_id = None
+    if existing_task:
+        msg_record = A2AMessage(
+            message_id=message_id_str,
+            context_id=context_id,
+            task_id=existing_task.id,
+            role=message.role,
+            extensions_json=_json_dumps(message.extensions or {}),
+            reference_task_ids_json=_json_dumps(message.referenceTaskIds or []),
+        )
+        db.add(msg_record)
+        for idx, part in enumerate(message.parts):
+            part_record = A2APart(
+                message_id=msg_record.id,
+                part_type=part.part_type,
+                text_content=part.text,
+                raw_content=part.raw,
+                url_content=part.url,
+                data_content=str(part.data) if part.data else None,
+                media_type=part.mediaType,
+                filename=part.filename,
+                metadata_json=_json_dumps(part.metadata or {}),
+            )
+            db.add(part_record)
+        db.commit()
+        task_context_id = existing_task.context_id
+        asyncio.create_task(_run_task(existing_task.id, request, current_user.id))
+        task_id = existing_task.id
+    else:
+        route_selected = "local"
+        remote_agent_id = None
+        if message.parts and message.parts[0].data:
+            route_mode = message.parts[0].data.get("route_mode", "auto")
+            remote_agent_id_param = message.parts[0].data.get("remote_agent_id")
+            if route_mode == "a2a" and remote_agent_id_param:
+                agent = _ensure_agent_access(db, remote_agent_id_param, current_user)
+                if not agent.healthy and config.rollback_to_local:
+                    route_selected = "local"
+                else:
+                    route_selected = "a2a"
+                    remote_agent_id = agent.id
+
+        idempotency_key = message.parts[0].data.get("idempotency_key") if message.parts and message.parts[0].data else None
+        metadata = message.parts[0].data.get("metadata", {}) if message.parts and message.parts[0].data else {}
+
+        task = a2a_runtime.create_task(
+            db,
+            project_id=project_id,
+            tenant_id=current_user.id,
+            source=route_selected,
+            input_text=input_text,
+            idempotency_key=idempotency_key,
+            remote_agent_id=remote_agent_id,
+            compatibility_mode=config.compatibility_mode,
+            metadata={"route_selected": route_selected, "token_present": bool(x_a2a_token), "request_metadata": metadata},
+            context_id=context_id,
+        )
+
+        msg_record = A2AMessage(
+            message_id=message_id_str,
+            context_id=context_id,
+            task_id=task.id,
+            role=message.role,
+            extensions_json=_json_dumps(message.extensions or {}),
+            reference_task_ids_json=_json_dumps(message.referenceTaskIds or []),
+        )
+        db.add(msg_record)
+        for idx, part in enumerate(message.parts):
+            part_record = A2APart(
+                message_id=msg_record.id,
+                part_type=part.part_type,
+                text_content=part.text,
+                raw_content=part.raw,
+                url_content=part.url,
+                data_content=str(part.data) if part.data else None,
+                media_type=part.mediaType,
+                filename=part.filename,
+                metadata_json=_json_dumps(part.metadata or {}),
+            )
+            db.add(part_record)
+
+        task.context_id = context_id
+        db.commit()
+        task_context_id = task.context_id
+
+        event_payload = _build_status_event(task, compatibility_mode=config.compatibility_mode, dual_event_write=config.dual_event_write)
+        event_row = a2a_runtime.append_event(db, task, "TaskStatusUpdateEvent", event_payload)
+        await a2a_runtime.publish(task.id, event_payload)
+        await a2a_runtime.notify_webhooks(db, task, event_row)
+        asyncio.create_task(_run_task(task.id, request, current_user.id))
+        task_id = task.id
+
+    async def _collect_events_to_queue(task_id: str, queue: asyncio.Queue, context_id: Optional[str]) -> None:
+        try:
+            history = (
+                db.query(A2ATaskEvent)
+                .filter(A2ATaskEvent.task_id == task_id)
+                .order_by(A2ATaskEvent.id.asc())
+                .all()
+            )
+            for item in history:
+                payload = _json_loads(item.payload_json, {})
+                if payload.get("type") == "TaskStatusUpdateEvent":
+                    task_obj = db.query(A2ATask).filter(A2ATask.id == task_id).first()
+                    event = TaskStatusUpdateEvent(
+                        taskId=task_id,
+                        contextId=task_obj.context_id if task_obj else context_id,
+                        status=A2ATaskStatusSchema(
+                            state=SchemaTaskState(payload.get("task_status", "WORKING")),
+                            timestamp=datetime.utcnow(),
+                        ),
+                        metadata=payload.get("metadata", {}),
+                    )
+                    await queue.put(("TaskStatusUpdateEvent", event.model_dump(mode='json')))
+                elif payload.get("type") == "TaskArtifactUpdateEvent":
+                    task_obj = db.query(A2ATask).filter(A2ATask.id == task_id).first()
+                    content = payload.get("artifact", {}).get("content", "")
+                    event = TaskArtifactUpdateEvent(
+                        taskId=task_id,
+                        contextId=task_obj.context_id if task_obj else context_id,
+                        artifact=A2AArtifactSchema(
+                            artifactId=f"artifact-{item.id}",
+                            parts=[A2APartSchema(part_type="text", text=content)],
+                        ),
+                        append=False,
+                        lastChunk=True,
+                    )
+                    await queue.put(("TaskArtifactUpdateEvent", event.model_dump(mode='json')))
+                elif payload.get("type") == "Message":
+                    msg_event = TaskMessageEvent(
+                        message=A2AMessageSchema(
+                            messageId=payload.get("messageId", ""),
+                            contextId=payload.get("contextId", context_id),
+                            taskId=task_id,
+                            role=A2AMessageRole(payload.get("role", "agent")),
+                            parts=[A2APartSchema(part_type="text", text=payload.get("content", ""))],
+                        )
+                    )
+                    await queue.put(("Message", msg_event.model_dump(mode='json')))
+                else:
+                    await queue.put(("raw", payload))
+
+            async for payload in a2a_runtime.subscribe(task_id):
+                if payload.get("type") == "TaskStatusUpdateEvent":
+                    task_obj = db.query(A2ATask).filter(A2ATask.id == task_id).first()
+                    event = TaskStatusUpdateEvent(
+                        taskId=task_id,
+                        contextId=task_obj.context_id if task_obj else context_id,
+                        status=A2ATaskStatusSchema(
+                            state=SchemaTaskState(payload.get("task_status", "WORKING")),
+                            timestamp=datetime.utcnow(),
+                        ),
+                        metadata=payload.get("metadata", {}),
+                    )
+                    await queue.put(("TaskStatusUpdateEvent", event.model_dump(mode='json')))
+                elif payload.get("type") == "TaskArtifactUpdateEvent":
+                    task_obj = db.query(A2ATask).filter(A2ATask.id == task_id).first()
+                    content = payload.get("artifact", {}).get("content", "")
+                    event = TaskArtifactUpdateEvent(
+                        taskId=task_id,
+                        contextId=task_obj.context_id if task_obj else context_id,
+                        artifact=A2AArtifactSchema(
+                            artifactId=f"artifact-stream-{datetime.utcnow().timestamp()}",
+                            parts=[A2APartSchema(part_type="text", text=content)],
+                        ),
+                        append=False,
+                        lastChunk=True,
+                    )
+                    await queue.put(("TaskArtifactUpdateEvent", event.model_dump(mode='json')))
+                elif payload.get("type") == "Message":
+                    msg_event = TaskMessageEvent(
+                        message=A2AMessageSchema(
+                            messageId=payload.get("messageId", ""),
+                            contextId=payload.get("contextId", context_id),
+                            taskId=task_id,
+                            role=A2AMessageRole(payload.get("role", "agent")),
+                            parts=[A2APartSchema(part_type="text", text=payload.get("content", ""))],
+                        )
+                    )
+                    await queue.put(("Message", msg_event.model_dump(mode='json')))
+                else:
+                    await queue.put(("raw", payload))
+
+                if payload.get("task_status") in {"COMPLETED", "FAILED", "CANCELED", "REJECTED"}:
+                    await queue.put(("terminal", None))
+                    break
+        except Exception:
+            await queue.put(("error", None))
+        finally:
+            await queue.put(("close", None))
 
     async def event_generator():
-        history = (
-            db.query(A2ATaskEvent)
-            .filter(A2ATaskEvent.task_id == task_id)
-            .order_by(A2ATaskEvent.id.asc())
-            .all()
-        )
-        for item in history:
-            payload = _json_loads(item.payload_json, {})
-            yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
-        async for payload in a2a_runtime.subscribe(task_id):
-            yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
-            if payload.get("task_status") in {"COMPLETED", "FAILED", "CANCELED", "REJECTED"}:
-                break
-        yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+        queue: asyncio.Queue = asyncio.Queue(maxsize=200)
+        collector = asyncio.create_task(_collect_events_to_queue(task_id, queue, task_context_id))
 
-    return StreamingResponse(
+        message_only = True
+        while True:
+            event_type, event_data = await queue.get()
+            if event_type == "close":
+                break
+            if event_type == "error":
+                break
+            if event_type == "terminal":
+                yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+                break
+            if event_type in ("TaskStatusUpdateEvent", "TaskArtifactUpdateEvent"):
+                message_only = False
+            yield f"data: {json.dumps(event_data, ensure_ascii=False, default=_json_serialize)}\n\n"
+            if event_type == "Message":
+                break
+
+        if message_only:
+            yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+
+        collector.cancel()
+
+    return A2AStreamingResponse(
         event_generator(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
     )
 
 
-@router.get("/tasks/{task_id}", response_model=TaskView)
+@router.get("/tasks/{{task_id}}")
 def get_task(
     task_id: str,
+    response: Response,
+    historyLength: Optional[int] = Query(default=None, description="Number of history messages to include"),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
-) -> TaskView:
+    _version_check: None = Depends(verify_a2a_version),
+) -> A2ATaskWithHistorySchema:
     task = _ensure_task_access(db, task_id, current_user)
-    return _task_to_view(task)
+    return _task_to_with_history(task, history_length=historyLength)
 
 
-@router.get("/tasks", response_model=List[TaskView])
+@router.get("/tasks")
 def list_tasks(
-    project_id: Optional[int] = Query(default=None),
-    state: Optional[str] = Query(default=None),
-    skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=50, ge=1, le=200),
+    response: Response,
+    contextId: Optional[str] = Query(default=None, description="Filter by context ID"),
+    status: Optional[SchemaTaskState] = Query(default=None, description="Filter by task status"),
+    pageSize: int = Query(default=20, ge=1, le=100, description="Number of items per page"),
+    pageToken: Optional[str] = Query(default=None, description="Pagination token"),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
-) -> List[TaskView]:
+    _version_check: None = Depends(verify_a2a_version),
+) -> Dict[str, Any]:
     query = db.query(A2ATask)
     if not current_user.is_admin:
         query = query.filter(A2ATask.tenant_id == current_user.id)
-    if project_id is not None:
-        _ensure_project_access(db, project_id, current_user)
-        query = query.filter(A2ATask.project_id == project_id)
-    if state:
-        query = query.filter(A2ATask.state == state)
-    tasks = query.order_by(A2ATask.created_at.desc()).offset(skip).limit(limit).all()
-    return [_task_to_view(item) for item in tasks]
+
+    if contextId:
+        query = query.filter(A2ATask.context_id == contextId)
+    if status:
+        query = query.filter(A2ATask.state == A2ATaskState(status.value))
+
+    total = query.count()
+    tasks = query.order_by(A2ATask.created_at.desc()).offset(0).limit(pageSize).all()
+
+    task_schemas = [_task_to_schema(item) for item in tasks]
+
+    return {
+        "items": [t.model_dump(mode='json') for t in task_schemas],
+        "nextPageToken": str(tasks[-1].id) if tasks else None,
+        "contextId": contextId,
+    }
 
 
-@router.post("/tasks/{task_id}/cancel", response_model=CancelTaskResponse)
+@router.post("/tasks/{task_id}:cancel")
 async def cancel_task(
     task_id: str,
+    request: CancelTaskRequest,
+    response: Response,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
+    _version_check: None = Depends(verify_a2a_version),
 ) -> CancelTaskResponse:
     task = _ensure_task_access(db, task_id, current_user)
-    if task.state in {"COMPLETED", "FAILED", "CANCELED", "REJECTED"}:
-        return CancelTaskResponse(task_id=task.id, state=task.state)
+    if task.state in {A2ATaskState.COMPLETED, A2ATaskState.FAILED, A2ATaskState.CANCELED, A2ATaskState.REJECTED}:
+        return CancelTaskResponse(task_id=task.id, state=task.state.value)
     try:
-        task = a2a_runtime.transition_task(db, task, to_state="CANCELED")
+        task = a2a_runtime.transition_task(db, task, to_state=A2ATaskState.CANCELED)
     except ValueError:
         raise HTTPException(status_code=409, detail="Task state transition conflict")
     config = a2a_runtime.get_project_config(db, task.project_id, current_user.id)
@@ -639,44 +1413,232 @@ async def cancel_task(
         project_id=task.project_id,
         task_id=task.id,
     )
-    return CancelTaskResponse(task_id=task.id, state=task.state)
+    return CancelTaskResponse(task_id=task.id, state=task.state.value)
 
 
-@router.get("/tasks/{task_id}/subscribe")
+@router.get("/tasks/{task_id}:subscribe")
 async def subscribe_task(
     task_id: str,
+    response: Response,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
+    _version_check: None = Depends(verify_a2a_version),
 ) -> StreamingResponse:
     task = _ensure_task_access(db, task_id, current_user)
-    initial_events = (
-        db.query(A2ATaskEvent)
-        .filter(A2ATaskEvent.task_id == task.id)
-        .order_by(A2ATaskEvent.id.asc())
-        .all()
-    )
+
+    async def _collect_subscribe_events_to_queue(task_id: str, queue: asyncio.Queue, context_id: Optional[str]) -> None:
+        try:
+            initial_events = (
+                db.query(A2ATaskEvent)
+                .filter(A2ATaskEvent.task_id == task_id)
+                .order_by(A2ATaskEvent.id.asc())
+                .all()
+            )
+            for event in initial_events:
+                payload = _json_loads(event.payload_json, {})
+                if payload.get("type") == "TaskStatusUpdateEvent":
+                    evt = TaskStatusUpdateEvent(
+                        taskId=task_id,
+                        contextId=context_id,
+                        status=A2ATaskStatusSchema(
+                            state=SchemaTaskState(payload.get("task_status", "WORKING")),
+                            timestamp=datetime.utcnow(),
+                        ),
+                        metadata=payload.get("metadata", {}),
+                    )
+                    await queue.put(("TaskStatusUpdateEvent", evt.model_dump(mode='json')))
+                elif payload.get("type") == "TaskArtifactUpdateEvent":
+                    content = payload.get("artifact", {}).get("content", "")
+                    evt = TaskArtifactUpdateEvent(
+                        taskId=task_id,
+                        contextId=context_id,
+                        artifact=A2AArtifactSchema(
+                            artifactId=f"artifact-{event.id}",
+                            parts=[A2APartSchema(part_type="text", text=content)],
+                        ),
+                        append=False,
+                        lastChunk=True,
+                    )
+                    await queue.put(("TaskArtifactUpdateEvent", evt.model_dump(mode='json')))
+                elif payload.get("type") == "Message":
+                    msg_event = TaskMessageEvent(
+                        message=A2AMessageSchema(
+                            messageId=payload.get("messageId", ""),
+                            contextId=payload.get("contextId", context_id),
+                            taskId=task_id,
+                            role=A2AMessageRole(payload.get("role", "agent")),
+                            parts=[A2APartSchema(part_type="text", text=payload.get("content", ""))],
+                        )
+                    )
+                    await queue.put(("Message", msg_event.model_dump(mode='json')))
+                else:
+                    await queue.put(("raw", payload))
+
+            if task.state in {A2ATaskState.COMPLETED, A2ATaskState.FAILED, A2ATaskState.CANCELED, A2ATaskState.REJECTED}:
+                await queue.put(("terminal", None))
+                return
+
+            async for payload in a2a_runtime.subscribe(task.id):
+                if payload.get("type") == "TaskStatusUpdateEvent":
+                    evt = TaskStatusUpdateEvent(
+                        taskId=task_id,
+                        contextId=context_id,
+                        status=A2ATaskStatusSchema(
+                            state=SchemaTaskState(payload.get("task_status", "WORKING")),
+                            timestamp=datetime.utcnow(),
+                        ),
+                        metadata=payload.get("metadata", {}),
+                    )
+                    await queue.put(("TaskStatusUpdateEvent", evt.model_dump(mode='json')))
+                elif payload.get("type") == "TaskArtifactUpdateEvent":
+                    content = payload.get("artifact", {}).get("content", "")
+                    evt = TaskArtifactUpdateEvent(
+                        taskId=task_id,
+                        contextId=context_id,
+                        artifact=A2AArtifactSchema(
+                            artifactId=f"artifact-stream-{datetime.utcnow().timestamp()}",
+                            parts=[A2APartSchema(part_type="text", text=content)],
+                        ),
+                        append=False,
+                        lastChunk=True,
+                    )
+                    await queue.put(("TaskArtifactUpdateEvent", evt.model_dump(mode='json')))
+                elif payload.get("type") == "Message":
+                    msg_event = TaskMessageEvent(
+                        message=A2AMessageSchema(
+                            messageId=payload.get("messageId", ""),
+                            contextId=payload.get("contextId", context_id),
+                            taskId=task_id,
+                            role=A2AMessageRole(payload.get("role", "agent")),
+                            parts=[A2APartSchema(part_type="text", text=payload.get("content", ""))],
+                        )
+                    )
+                    await queue.put(("Message", msg_event.model_dump(mode='json')))
+                else:
+                    await queue.put(("raw", payload))
+
+                if payload.get("task_status") in {"COMPLETED", "FAILED", "CANCELED", "REJECTED"}:
+                    await queue.put(("terminal", None))
+                    break
+        except Exception:
+            await queue.put(("error", None))
+        finally:
+            await queue.put(("close", None))
 
     async def event_generator():
-        for event in initial_events:
-            payload = _json_loads(event.payload_json, {})
-            yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
-        if task.state in {"COMPLETED", "FAILED", "CANCELED", "REJECTED"}:
-            yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
-            return
-        async for payload in a2a_runtime.subscribe(task.id):
-            yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
-            if payload.get("task_status") in {"COMPLETED", "FAILED", "CANCELED", "REJECTED"}:
-                break
-        yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+        queue: asyncio.Queue = asyncio.Queue(maxsize=200)
+        collector = asyncio.create_task(_collect_subscribe_events_to_queue(task_id, queue, task.context_id))
 
-    return StreamingResponse(
+        while True:
+            event_type, event_data = await queue.get()
+            if event_type == "close":
+                break
+            if event_type == "error":
+                break
+            if event_type == "terminal":
+                yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+                break
+            yield f"data: {json.dumps(event_data, ensure_ascii=False, default=_json_serialize)}\n\n"
+            if event_type == "Message":
+                break
+
+        yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+        collector.cancel()
+
+    return A2AStreamingResponse(
         event_generator(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
     )
 
 
-@router.get("/tasks/{task_id}/webhooks", response_model=List[TaskWebhookView])
+@router.post("/tasks/{task_id}/pushNotificationConfigs", response_model=PushNotificationConfig, status_code=status.HTTP_201_CREATED)
+def create_push_notification_config(
+    task_id: str,
+    payload: PushNotificationConfigCreate,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+    _version_check: None = Depends(verify_a2a_version),
+) -> PushNotificationConfig:
+    task = _ensure_task_access(db, task_id, current_user)
+    item = A2ATaskWebhook(
+        task_id=task.id,
+        target_url=payload.targetUrl,
+        secret=payload.secret,
+        auth_header=payload.authHeader,
+        enabled=payload.enabled,
+        created_by=current_user.id,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return PushNotificationConfig(
+        id=item.id,
+        taskId=item.task_id,
+        targetUrl=item.target_url,
+        secret=item.secret,
+        authHeader=item.auth_header,
+        enabled=item.enabled,
+        createdBy=item.created_by,
+        createdAt=item.created_at,
+    )
+
+
+@router.get("/tasks/{task_id}/pushNotificationConfigs", response_model=List[PushNotificationConfig])
+def list_push_notification_configs(
+    task_id: str,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+    _version_check: None = Depends(verify_a2a_version),
+) -> List[PushNotificationConfig]:
+    task = _ensure_task_access(db, task_id, current_user)
+    items = db.query(A2ATaskWebhook).filter(A2ATaskWebhook.task_id == task.id).order_by(A2ATaskWebhook.id.desc()).all()
+    return [
+        PushNotificationConfig(
+            id=item.id,
+            taskId=item.task_id,
+            targetUrl=item.target_url,
+            secret=item.secret,
+            authHeader=item.auth_header,
+            enabled=item.enabled,
+            createdBy=item.created_by,
+            createdAt=item.created_at,
+        )
+        for item in items
+    ]
+
+
+@router.delete("/tasks/{task_id}/pushNotificationConfigs/{config_id}")
+def delete_push_notification_config(
+    task_id: str,
+    config_id: int,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+    _version_check: None = Depends(verify_a2a_version),
+) -> Dict[str, str]:
+    task = _ensure_task_access(db, task_id, current_user)
+    item = db.query(A2ATaskWebhook).filter(
+        A2ATaskWebhook.id == config_id,
+        A2ATaskWebhook.task_id == task.id,
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Push notification config not found")
+    db.delete(item)
+    db.commit()
+    return {"status": "success"}
+
+
+@router.get(f"{A2A_API_PREFIX}/extendedAgentCard", response_model=AgentCardExtendedSchema)
+def get_extended_agent_card(
+    current_user: CurrentUser = Depends(get_current_user),
+) -> AgentCardExtendedSchema:
+    return _build_extended_agent_card(current_user)
+
+
+@router.get(f"{A2A_API_PREFIX}/tasks/{{task_id}}/webhooks", response_model=List[TaskWebhookView])
 def list_task_webhooks(
     task_id: str,
     db: Session = Depends(get_db),
@@ -697,7 +1659,7 @@ def list_task_webhooks(
     ]
 
 
-@router.post("/tasks/{task_id}/webhooks", response_model=TaskWebhookView, status_code=status.HTTP_201_CREATED)
+@router.post(f"{A2A_API_PREFIX}/tasks/{{task_id}}/webhooks", response_model=TaskWebhookView, status_code=status.HTTP_201_CREATED)
 def create_task_webhook(
     task_id: str,
     payload: TaskWebhookCreate,
@@ -735,7 +1697,7 @@ def create_task_webhook(
     )
 
 
-@router.delete("/tasks/{task_id}/webhooks/{webhook_id}")
+@router.delete(f"{A2A_API_PREFIX}/tasks/{{task_id}}/webhooks/{{webhook_id}}")
 def delete_task_webhook(
     task_id: str,
     webhook_id: int,
@@ -751,7 +1713,7 @@ def delete_task_webhook(
     return {"status": "success"}
 
 
-@router.post("/webhook-deliveries/{delivery_id}/replay")
+@router.post(f"{A2A_API_PREFIX}/webhook-deliveries/{{delivery_id}}/replay")
 async def replay_delivery(
     delivery_id: int,
     db: Session = Depends(get_db),
@@ -769,14 +1731,14 @@ async def replay_delivery(
     return {"status": delivery.status, "attempt": delivery.attempt, "dead_letter": delivery.dead_letter, "task_id": task.id}
 
 
-@router.get("/metrics")
+@router.get(f"{A2A_API_PREFIX}/metrics")
 async def get_metrics(current_user: CurrentUser = Depends(get_current_user)) -> Dict[str, Any]:
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Admin permission required")
     return await a2a_runtime.metrics.snapshot()
 
 
-@router.get("/projects/{project_id}/rollout", response_model=RolloutConfigView)
+@router.get(f"{A2A_API_PREFIX}/projects/{{project_id}}/rollout", response_model=RolloutConfigView)
 def get_rollout_config(
     project_id: int,
     db: Session = Depends(get_db),
@@ -797,7 +1759,7 @@ def get_rollout_config(
     )
 
 
-@router.put("/projects/{project_id}/rollout", response_model=RolloutConfigView)
+@router.put(f"{A2A_API_PREFIX}/projects/{{project_id}}/rollout", response_model=RolloutConfigView)
 def update_rollout_config(
     project_id: int,
     payload: RolloutConfigUpdate,
@@ -841,7 +1803,7 @@ def update_rollout_config(
     )
 
 
-@router.get("/alerts")
+@router.get(f"{A2A_API_PREFIX}/alerts")
 def get_alert_panel(
     project_id: int,
     db: Session = Depends(get_db),
@@ -855,11 +1817,11 @@ def get_alert_panel(
     return {
         "project_id": project_id,
         "thresholds": merged,
-        "panel": {"metrics_endpoint": "/api/v1/a2a/metrics", "task_list_endpoint": "/api/v1/a2a/tasks"},
+        "panel": {"metrics_endpoint": "/api/v1/a2a/metrics", "task_list_endpoint": "/tasks"},
     }
 
 
-@router.get("/audit-logs")
+@router.get(f"{A2A_API_PREFIX}/audit-logs")
 def list_audit_logs(
     project_id: Optional[int] = Query(default=None),
     skip: int = Query(default=0, ge=0),
