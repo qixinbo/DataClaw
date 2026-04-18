@@ -49,12 +49,38 @@ Whether you're querying a massive Supabase/PostgreSQL database or just tossing i
 
 ## 🏗️ Architecture
 
-DataClaw is divided into three main claws (components):
+DataClaw's architecture mainly consists of four core components:
 
 1. **`frontend/`** 🎨: The shiny shell. Built with **React 19**, **Vite**, **TailwindCSS**, and **Zustand**. It features a chat-like interface, streaming AI responses, and interactive Vega charts.
 2. **`backend/`** ⚙️: The muscle. A **FastAPI** application managing projects, data source connections, user sessions, and API gateways.
 3. **`nanobot/`** 🧠: The brain. The core AI agent framework handling NL2SQL, schema caching, prompt injection, and LLM routing.
 4. **`data/`** 🗄️: Runtime data root. Decoupled from code directories and used for uploads, sessions, workspace skills, reports, and cached configs.
+
+```mermaid
+graph TD
+    User([👤 User / Browser]) -->|HTTP / WebSocket| Frontend
+    
+    subgraph DataClaw System
+        Frontend[🎨 frontend<br/>React / Vite / Zustand]
+        Backend[⚙️ backend<br/>FastAPI / Session / Data Sources]
+        Nanobot[🧠 nanobot<br/>AI Agent / NL2SQL / RAG]
+        Data[🗄️ data<br/>Runtime Files / Artifacts]
+        
+        Frontend -->|REST API / SSE| Backend
+        Backend <-->|Task Delegation / Calling| Nanobot
+        Backend -->|Read / Write| Data
+        Nanobot -->|Read / Write| Data
+    end
+    
+    subgraph External Services
+        LLM([🤖 LLM Providers<br/>OpenAI, DeepSeek, etc.])
+        DB[(📊 Data Sources<br/>PostgreSQL, CSV, Supabase)]
+    end
+    
+    Nanobot <-->|Prompt / Completion| LLM
+    Backend <-->|Connect / Query| DB
+    Nanobot -.->|Schema Retrieval / Exec| DB
+```
 
 ***
 

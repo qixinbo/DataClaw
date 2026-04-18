@@ -49,12 +49,38 @@
 
 ## 🏗️ 项目架构
 
-DataClaw 的架构主要分为三只“大钳子”：
+DataClaw 的架构主要由四个核心部分组成：
 
 1. **`frontend/`** 🎨: 闪亮的外壳。基于 **React 19**、**Vite**、**TailwindCSS** 和 **Zustand** 构建。拥有类似微信/ChatGPT的对话界面、支持流式思考过程渲染以及交互式图表展示。
 2. **`backend/`** ⚙️: 强健的肌肉。一个 **FastAPI** 后端服务，负责管理项目、数据源连接、用户会话持久化以及作为 API 网关。
 3. **`nanobot/`** 🧠: 智慧的大脑。核心的 AI Agent 框架，负责处理意图路由、NL2SQL 转换、Schema 缓存管理以及与 LLM 的底层交互。
 4. **`data/`** 🗄️: 运行时数据目录。与代码目录解耦，存放上传文件、会话、技能工作区、报告与配置缓存。
+
+```mermaid
+graph TD
+    User([👤 用户 / 浏览器]) -->|HTTP / WebSocket| Frontend
+    
+    subgraph DataClaw 系统
+        Frontend[🎨 frontend<br/>React / Vite / Zustand]
+        Backend[⚙️ backend<br/>FastAPI / 会话 / 数据源管理]
+        Nanobot[🧠 nanobot<br/>AI Agent / NL2SQL / RAG]
+        Data[🗄️ data<br/>运行时文件 / 产物缓存]
+        
+        Frontend -->|REST API / SSE| Backend
+        Backend <-->|任务委派 / 函数调用| Nanobot
+        Backend -->|读写| Data
+        Nanobot -->|读写| Data
+    end
+    
+    subgraph 外部服务与数据
+        LLM([🤖 LLM 供应商<br/>OpenAI, DeepSeek, 智谱等])
+        DB[(📊 数据源<br/>PostgreSQL, CSV, Supabase等)]
+    end
+    
+    Nanobot <-->|Prompt / Completion| LLM
+    Backend <-->|连接 / 查询| DB
+    Nanobot -.->|Schema 检索 / SQL 执行| DB
+```
 
 ***
 
